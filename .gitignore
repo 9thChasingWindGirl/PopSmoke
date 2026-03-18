@@ -1,0 +1,44 @@
+# Logs
+/logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.trae
+.traerc
+.env
+.env.example
+
+# Editor directories and files
+.vscode/
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env.local
+ANDROID_BUILD.md
+ANDROID_ICONS.md
+ANDROID_PACKAGE_CHECK.md
+
+# Android / Capacitor (仅 android 分支需要)
+#android/
+#capacitor.config.json
+#build-extras.gradle
+#icons/
+#public/manifest.json
+#public/android-chrome-*.png
+#.github/workflows/build-android.yml
+
+# Figma prototypes
+figma-prototypes/

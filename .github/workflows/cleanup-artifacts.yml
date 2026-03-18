@@ -1,0 +1,22 @@
+name: 清理旧构建产物
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    
+    steps:
+      - name: 清理超过 7 天的构建产物
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: '7 days'
+          skip-recent: 3
+          
+      - name: 清理完成
+        run: echo "构建产物清理完成"

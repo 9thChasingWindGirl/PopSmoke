@@ -1,0 +1,336 @@
+import { Language } from '../types';
+
+export const i18n_KO = {
+  // ============ App Level / Common ============
+  appTitle: '흡연',
+  appSubtitle: '관리',
+  tracker: '기록',
+  notificationSuccess: '성공！',
+  notificationError: '오류！',
+  notificationInfo: '정보',
+  notificationWarning: '경고！',
+  
+  // ============ Navigation ============
+  analysis: '분석',
+  settings: '설정',
+  history: '기록',
+  
+  // ============ Dashboard ============
+  lastRecord: '마지막 기록',
+  smokeButton: '흡연',
+  clickToLog: '기록하기',
+  todayLogs: '오늘의 기록',
+  noRecords: '오늘 기록 없음',
+  currentGaugeLevel: '오늘의 흡연 수',
+  smokeUnit: '개',
+  
+  // ============ Settings - Threshold ============
+  dailyLimit: '일일 한도',
+  warningLimit: '경고 수준',
+  thresholdSettings: '임계값 설정',
+  
+  // ============ Settings - Theme & Language ============
+  themeColor: '테마 색상',
+  language: '언어 / Language',
+  customHex: '사용자 지정 색상',
+  customColor: '사용자 지정 색상',
+  theme: '테마',
+  
+  // ============ Dashboard - Messages ============
+  warningMsg: '경고: 일일 한도에 근접!',
+  limitReachedMsg: '일일 한도 도달!',
+  
+  // ============ Analysis - Export ============
+  totalCigarettes: '총 담배 수',
+  exportCSV: 'CSV 내보내기',
+  csvNote: '날짜, 시간 및 월별 그룹 태그가 포함됩니다.',
+  noDataToExport: '이번 달에 내보낼 데이터가 없습니다.',
+  exportSuccess: '내보내기 성공',
+  exportFailed: '내보내기 실패',
+  
+  // ============ Analysis - Statistics ============
+  weeklyFreq: '주간',
+  monthlyFreq: '월간',
+  thisWeek: '이번 주',
+  weekData: '주 데이터',
+  monthData: '월 데이터',
+  weekTotal: '이번 주 합계',
+  mostSmokedDay: '가장 많이 흡연한 요일',
+  monthTotal: '이번 달 합계',
+  lastMonthTotal: '지난 달 합계',
+  mostSmokedDate: '가장 많이 흡연한 날',
+  
+  // ============ Calendar / Weekdays ============
+  day: '일',
+  mon: '월',
+  tue: '화',
+  wed: '수',
+  thu: '목',
+  fri: '금',
+  sat: '토',
+  sun: '일',
+  
+  // ============ Common Actions ============
+  more: '더보기 / 편집',
+  back: '뒤로',
+  next: '다음',
+  prev: '이전',
+  delete: '삭제',
+  edit: '편집',
+  rename: '이름 변경',
+  reset: '재설정',
+  close: '닫기',
+  hide: '숨기기',
+  save: '저장',
+  cancel: '취소',
+  confirm: '확인',
+  editTime: '시간 편집',
+  never: '없음',
+  view: '보기',
+  about: '정보',
+  blog: '블로그',
+  github: 'GitHub',
+  stats: '통계',
+  data: '데이터',
+  hour: '시',
+  minute: '분',
+  count: '개수',
+  
+  // ============ History Page ============
+  clearLocalData: '로컬 데이터 지우기',
+  currentMonth: '현재 월',
+  prevMonth: '이전 월',
+  nextMonth: '다음 월',
+  confirmClearData: '데이터 지우기 확인',
+  cancelClearData: '취소',
+  clearDataWarning: '경고!',
+  clearDataMessage: '모든 로컬 데이터를 지우시겠습니까? 이 작업은 되돌릴 수 없습니다!',
+  clearData: '데이터 지우기',
+  clearDataConfirm: '이 작업은 모든 흡연 기록을 지웁니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?',
+  yesClear: '예, 지우기',
+  loadMore: '더 불러오기',
+  
+  // ============ Storage / Error ============
+  storageError: '저장소 오류',
+  storageErrorHint: '설정으로 이동하여 오래된 데이터를 삭제하고 공간을 확보하세요.',
+  goToSettings: '설정으로',
+  dismiss: '닫기',
+  
+  // ============ History - Filters & Sort ============
+  filtersAndSort: '필터 및 정렬',
+  startDate: '시작 날짜',
+  endDate: '종료 날짜',
+  minCount: '최소 수',
+  maxCount: '최대 수',
+  sortByDate: '날짜순 정렬',
+  sortByCount: '수량순 정렬',
+  resetFilters: '필터 재설정',
+  noMatchingRecords: '일치하는 기록 없음',
+  totalRecords: '총 기록 수',
+  filteredRecords: '필터링된 기록 수',
+  dateRange: '날짜 범위',
+  averagePerDay: '일일 평균',
+  prevPage: '이전 페이지',
+  nextPage: '다음 페이지',
+  
+  // ============ API Management - Feishu ============
+  feishuApi: 'Feishu API',
+  feishuApiSettings: 'Feishu API 설정',
+  feishuDataSync: 'Feishu 데이터 동기화',
+  apiUrl: 'API URL',
+  syncFromFeishu: 'Feishu에서 동기화',
+  syncToFeishu: 'Feishu로 동기화',
+  startSync: '동기화 시작',
+  syncing: '동기화 중...',
+  targetTableName: '대상 테이블 이름',
+  accessKey: '액세스 키',
+  accessKeyDialogTitle: '인증 비밀번호',
+  accessKeyDialogMessage: 'Feishu API 쓰기 액세스 키를 입력하세요:',
+  submitToFeishu: 'Feishu에 제출',
+  submitting: '제출 중...',
+  startSubmit: '제출 시작',
+  
+  // ============ API Management - Cloud Sync ============
+  cloudSync: '클라우드 동기화',
+  cloudSyncing: '동기화 중...',
+  loginFirst: '동기화하려면 먼저 로그인하세요',
+  syncSuccess: '동기화 성공',
+  syncFailed: '동기화 실패',
+  noNewRecordsToSync: '동기화할 새 레코드가 없습니다',
+  uploaded: '업로드됨',
+  downloaded: '다운로드됨',
+  records: '개',
+  
+  // ============ API Management - Feishu Sync Messages ============
+  feishuSyncSuccess: 'Feishu API에서 동기화 성공',
+  feishuSyncToStorage: 'Feishu API에서 로컬 스토리지로 동기화 성공',
+  feishuSyncToCloud: 'Feishu API에서 Supabase로 동기화 성공',
+  syncedRecordsFromFeishu: 'Feishu에서 {newCount}개의 새 레코드를 동기화했습니다（총：{totalCount}개，중복：{duplicateCount}개）',
+  
+  // ============ API Management - Import/Export Count ============
+  importedCount: '가져온 수',
+  totalCount: '총 수',
+  submittedCount: '제출 성공 수',
+  failedCount: '제출 실패 수',
+  
+  // ============ Auth - Sign In/Up ============
+  signIn: '로그인到Supabase',
+  signUp: '가입',
+  signOut: '로그아웃',
+  email: '이메일',
+  password: '비밀번호',
+  passwordPlaceholder: '비밀번호 입력',
+  noAccount: '계정이 없으신가요? 가입',
+  haveAccount: '이미 계정이 있으신가요? 로그인',
+  loading: '로딩 중...',
+  skipLogin: '로그인 건너뛰기, 로컬 모드 사용',
+  verifyEmail: '가입 성공! 이메일을 확인하고 확인 링크를 클릭하세요.',
+  localModeHint: '현재 로컬 모드 사용 중. 로그인하여 클라우드에 데이터 동기화',
+  
+  // ============ Auth - Account Management ============
+  accountManagement: '계정 관리',
+  uploadAvatar: '아바타 업로드',
+  uploading: '업로드 중...',
+  emailPlaceholder: '이메일 입력',
+  updateEmail: '이메일 업데이트',
+  phone: '전화번호',
+  phonePlaceholder: '전화번호 입력',
+  updatePhone: '전화번호 업데이트',
+  
+  // ============ Auth - Password Reset ============
+  resetPassword: '비밀번호 재설정',
+  currentPassword: '현재 비밀번호',
+  newPassword: '새 비밀번호',
+  confirmPassword: '비밀번호 확인',
+  passwordMinLength: '비밀번호는 6자 이상이어야 합니다',
+  passwordMismatch: '비밀번호가 일치하지 않습니다',
+  passwordResetSuccess: '비밀번호 재설정 성공',
+  passwordResetFailed: '비밀번호 재설정 실패',
+  currentPasswordIncorrect: '현재 비밀번호가 올바르지 않습니다',
+  signOutConfirm: '로그아웃 하시겠습니까?',
+  
+  // ============ Cloud Data Dialog ============
+  cloudDataFound: '클라우드 데이터 발견',
+  cloudDataFoundMessage: '클라우드 스토리지에 {count}개의 기록이 있습니다. 다운로드하시겠습니까?',
+  downloadFromCloud: '클라우드에서 다운로드',
+  skipDownload: '건너뛰기',
+  loginRequired: '로그인 필요',
+  loginRequiredMessage: 'Supabase API가 구성되었지만 로그인되지 않았습니다. 클라우드 데이터에 액세스하려면 로그인하세요.',
+  loginNow: '지금 로그인',
+  
+  // ============ API Management Page ============
+  apiManagement: 'API 관리',
+  api: 'API',
+  saveApiSettings: '저장',
+  securityPassword: '보안 비밀번호',
+  enterPassword: '보안 비밀번호 입력',
+  selectSyncSource: '동기화 소스 선택',
+  feishu: 'Feishu',
+  supabase: 'Supabase',
+  storageMethod: '스토리지 방식',
+  dataManagement: '데이터 관리',
+  storageUsage: '스토리지 사용량',
+  clearOldData: '로컬 데이터 지우기',
+  apiUrlDisplay: '저장된 API 설정',
+  apiConfigRequired: 'API 설정 필요',
+  syncFromFeishuOnly: 'Feishu에서 동기화',
+  syncFromSupabaseOnly: 'Supabase에서 동기화',
+  deleteApiSettings: 'API 설정 삭제',
+  confirmDeleteApiSettings: '저장된 API 설정을 삭제하시겠습니까?',
+  renameApiSettings: 'API 설정 이름 변경',
+  resetApiSettings: 'API 설정 재설정',
+  enterNewPassword: 'API 설정의 새 보안 비밀번호를 입력하세요:',
+  apiSettingsVerifyPassword: '저장된 API 설정에서 보안 비밀번호를 확인하여 수정하세요',
+  viewSavedApiSettings: '저장된 API 설정 보기',
+  
+  // ============ Login Restore ============
+  previousLoginFound: '이전 로그인 기록 발견',
+  previousLoginFoundMessage: '이전 로그인 기록이 발견되었습니다. 로그인 상태를 복원하시겠습니까? 먼저 보안 비밀번호를 확인해야 합니다.',
+  restoreLogin: '로그인 복원',
+  continueLocalMode: '로컬 모드 계속',
+  enterSecurityPasswordForRestore: '로그인 상태를 복원하려면 보안 비밀번호를 입력하세요',
+  
+  // ============ DatePicker ============
+  clear: '지우기',
+  today: '오늘',
+  selectDate: '날짜 선택',
+  selectStartDate: '시작 날짜 선택',
+  selectEndDate: '종료 날짜 선택',
+  
+  // ============ Months ============
+  january: '1월',
+  february: '2월',
+  march: '3월',
+  april: '4월',
+  may: '5월',
+  june: '6월',
+  july: '7월',
+  august: '8월',
+  september: '9월',
+  october: '10월',
+  november: '11월',
+  december: '12월',
+  
+  // ============ Weekdays Short ============
+  sunday: '일',
+  monday: '월',
+  tuesday: '화',
+  wednesday: '수',
+  thursday: '목',
+  friday: '금',
+  saturday: '토',
+  
+  // ============ Color Picker ============
+  presetColors: '프리셋 색상',
+  
+  // ============ Font Attribution ============
+  fontAttribution: '본 앱은 Huawei Device Co., Ltd.에서 제공하는 HarmonyOS Sans 글꼴을 사용합니다.',
+  
+  // ============ API Management - Anon Key ============
+  anonKey: '익명 키',
+  
+  // ============ Analysis Page - Operation Log ============
+  operationLog: '작업 로그',
+  feishuPasswordRequired: 'Feishu API 설정이 암호화되어 있습니다. 복호화하려면 비밀번호를 입력하세요.',
+  
+  // ============ Settings - Messages ============
+  dataCleared: '데이터가 삭제되었습니다',
+  
+  // ============ Settings - Error Messages ============
+  bucketNotExist: '스토리지 버킷이 존재하지 않습니다. 관리자에게 문의하세요',
+  permissionDenied: '권한이 거부되었습니다. 버킷 설정을 확인하세요',
+  avatarUploadSuccess: '아바타가 성공적으로 업로드되었습니다',
+  avatarUploadFailed: '아바타 업로드 실패',
+  enterEmail: '이메일 주소를 입력하세요',
+  emailBindSuccess: '이메일이 성공적으로 바인딩되었습니다. 인증 이메일을 확인하세요',
+  emailBindFailed: '이메일 바인딩 실패',
+  passwordSameAsCurrent: '새 비밀번호는 현재 비밀번호와 같을 수 없습니다',
+  passwordRequirements: '비밀번호 요구사항: 6자 이상',
+  signOutFailed: '로그아웃 실패',
+  
+  // ============ Settings - Storage Info ============
+  used: '사용됨',
+  mb: 'MB',
+  
+  // ============ Settings - Language Names ============
+  chinese: '중국어',
+  japanese: '일본어',
+  korean: '한국어',
+  
+  // ============ Operation Log Component ============
+  noOperationRecords: '작업 기록 없음',
+  showRecent5: '최근 5개 표시',
+  showAll: '모두 표시',
+  clearAll: '모두 지우기',
+  createLog: '생성',
+  updateLog: '수정',
+  deleteLog: '삭제',
+  
+  // ============ External Link Warning ============
+  externalLinkWarningTitle: '외부 링크',
+  externalLinkWarningMessage: '외부 웹사이트에 방문하려고 합니다:',
+  externalLinkContinue: '계속',
+  externalLinkCancel: '취소'
+};
+
+export type I18nKO = typeof i18n_KO;

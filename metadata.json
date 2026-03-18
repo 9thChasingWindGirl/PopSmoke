@@ -1,0 +1,5 @@
+{
+  "name": "PopSmoke Tracker",
+  "description": "A Pop Art styled smoking tracker with visual analytics and threshold alerts.",
+  "requestFramePermissions": []
+}
