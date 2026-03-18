@@ -1198,7 +1198,7 @@ export default function App() {
         downloadText={t.downloadFromCloud}
         loginText={t.loginNow}
         skipText={t.skipDownload}
-        requirePassword={cloudDataSource === 'feishu'}
+        requirePassword={!!cloudDataSource}
         passwordPlaceholder={t.enterPassword || 'Enter password'}
       />
 

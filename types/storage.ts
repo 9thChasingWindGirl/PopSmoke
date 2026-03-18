@@ -1,8 +1,8 @@
 export interface SmokeLog {
   id: string;
   user_id: string;
-  table_id?: string;
-  table_name?: string;
+  table_id?: string | null;
+  table_name?: string | null;
   record_date: string;
   record_time: string;
   record_index: number;

@@ -212,16 +212,29 @@ const generateLogId = (userId: string, recordDate: string, recordTime: string, i
 
 const getUniqueKey = (log: SmokeLog): string => `${log.user_id}_${log.record_date}_${log.record_time}`;
 
+const formatTimestamp = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
+  const microseconds = '000'; // JavaScript Date only provides millisecond precision, so we add 3 zeros for microseconds
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}${microseconds}+00`;
+};
+
 const completeLogFields = (log: SmokeLog): SmokeLog => ({
   ...log,
   user_id: log.user_id || 'local',
-  table_id: log.table_id || '',
-  table_name: log.table_name || '',
+  table_id: log.table_id ?? null,
+  table_name: log.table_name ?? null,
   record_date: log.record_date || '',
   record_time: log.record_time || '',
   record_index: log.record_index || 1,
   timestamp: log.timestamp || Date.now(),
-  created_at: log.created_at || new Date().toISOString()
+  created_at: log.created_at || formatTimestamp(new Date())
 });
 
 export const getFeishuApiSettings = async (): Promise<FeishuApiSettings> => {
@@ -416,7 +429,7 @@ export const convertToSmokeLogs = (tableData: FeishuTableData, userId?: string):
               record_time: recordTime,
               record_index: recordIndex,
               timestamp,
-              created_at: new Date().toISOString()
+              created_at: formatTimestamp(new Date())
             });
           }
         }
@@ -796,7 +809,8 @@ export const apiService = {
       timestamp: Date.now()
     };
 
-    const updatedLogs = [newLog, ...existingLogs];
+    const completedLog = completeLogFields(newLog);
+    const updatedLogs = [completedLog, ...existingLogs];
     await adapter.saveLogs(updatedLogs);
 
     if (userId) {
@@ -810,11 +824,11 @@ export const apiService = {
     EventHandle.publish({
       type: EventType.LOG_CREATE,
       category: 'data',
-      data: { success: true, log: newLog, logs: updatedLogs },
+      data: { success: true, log: completedLog, logs: updatedLogs },
       timestamp: Date.now()
     });
 
-    return newLog;
+    return completedLog;
   },
 
   async saveSettingsComplete(settings: AppSettings): Promise<void> {

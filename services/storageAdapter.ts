@@ -514,8 +514,8 @@ class SQLiteAdapter implements DataStorageAdapter {
           const values = batch.map(log => [
             log.id,
             log.user_id,
-            log.table_id || null,
-            log.table_name || null,
+            log.table_id ?? null,
+            log.table_name ?? null,
             log.record_date || null,
             log.record_time || null,
             log.record_index || 0,
