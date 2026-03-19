@@ -71,6 +71,10 @@ export default function App() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [showStorageErrorDialog, setShowStorageErrorDialog] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [showAuthErrorNotification, setShowAuthErrorNotification] = useState(false);
@@ -201,35 +205,45 @@ export default function App() {
             hasRuntimeSupabaseConfig: !!runtimeSupabaseConfig
           });
 
-          const currentUser = await authService.getCurrentUser();
-          if (currentUser.user) {
-            systemLogService.info('auth', '会话恢复成功', { userId: currentUser.user.id });
-            setShowAuthModal(false);
-            setShowPasswordReset(false);
-            setShowPreviousLoginDialog(false);
-            setShowRestorePasswordDialog(false);
-            setIsLocalMode(false);
-            setLoggedInFlag(true);
-            loadUserData(currentUser.user);
-          } else {
-            systemLogService.info('auth', '无活跃会话，检查保存的API设置');
-            if (savedApiSettings && localLogs?.length > 0) {
-              setShowPreviousLoginDialog(true);
+          setIsConnecting(true);
+          try {
+            const currentUser = await authService.getCurrentUser();
+            if (currentUser.user) {
+              systemLogService.info('auth', '会话恢复成功', { userId: currentUser.user.id });
+              setShowAuthModal(false);
+              setShowPasswordReset(false);
+              setShowPreviousLoginDialog(false);
+              setShowRestorePasswordDialog(false);
+              setIsLocalMode(false);
+              setLoggedInFlag(true);
+              loadUserData(currentUser.user);
             } else {
-              checkCloudDataAndShowDialog(
-                localLogs?.length || 0,
-                savedApiSettings,
-                false
-              );
+              systemLogService.info('auth', '无活跃会话，检查保存的API设置');
+              if (savedApiSettings && localLogs?.length > 0) {
+                setShowPreviousLoginDialog(true);
+              } else {
+                checkCloudDataAndShowDialog(
+                  localLogs?.length || 0,
+                  savedApiSettings,
+                  false
+                );
+              }
             }
+          } finally {
+            setIsConnecting(false);
           }
         } else {
           systemLogService.info('init', '首次启动，检查云端数据');
-          checkCloudDataAndShowDialog(
-            localLogs?.length || 0,
-            savedApiSettings,
-            false
-          );
+          setIsConnecting(true);
+          try {
+            checkCloudDataAndShowDialog(
+              localLogs?.length || 0,
+              savedApiSettings,
+              false
+            );
+          } finally {
+            setIsConnecting(false);
+          }
         }
       } catch (error) {
         systemLogService.error('init', '应用初始化失败', error as Error);
@@ -437,6 +451,7 @@ export default function App() {
       return { needPassword: false };
     }
 
+    setIsSyncing(true);
     try {
       const result = await apiService.downloadCloudData(
         cloudDataSource,
@@ -457,6 +472,8 @@ export default function App() {
     } catch (error) {
       console.error('Failed to download cloud data:', error);
       return { needPassword: false };
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -470,43 +487,48 @@ export default function App() {
   };
 
   const handleAuth = async () => {
+    setIsAuthenticating(true);
     let result: AuthState;
     
-    if (authMode === 'signin') {
-      result = await authService.signIn(email, password);
-      if (result.user && result.user.email_confirmed_at) {
-        const loginLog: OperationLogType = {
-          id: `login_${Date.now()}`,
-          type: 'sync',
-          data: { id: '', user_id: result.user.id, record_date: new Date().toISOString().split('T')[0], record_time: new Date().toTimeString().split(' ')[0].substring(0, 5), timestamp: Date.now() } as SmokeLog,
-          syncStatus: 'synced',
-          timestamp: Date.now(),
-          message: `登录成功: ${email}`
-        };
-        setOperationLogs(prev => [loginLog, ...prev]);
-        setShowAuthModal(false);
-        setIsLocalMode(false);
+    try {
+      if (authMode === 'signin') {
+        result = await authService.signIn(email, password);
+        if (result.user && result.user.email_confirmed_at) {
+          const loginLog: OperationLogType = {
+            id: `login_${Date.now()}`,
+            type: 'sync',
+            data: { id: '', user_id: result.user.id, record_date: new Date().toISOString().split('T')[0], record_time: new Date().toTimeString().split(' ')[0].substring(0, 5), timestamp: Date.now() } as SmokeLog,
+            syncStatus: 'synced',
+            timestamp: Date.now(),
+            message: `登录成功: ${email}`
+          };
+          setOperationLogs(prev => [loginLog, ...prev]);
+          setShowAuthModal(false);
+          setIsLocalMode(false);
+        }
+      } else {
+        result = await authService.signUp(email, password);
+        if (result.user) {
+          const signUpLog: OperationLogType = {
+            id: `signup_${Date.now()}`,
+            type: 'sync',
+            data: { id: '', user_id: result.user.id, record_date: new Date().toISOString().split('T')[0], record_time: new Date().toTimeString().split(' ')[0].substring(0, 5), timestamp: Date.now() } as SmokeLog,
+            syncStatus: 'pending',
+            timestamp: Date.now(),
+            message: `注册成功: ${email}，请验证邮箱`
+          };
+          setOperationLogs(prev => [signUpLog, ...prev]);
+          setAuthState({ user: null, loading: false, error: t.verifyEmail || '注册成功！请查收验证邮件并点击链接完成验证。' });
+          setShowAuthErrorNotification(true);
+          return;
+        }
       }
-    } else {
-      result = await authService.signUp(email, password);
-      if (result.user) {
-        const signUpLog: OperationLogType = {
-          id: `signup_${Date.now()}`,
-          type: 'sync',
-          data: { id: '', user_id: result.user.id, record_date: new Date().toISOString().split('T')[0], record_time: new Date().toTimeString().split(' ')[0].substring(0, 5), timestamp: Date.now() } as SmokeLog,
-          syncStatus: 'pending',
-          timestamp: Date.now(),
-          message: `注册成功: ${email}，请验证邮箱`
-        };
-        setOperationLogs(prev => [signUpLog, ...prev]);
-        setAuthState({ user: null, loading: false, error: t.verifyEmail || '注册成功！请查收验证邮件并点击链接完成验证。' });
+      
+      if (result.error) {
         setShowAuthErrorNotification(true);
-        return;
       }
-    }
-    
-    if (result.error) {
-      setShowAuthErrorNotification(true);
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -538,6 +560,7 @@ export default function App() {
 
   const handleRestoreLogin = async () => {
     setRestoreError(null);
+    setIsRestoring(true);
     
     try {
       const adapter = getStorageAdapter();
@@ -580,6 +603,8 @@ export default function App() {
       
     } catch (error) {
       setRestoreError(error instanceof Error ? error.message : '恢复登录失败');
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -791,7 +816,23 @@ export default function App() {
   };
 
   if (isLoading) {
-    return <PopLoading settings={settings} />;
+    return <PopLoading settings={settings} status="loading" />;
+  }
+  
+  if (isConnecting) {
+    return <PopLoading settings={settings} status="connecting" />;
+  }
+  
+  if (isSyncing) {
+    return <PopLoading settings={settings} status="syncing" />;
+  }
+  
+  if (isAuthenticating) {
+    return <PopLoading settings={settings} status="authenticating" />;
+  }
+  
+  if (isRestoring) {
+    return <PopLoading settings={settings} status="restoring" />;
   }
 
   const handlePasswordReset = async () => {
