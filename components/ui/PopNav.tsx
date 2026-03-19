@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ViewState, Language } from '../../types';
 import { PopColorPicker } from './PopColorPicker';
 import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
+import { Capacitor } from '@capacitor/core';
 
 interface PopNavProps {
   view: ViewState;
@@ -25,8 +26,14 @@ const PopNav: React.FC<PopNavProps> = ({
 }) => {
   const mobileColorPickerRef = useRef<HTMLDivElement>(null);
   const [showMobileColorPicker, setShowMobileColorPicker] = React.useState(false);
+  const [statusBarHeight, setStatusBarHeight] = useState(0);
 
-  // 点击外部关闭颜色选择器
+  useEffect(() => {
+    if (isAndroid && Capacitor.isNativePlatform()) {
+      setStatusBarHeight(24);
+    }
+  }, [isAndroid]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (mobileColorPickerRef.current && !mobileColorPickerRef.current.contains(event.target as Node)) {
@@ -40,9 +47,15 @@ const PopNav: React.FC<PopNavProps> = ({
     };
   }, []);
 
+  const navStyle = {
+    backgroundColor: 'white',
+    height: isAndroid ? `${60 + statusBarHeight}px` : '60px',
+    paddingTop: isAndroid ? `${statusBarHeight}px` : '0'
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-2 pt-4">
-      <nav className={`${POP_COMPONENT_STYLES.nav.header.container} ${isAndroid ? 'h-[100px] pt-12' : 'h-[60px]'}`} style={{ backgroundColor: 'white' }}>
+      <nav className={POP_COMPONENT_STYLES.nav.header.container} style={navStyle}>
         <div className={POP_COMPONENT_STYLES.nav.header.title} onClick={() => setView(ViewState.DASHBOARD)}>
           POP<span style={{ color: settings.themeColor }}>SMOKE</span>
         </div>

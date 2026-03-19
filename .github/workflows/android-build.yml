@@ -13,7 +13,6 @@ on:
 
 env:
   APP_NAME: 'PopSmoke'
-  APP_VERSION: '0.3.16'
 
 permissions:
   contents: write
@@ -22,11 +21,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ env.APP_VERSION }}
+      version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.build_info.outputs.build_number }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: 读取版本号
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "版本号: $VERSION"
 
       - name: 安装 pnpm
         uses: pnpm/action-setup@v4
@@ -107,9 +113,9 @@ jobs:
             ARCH=$(get_arch_name "$BASENAME")
             
             if [ -n "$ARCH" ]; then
-              NEW_NAME="${{ env.APP_NAME }}-v${{ env.APP_VERSION }}-${{ steps.build_info.outputs.build_number }}-${ARCH}.${EXT}"
+              NEW_NAME="${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}-${ARCH}.${EXT}"
             else
-              NEW_NAME="${{ env.APP_NAME }}-v${{ env.APP_VERSION }}-${{ steps.build_info.outputs.build_number }}.${EXT}"
+              NEW_NAME="${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.${EXT}"
             fi
             
             cp "$APK" "android/app/build/outputs/apk/final/$NEW_NAME"
@@ -119,12 +125,12 @@ jobs:
           # 也复制 universal APK（如果存在）作为主 APK
           UNIVERSAL_APK=$(echo "$APK_FILES" | grep -i "universal" | head -1)
           if [ -n "$UNIVERSAL_APK" ]; then
-            cp "$UNIVERSAL_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ env.APP_VERSION }}-${{ steps.build_info.outputs.build_number }}.apk"
+            cp "$UNIVERSAL_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.apk"
             echo "已复制 universal APK 作为主 APK"
           else
             # 如果没有 universal APK，使用第一个找到的
             FIRST_APK=$(echo "$APK_FILES" | head -1)
-            cp "$FIRST_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ env.APP_VERSION }}-${{ steps.build_info.outputs.build_number }}.apk"
+            cp "$FIRST_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.apk"
             echo "已复制第一个 APK 作为主 APK"
           fi
 

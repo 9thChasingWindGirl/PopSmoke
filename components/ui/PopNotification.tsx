@@ -446,24 +446,54 @@ interface PopLoadingProps {
   settings: AppSettings;
   language?: Language;
   message?: string;
+  status?: 'loading' | 'connecting' | 'syncing' | 'authenticating' | 'resetting' | 'restoring';
 }
 
 export const PopLoading: React.FC<PopLoadingProps> = ({
   settings,
   language = settings?.language || 'en',
-  message
+  message,
+  status = 'loading'
 }) => {
   const t = TRANSLATIONS[language as Language];
+  
+  const getDefaultMessage = () => {
+    if (message) return message;
+    
+    const statusMessages: Record<string, string> = {
+      loading: t.loading || '加载中...',
+      connecting: t.connecting || '连接中...',
+      syncing: t.syncing || '同步中...',
+      authenticating: t.authenticating || '认证中...',
+      resetting: t.resetting || '重置中...',
+      restoring: t.restoring || '恢复中...'
+    };
+    
+    return statusMessages[status] || t.loading || '加载中...';
+  };
+  
+  const getLoaderStyle = () => {
+    const statusColors: Record<string, string> = {
+      loading: 'border-black',
+      connecting: 'border-blue-600',
+      syncing: 'border-green-600',
+      authenticating: 'border-red-600',
+      resetting: 'border-pink-600',
+      restoring: 'border-teal-600'
+    };
+    
+    return statusColors[status] || 'border-black';
+  };
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-paper">
       <div className="flex flex-col items-center space-y-4">
-        <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+        <div className={`w-12 h-12 border-4 ${getLoaderStyle()} border-t-transparent rounded-full animate-spin`}></div>
         <div className="font-display text-xl">
           POP<span style={{ color: settings?.themeColor || '#FFD700' }}>SMOKE</span>
         </div>
         <div className="text-gray-600 text-sm">
-          {message || t.loading || '加载中...'}
+          {getDefaultMessage()}
         </div>
       </div>
     </div>

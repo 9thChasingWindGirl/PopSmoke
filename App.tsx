@@ -193,11 +193,10 @@ export default function App() {
           systemLogService.debug('storage', '应用本地日志数据');
         }
         
-        const shouldTryRestore = hasLoggedIn || (!!runtimeSupabaseConfig && isAndroid);
+        const shouldTryRestore = hasLoggedIn;
 
         if (shouldTryRestore) {
-          // Android: 只要有运行时Supabase配置就尝试恢复；Web: 按历史登录标记恢复
-          systemLogService.info('auth', `${isAndroid ? 'Android' : 'Web'}端尝试恢复会话`, {
+          systemLogService.info('auth', '尝试恢复会话', {
             hasLoggedIn,
             hasRuntimeSupabaseConfig: !!runtimeSupabaseConfig
           });

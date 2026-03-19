@@ -2,7 +2,7 @@ import React, { Component, ReactNode } from 'react';
 import { systemLogService } from '../services/systemLogService';
 import { handleError, getErrorInfo, type ErrorInfo as AppErrorInfo } from '../utils/errors/ErrorHandler';
 import { TRANSLATIONS } from '../i18n';
-import { getStorageAdapter } from '../services/storageAdapter';
+import { Language } from '../types';
 
 interface Props {
   children: ReactNode;
@@ -57,10 +57,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private getTranslations = () => {
     try {
-      const adapter = getStorageAdapter();
-      const settings = adapter.getSettingsSync();
-      const language = settings?.language || 'en';
-      return TRANSLATIONS[language] || TRANSLATIONS.en;
+      const stored = localStorage.getItem('popsmoke_settings');
+      if (stored) {
+        const settings = JSON.parse(stored);
+        const language = (settings?.language as Language) || 'en';
+        return TRANSLATIONS[language] || TRANSLATIONS.en;
+      }
+      return TRANSLATIONS.en;
     } catch {
       return TRANSLATIONS.en;
     }
