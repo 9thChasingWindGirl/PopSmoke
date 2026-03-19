@@ -925,7 +925,7 @@ export const apiService = {
         }
       }
     } else if (dataSource === 'supabase' && userId) {
-      cloudLogs = await this.getLogs(userId);
+      cloudLogs = await this.getAllLogs(userId);
     }
 
     if (cloudLogs.length === 0) {

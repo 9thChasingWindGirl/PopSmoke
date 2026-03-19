@@ -477,6 +477,24 @@ export default function App() {
     }
   };
 
+  const handleSyncWithCloud = async (userId: string) => {
+    setIsSyncing(true);
+    try {
+      const result = await apiService.syncWithCloud(userId);
+      if (result.success) {
+        const adapter = getStorageAdapter();
+        const updatedLogs = await adapter.getLogs();
+        setLogs(updatedLogs);
+      }
+      return result;
+    } catch (error) {
+      console.error('Sync failed:', error);
+      return { success: false, message: error instanceof Error ? error.message : '同步失败', localCount: 0, cloudCount: 0, uploadedCount: 0, downloadedCount: 0, totalCount: 0 };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleLoginForCloudData = () => {
     setShowAuthModal(true);
     setAuthMode('signin');
@@ -1127,6 +1145,8 @@ export default function App() {
                       operationLogs={operationLogs}
                       onClearOperationLogs={() => setOperationLogs([])}
                       onAddOperationLog={(log) => setOperationLogs(prev => [log, ...prev])}
+                      isSyncing={isSyncing}
+                      onSyncWithCloud={handleSyncWithCloud}
                     />
                 </div>
               )}

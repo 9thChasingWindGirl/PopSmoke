@@ -20,16 +20,17 @@ interface PopAnalysisProps {
   operationLogs?: OperationLogType[];
   onClearOperationLogs?: () => void;
   onAddOperationLog?: (log: OperationLogType) => void;
+  isSyncing?: boolean;
+  onSyncWithCloud?: (userId: string) => Promise<any>;
 }
 
 type ViewMode = 'week' | 'month';
 type SyncSource = 'feishu' | 'supabase' | null;
 
-export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, onNavigateToSettings, onRefreshLogs, operationLogs = [], onClearOperationLogs, onAddOperationLog }) => {
+export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, onNavigateToSettings, onRefreshLogs, operationLogs = [], onClearOperationLogs, onAddOperationLog, isSyncing = false, onSyncWithCloud }) => {
   const t = TRANSLATIONS[settings.language];
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const analysisRef = useRef<HTMLDivElement>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [exportStatus, setExportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -144,7 +145,6 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
 
   const handleSync = async (source: SyncSource, password?: string) => {
     setShowSyncSourceDialog(false);
-    setIsSyncing(true);
     setSyncStatus(null);
 
     try {
@@ -155,7 +155,6 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         
         // 如果配置已加密且没有提供密码，显示密码输入对话框
         if (result.message && result.message.includes('encrypted')) {
-          setIsSyncing(false);
           setPendingSyncSource('feishu');
           setShowPasswordDialog(true);
           return;
@@ -219,7 +218,6 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         const { isApiConfigEncrypted } = await import('../../services/apiService');
         const needsPassword = await isApiConfigEncrypted('supabase');
         if (needsPassword && !password) {
-          setIsSyncing(false);
           setPendingSyncSource('supabase');
           setShowPasswordDialog(true);
           return;
@@ -234,14 +232,21 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
               success: false,
               message: (t as any).passwordError || 'Password incorrect'
             });
-            setIsSyncing(false);
             return;
           }
           // 使用解密的配置创建客户端
           createSupabaseClient(decrypted.apiUrl, decrypted.anonKey);
         }
 
-        const result = await apiService.syncWithCloud(user.id);
+        let result;
+        if (onSyncWithCloud) {
+          result = await onSyncWithCloud(user.id);
+        } else {
+          //  fallback to direct call if onSyncWithCloud is not provided
+          const { apiService } = await import('../../services/apiService');
+          result = await apiService.syncWithCloud(user.id);
+        }
+        
         setSyncStatus({
           success: result.success,
           message: result.message
@@ -269,9 +274,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
             onAddOperationLog(syncLog);
           }
           
-          const adapter = getStorageAdapter();
-          const updatedLogs = await adapter.getLogs();
-          onRefreshLogs(updatedLogs);
+          // 不需要再调用onRefreshLogs，因为handleSyncWithCloud已经处理了
         }
       }
     } catch (error) {
@@ -279,8 +282,6 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         success: false,
         message: error instanceof Error ? error.message : t.syncFailed
       });
-    } finally {
-      setIsSyncing(false);
     }
   };
 
