@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { POP_COMPONENT_STYLES, getModalTitleColor, getNotificationStyle } from '../../styles/componentStyles';
+import { AppSettings, Language } from '../../types';
+import { TRANSLATIONS } from '../../i18n';
 
 type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
@@ -438,4 +440,32 @@ export const PopSelect: React.FC<PopSelectProps> = ({
   );
 
   return createPortal(content, document.body);
+};
+
+interface PopLoadingProps {
+  settings: AppSettings;
+  language?: Language;
+  message?: string;
+}
+
+export const PopLoading: React.FC<PopLoadingProps> = ({
+  settings,
+  language = settings?.language || 'en',
+  message
+}) => {
+  const t = TRANSLATIONS[language as Language];
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-paper">
+      <div className="flex flex-col items-center space-y-4">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+        <div className="font-display text-xl">
+          POP<span style={{ color: settings?.themeColor || '#FFD700' }}>SMOKE</span>
+        </div>
+        <div className="text-gray-600 text-sm">
+          {message || t.loading || '加载中...'}
+        </div>
+      </div>
+    </div>
+  );
 };

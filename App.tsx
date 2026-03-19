@@ -15,6 +15,7 @@ import { PopAuthModal } from './components/ui/PopAuthModal';
 import { PopPasswordResetDialog } from './components/ui/PopPasswordResetDialog';
 import { PopCloudDataDialog } from './components/ui/PopCloudDataDialog';
 import { PopColorPicker } from './components/ui/PopColorPicker';
+import { PopLoading } from './components/ui/PopNotification';
 import PopNav from './components/ui/PopNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
@@ -592,19 +593,20 @@ export default function App() {
       cleanupOldData(authState.user?.id);
     }
     
-    // 立即触发POW动画
-    const newEffectId = effectIdCounter++;
-    const randomX = 50 + (Math.random() * 10 - 5); 
-    const randomY = 50 + (Math.random() * 10 - 5);
-    
-    setPopEffects(prev => [...prev, { id: newEffectId, x: randomX, y: randomY }]);
-    
-    setTimeout(() => {
-      setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
-    }, 600);
-    
     try {
+      // 等待记录创建完成
       await apiService.createRecord(authState.user?.id, logs);
+      
+      // 记录创建完成后触发POW动画
+      const newEffectId = effectIdCounter++;
+      const randomX = 50 + (Math.random() * 10 - 5); 
+      const randomY = 50 + (Math.random() * 10 - 5);
+      
+      setPopEffects(prev => [...prev, { id: newEffectId, x: randomX, y: randomY }]);
+      
+      setTimeout(() => {
+        setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
+      }, 600);
       
       const operationLog: OperationLogType = {
         id: crypto.randomUUID(),
@@ -790,17 +792,7 @@ export default function App() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-          <div className="font-display text-xl">
-            POP<span style={{ color: settings.themeColor }}>SMOKE</span>
-          </div>
-          <div className="text-gray-600 text-sm">{t.loading || '加载中...'}</div>
-        </div>
-      </div>
-    );
+    return <PopLoading settings={settings} />;
   }
 
   const handlePasswordReset = async () => {
