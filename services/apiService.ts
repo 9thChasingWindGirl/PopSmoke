@@ -146,6 +146,32 @@ export const getUserSupabaseConfig = async (): Promise<{ apiUrl: string; anonKey
   }
 };
 
+export const isApiConfigEncrypted = async (source: 'feishu' | 'supabase'): Promise<boolean> => {
+  try {
+    const adapter = getStorageAdapter();
+    const savedSettings = await adapter.getApiSettings();
+
+    if (!savedSettings) {
+      return false;
+    }
+
+    const configField = source === 'feishu' ? savedSettings.feishu : savedSettings.supabase;
+    if (!configField) {
+      return false;
+    }
+
+    try {
+      JSON.parse(configField);
+      return false;
+    } catch (e) {
+      return true;
+    }
+  } catch (error) {
+    console.error(`Failed to check ${source} config encryption:`, error);
+    return false;
+  }
+};
+
 export const decryptSupabaseConfig = async (password: string): Promise<{ apiUrl: string; anonKey: string } | null> => {
   try {
     const adapter = getStorageAdapter();
@@ -204,7 +230,10 @@ export const setSupabaseClient = (client: SupabaseClient, config: { apiUrl: stri
   clientManager.setClient(config.apiUrl, config.anonKey);
 };
 
-export let supabase = clientManager.getClient();
+// 导出一个函数来获取最新的客户端实例，而不是直接导出变量
+export const getSupabase = (): SupabaseClient => {
+  return clientManager.getClient();
+};
 
 const generateLogId = (userId: string, recordDate: string, recordTime: string, index?: number): string => {
   return crypto.randomUUID();
@@ -228,8 +257,8 @@ const formatTimestamp = (date: Date): string => {
 const completeLogFields = (log: SmokeLog): SmokeLog => ({
   ...log,
   user_id: log.user_id || 'local',
-  table_id: log.table_id ?? null,
-  table_name: log.table_name ?? null,
+  table_id: log.table_id || null,
+  table_name: log.table_name || null,
   record_date: log.record_date || '',
   record_time: log.record_time || '',
   record_index: log.record_index || 1,
@@ -384,7 +413,7 @@ export const fetchTableData = async (settings: FeishuApiSettings, tableId?: stri
     const data: FeishuApiResponse = await response.json();
 
     if (data.code !== 200) throw new Error(String(data.msg) || 'Failed to fetch table data');
-    return (data.data as FeishuTableData) || { table_info: { table_id: '', table_name: '' }, records: [] };
+    return (data.data as FeishuTableData) || { table_info: { table_id: null, table_name: null }, records: [] };
   } catch (error) {
     console.error('Failed to fetch table data:', error);
     throw error;
@@ -393,8 +422,8 @@ export const fetchTableData = async (settings: FeishuApiSettings, tableId?: stri
 
 export const convertToSmokeLogs = (tableData: FeishuTableData, userId?: string): SmokeLog[] => {
   const logs: SmokeLog[] = [];
-  const tableId = tableData.table_info.table_id;
-  const tableName = tableData.table_info.table_name;
+  const tableId = tableData.table_info.table_id || null;
+  const tableName = tableData.table_info.table_name || null;
 
   tableData.records.forEach((record) => {
     const recordDate = record['记录日期'];
@@ -575,23 +604,40 @@ export const apiService = {
     completedLogs.forEach((log) => uniqueLogs.set(`${log.user_id}_${log.record_date}_${log.record_time}`, log));
     const deduplicatedLogs = Array.from(uniqueLogs.values());
 
+    // 查询已存在的记录
+    const client = await getClient();
+    const userIds = [...new Set(deduplicatedLogs.map(log => log.user_id))];
+    const dates = [...new Set(deduplicatedLogs.map(log => log.record_date))];
+    
+    const { data: existing } = await client
+      .from('smoke_logs')
+      .select('user_id, record_date, record_time')
+      .in('user_id', userIds)
+      .in('record_date', dates);
+    
+    const existingKeys = new Set((existing || []).map(r => `${r.user_id}_${r.record_date}_${r.record_time}`));
+    const newLogs = deduplicatedLogs.filter(log => !existingKeys.has(getUniqueKey(log)));
+
+    if (newLogs.length === 0) {
+      return { success: true, count: 0 };
+    }
+
     const BATCH_SIZE = 500;
     const batches: SmokeLog[][] = [];
-    for (let i = 0; i < deduplicatedLogs.length; i += BATCH_SIZE) {
-      batches.push(deduplicatedLogs.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
+      batches.push(newLogs.slice(i, i + BATCH_SIZE));
     }
 
     let successCount = 0;
     let lastError: string | undefined;
 
     for (const batch of batches) {
-      const client = await getClient();
-      const { error } = await client.from('smoke_logs').upsert(batch, { onConflict: 'user_id, record_date, record_time' });
+      const { error } = await client.from('smoke_logs').insert(batch);
       if (error) lastError = error.message;
       else successCount += batch.length;
     }
 
-    return { success: successCount === deduplicatedLogs.length, count: successCount, error: lastError };
+    return { success: successCount === newLogs.length, count: successCount, error: lastError };
   },
 
   async updateLog(updatedLog: SmokeLog, existingLogs: SmokeLog[]): Promise<SmokeLog> {
@@ -813,20 +859,20 @@ export const apiService = {
     const updatedLogs = [completedLog, ...existingLogs];
     await adapter.saveLogs(updatedLogs);
 
-    if (userId) {
-      try {
-        await this.saveLog(newLog);
-      } catch (error) {
-        console.error('Failed to sync log to cloud:', error);
-      }
-    }
-
+    // 立即发布事件，通知UI更新
     EventHandle.publish({
       type: EventType.LOG_CREATE,
       category: 'data',
       data: { success: true, log: completedLog, logs: updatedLogs },
       timestamp: Date.now()
     });
+
+    // 在后台异步进行Supabase同步，不阻塞返回
+    if (userId) {
+      this.saveLog(newLog).catch(error => {
+        console.error('Failed to sync log to cloud:', error);
+      });
+    }
 
     return completedLog;
   },

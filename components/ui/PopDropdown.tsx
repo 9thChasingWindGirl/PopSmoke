@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface PopDropdownProps {
   trigger: React.ReactNode;
@@ -8,15 +8,15 @@ interface PopDropdownProps {
   className?: string;
 }
 
-export const PopDropdown: React.FC<PopDropdownProps> = ({
+export const PopDropdown = forwardRef<HTMLDivElement, PopDropdownProps>(({
   trigger,
   isOpen,
   onToggle,
   children,
   className = '',
-}) => {
+}, ref) => {
   return (
-    <div className={`relative ${className}`}>
+    <div ref={ref} className={`relative ${className}`}>
       <div onClick={onToggle} className="cursor-pointer">
         {trigger}
       </div>
@@ -27,7 +27,9 @@ export const PopDropdown: React.FC<PopDropdownProps> = ({
       )}
     </div>
   );
-};
+});
+
+PopDropdown.displayName = 'PopDropdown';
 
 interface PopDropdownTriggerProps {
   label: string;

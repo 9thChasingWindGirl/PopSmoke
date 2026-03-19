@@ -20,7 +20,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
 import { TRANSLATIONS } from './i18n';
 import { getStorageAdapter, getAuthStorageAdapter, getSyncQueueManager, simpleDecrypt, isAndroidPlatform, hasLoggedInBefore, setLoggedInFlag, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, createSupabaseAuthStorage } from './services/storageAdapter';
-import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, supabase, fetchAllTables, convertToSmokeLogs } from './services/apiService';
+import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs, getSupabase } from './services/apiService';
 import EventHandle from './event/EventHandle';
 import { EventType } from './event/EventType';
 import { getStorageKeys } from './utils/logUtils';
@@ -592,6 +592,17 @@ export default function App() {
       cleanupOldData(authState.user?.id);
     }
     
+    // 立即触发POW动画
+    const newEffectId = effectIdCounter++;
+    const randomX = 50 + (Math.random() * 10 - 5); 
+    const randomY = 50 + (Math.random() * 10 - 5);
+    
+    setPopEffects(prev => [...prev, { id: newEffectId, x: randomX, y: randomY }]);
+    
+    setTimeout(() => {
+      setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
+    }, 600);
+    
     try {
       await apiService.createRecord(authState.user?.id, logs);
       
@@ -611,16 +622,6 @@ export default function App() {
       setStorageError(error instanceof Error ? error.message : 'Record error');
       setShowStorageErrorDialog(true);
     }
-    
-    const newEffectId = effectIdCounter++;
-    const randomX = 50 + (Math.random() * 10 - 5); 
-    const randomY = 50 + (Math.random() * 10 - 5);
-    
-    setPopEffects(prev => [...prev, { id: newEffectId, x: randomX, y: randomY }]);
-    
-    setTimeout(() => {
-      setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
-    }, 600);
   };
 
   const handleDelete = async (id: string) => {

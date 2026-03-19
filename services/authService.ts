@@ -1,4 +1,4 @@
-import { getSupabaseClient, supabase } from './apiService';
+import { getSupabaseClient, getSupabase } from './apiService';
 import { User, AuthState } from '../types';
 import EventHandle from '../event/EventHandle';
 import { EventType } from '../event/EventType';
@@ -239,7 +239,7 @@ export const authService = {
 
   // 监听认证状态变化
   onAuthStateChange(callback: (user: User | null) => void) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
       callback(session?.user as User | null);
     });
     
@@ -256,7 +256,7 @@ export const authService = {
 
   // 监听认证事件（包括密码重置等）
   onAuthEvent(callback: (event: string, session: any) => void) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
       callback(event, session);
     });
     

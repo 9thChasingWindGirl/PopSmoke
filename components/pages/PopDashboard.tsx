@@ -130,32 +130,34 @@ export const PopDashboard: React.FC<PopDashboardProps> = ({ logs, settings, onRe
               <div className="flex flex-col items-center w-full">
                   <div className="relative pb-4">
                     <div className="absolute inset-0 bg-black/10 blur-2xl rounded-2xl scale-110"></div>
-                    <button
-                      onClick={onRecord}
-                      className="relative group transition-all active:translate-y-1 active:translate-x-1 active:shadow-none w-40 h-40 md:w-44 md:h-44 lg:w-48 lg:h-48"
-                    >
-                      <div className="absolute inset-0 bg-black rounded-2xl translate-y-2 translate-x-2"></div>
-                      <div
-                        className="relative w-full h-full rounded-2xl border-4 border-black flex flex-col items-center justify-center gap-0 overflow-hidden shadow-[inset_0_4px_0_rgba(255,255,255,0.4),inset_0_-4px_0_rgba(0,0,0,0.1)] transition-all duration-100"
-                        style={{ backgroundColor: settings.themeColor }}
+                    <div className={POP_COMPONENT_STYLES.dashboard.smokeButton.container}>
+                      <button
+                        onClick={onRecord}
+                        className="w-full h-full"
                       >
-                        <div className="flex flex-col items-center -mt-1">
-                          <span className="text-2xl md:text-3xl lg:text-4xl font-display font-black text-black uppercase italic tracking-tighter leading-none drop-shadow-[1px_1px_0px_rgba(255,255,255,0.5)] transform -translate-x-1">{t.smokeButton}</span>
-                        </div>
-                        <div className="absolute top-6 left-10 w-6 h-3 bg-white/40 rounded-full rotate-[-45deg]"></div>
-                        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                          <div 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsFlipped(true);
-                            }}
-                            className="text-sm font-bold underline hover:text-gray-600 decoration-2 underline-offset-4 font-display tracking-wide uppercase p-2 cursor-pointer"
-                          >
-                            {t.more} &rarr;
+                        <div className={POP_COMPONENT_STYLES.dashboard.smokeButton.shadow}></div>
+                        <div
+                          className={POP_COMPONENT_STYLES.dashboard.smokeButton.button}
+                          style={{ backgroundColor: settings.themeColor }}
+                        >
+                          <div className="flex flex-col items-center -mt-1">
+                            <span className="text-2xl md:text-3xl lg:text-4xl font-display font-black text-black uppercase italic tracking-tighter leading-none drop-shadow-[1px_1px_0px_rgba(255,255,255,0.5)] transform -translate-x-1">{t.smokeButton}</span>
+                          </div>
+                          <div className="absolute top-6 left-10 w-6 h-3 bg-white/40 rounded-full rotate-[-45deg]"></div>
+                          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsFlipped(true);
+                              }}
+                              className={POP_COMPONENT_STYLES.dashboard.smokeButton.moreLink}
+                            >
+                              {t.more} &rarr;
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                    </div>
                   </div>
               </div>
 

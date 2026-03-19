@@ -1,6 +1,8 @@
 import React, { Component, ReactNode } from 'react';
 import { systemLogService } from '../services/systemLogService';
 import { handleError, getErrorInfo, type ErrorInfo as AppErrorInfo } from '../utils/errors/ErrorHandler';
+import { TRANSLATIONS } from '../i18n';
+import { getStorageAdapter } from '../services/storageAdapter';
 
 interface Props {
   children: ReactNode;
@@ -53,12 +55,24 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  private getTranslations = () => {
+    try {
+      const adapter = getStorageAdapter();
+      const settings = adapter.getSettingsSync();
+      const language = settings?.language || 'en';
+      return TRANSLATIONS[language] || TRANSLATIONS.en;
+    } catch {
+      return TRANSLATIONS.en;
+    }
+  };
+
   public render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
+      const t = this.getTranslations();
       const info = this.state.errorInfo;
       const isRecoverable = info?.recoverable ?? true;
       const action = info?.action;
@@ -69,7 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="text-center">
               <div className="text-6xl mb-4">💥</div>
               <h2 className="font-display text-2xl uppercase tracking-wider mb-4">
-                Something went wrong
+                {t.somethingWentWrong}
               </h2>
               <p className="text-gray-600 mb-6">
                 {info?.userMessage || 'An unexpected error occurred'}
@@ -78,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
               {this.props.showDetails && this.state.error && (
                 <details className="text-left mb-6 p-4 bg-gray-100 border-2 border-black">
                   <summary className="cursor-pointer font-display uppercase text-sm">
-                    Error Details
+                    {t.errorDetails}
                   </summary>
                   <pre className="mt-2 text-xs overflow-auto">
                     {this.state.error.message}
@@ -99,14 +113,14 @@ export class ErrorBoundary extends Component<Props, State> {
                     className="px-6 py-2 font-display text-sm uppercase tracking-wider border-4 border-black shadow-pop transition-all transform hover:shadow-pop-hover hover:translate-x-[2px] hover:translate-y-[2px]"
                     style={{ backgroundColor: '#FFD700' }}
                   >
-                    Try Again
+                    {t.tryAgain}
                   </button>
                 )}
                 <button
                   onClick={this.handleRefresh}
                   className="px-6 py-2 font-display text-sm uppercase tracking-wider border-4 border-black shadow-pop transition-all transform hover:shadow-pop-hover hover:translate-x-[2px] hover:translate-y-[2px] bg-white"
                 >
-                  Refresh Page
+                  {t.refreshPage}
                 </button>
               </div>
             </div>

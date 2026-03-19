@@ -292,6 +292,8 @@ export const i18n_EN = {
   // ============ Analysis Page - Operation Log ============
   operationLog: 'Operation Log',
   feishuPasswordRequired: 'Feishu API settings are encrypted. Please enter password to view.',
+  apiPasswordRequired: 'API settings are encrypted. Please enter password to view.',
+  passwordError: 'Password incorrect. Please try again.',
   
   // ============ Settings - Messages ============
   dataCleared: 'Data Cleared',
@@ -330,7 +332,13 @@ export const i18n_EN = {
   externalLinkWarningTitle: 'External Link',
   externalLinkWarningMessage: 'You are about to visit an external website:',
   externalLinkContinue: 'Continue',
-  externalLinkCancel: 'Cancel'
+  externalLinkCancel: 'Cancel',
+  
+  // ============ Error Boundary ============
+  somethingWentWrong: 'Something went wrong',
+  tryAgain: 'Try Again',
+  refreshPage: 'Refresh Page',
+  errorDetails: 'Error Details'
 };
 
 export type I18nTranslations = typeof i18n_EN;

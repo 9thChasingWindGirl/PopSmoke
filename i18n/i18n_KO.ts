@@ -292,6 +292,8 @@ export const i18n_KO = {
   // ============ Analysis Page - Operation Log ============
   operationLog: '작업 로그',
   feishuPasswordRequired: 'Feishu API 설정이 암호화되어 있습니다. 복호화하려면 비밀번호를 입력하세요.',
+  apiPasswordRequired: 'API 설정이 암호화되어 있습니다. 복호화하려면 비밀번호를 입력하세요.',
+  passwordError: '비밀번호가 올바르지 않습니다. 다시 시도해주세요.',
   
   // ============ Settings - Messages ============
   dataCleared: '데이터가 삭제되었습니다',
@@ -328,9 +330,15 @@ export const i18n_KO = {
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: '외부 링크',
-  externalLinkWarningMessage: '외부 웹사이트에 방문하려고 합니다:',
+  externalLinkWarningMessage: '외부 웹사이트를 방문하려고 합니다:',
   externalLinkContinue: '계속',
-  externalLinkCancel: '취소'
+  externalLinkCancel: '취소',
+  
+  // ============ Error Boundary ============
+  somethingWentWrong: '오류가 발생했습니다',
+  tryAgain: '다시 시도',
+  refreshPage: '페이지 새로고침',
+  errorDetails: '오류 세부 정보'
 };
 
 export type I18nKO = typeof i18n_KO;

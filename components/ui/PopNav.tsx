@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ViewState, Language } from '../../types';
 import { PopColorPicker } from './PopColorPicker';
+import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 
 interface PopNavProps {
   view: ViewState;
@@ -25,10 +26,24 @@ const PopNav: React.FC<PopNavProps> = ({
   const mobileColorPickerRef = useRef<HTMLDivElement>(null);
   const [showMobileColorPicker, setShowMobileColorPicker] = React.useState(false);
 
+  // 点击外部关闭颜色选择器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileColorPickerRef.current && !mobileColorPickerRef.current.contains(event.target as Node)) {
+        setShowMobileColorPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="w-full max-w-4xl mx-auto px-2 pt-4">
-      <nav className={`p-3 md:p-4 flex justify-between items-center bg-white border-4 border-black shrink-0 z-50 ${isAndroid ? 'h-[100px] pt-12' : 'h-[60px]'}`} style={{ backgroundColor: 'white' }}>
-        <div className="font-display text-xl md:text-2xl tracking-wide cursor-pointer" onClick={() => setView(ViewState.DASHBOARD)}>
+      <nav className={`${POP_COMPONENT_STYLES.nav.header.container} ${isAndroid ? 'h-[100px] pt-12' : 'h-[60px]'}`} style={{ backgroundColor: 'white' }}>
+        <div className={POP_COMPONENT_STYLES.nav.header.title} onClick={() => setView(ViewState.DASHBOARD)}>
           POP<span style={{ color: settings.themeColor }}>SMOKE</span>
         </div>
         
@@ -39,7 +54,7 @@ const PopNav: React.FC<PopNavProps> = ({
             <select
               value={settings.language}
               onChange={(e) => handleUpdateSettings({ ...settings, language: e.target.value as Language })}
-              className="border-2 border-black px-1 py-1 text-sm font-bold cursor-pointer"
+              className={POP_COMPONENT_STYLES.nav.header.mobileSelect}
               style={{ backgroundColor: settings.themeColor }}
             >
               <option value="en">EN</option>
@@ -51,7 +66,7 @@ const PopNav: React.FC<PopNavProps> = ({
             {/* 主题颜色选择 */}
             <div className="relative" ref={mobileColorPickerRef}>
               <div
-                className="w-8 h-8 border-2 border-black cursor-pointer"
+                className={POP_COMPONENT_STYLES.nav.header.mobileColorPicker}
                 style={{ backgroundColor: settings.themeColor }}
                 onClick={() => setShowMobileColorPicker(!showMobileColorPicker)}
               />
@@ -69,12 +84,12 @@ const PopNav: React.FC<PopNavProps> = ({
           </div>
           
           {/* 桌面端导航 */}
-          <div className="hidden md:flex items-center space-x-6">
-            <button onClick={() => setView(ViewState.DASHBOARD)} className={`font-bold uppercase border-b-2 border-transparent hover:border-black ${view === ViewState.DASHBOARD ? 'border-black' : ''}`} style={{ width: '100px', textAlign: 'center' }}>{t.tracker}</button>
-            <button onClick={() => setView(ViewState.ANALYSIS)} className={`font-bold uppercase border-b-2 border-transparent hover:border-black ${view === ViewState.ANALYSIS ? 'border-black' : ''}`} style={{ width: '100px', textAlign: 'center' }}>{t.analysis}</button>
-            <button onClick={() => setView(ViewState.HISTORY)} className={`font-bold uppercase border-b-2 border-transparent hover:border-black ${view === ViewState.HISTORY ? 'border-black' : ''}`} style={{ width: '100px', textAlign: 'center' }}>{t.history}</button>
-            <button onClick={() => setView(ViewState.API)} className={`font-bold uppercase border-b-2 border-transparent hover:border-black ${view === ViewState.API ? 'border-black' : ''}`} style={{ width: '100px', textAlign: 'center' }}>{t.apiManagement}</button>
-            <button onClick={() => setView(ViewState.SETTINGS)} className={`font-bold uppercase border-b-2 border-transparent hover:border-black ${view === ViewState.SETTINGS ? 'border-black' : ''}`} style={{ width: '100px', textAlign: 'center' }}>{t.settings}</button>
+          <div className={POP_COMPONENT_STYLES.nav.header.desktopNav.container}>
+            <button onClick={() => setView(ViewState.DASHBOARD)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.DASHBOARD ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.tracker}</button>
+            <button onClick={() => setView(ViewState.ANALYSIS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.ANALYSIS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.analysis}</button>
+            <button onClick={() => setView(ViewState.HISTORY)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.HISTORY ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.history}</button>
+            <button onClick={() => setView(ViewState.API)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.API ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.apiManagement}</button>
+            <button onClick={() => setView(ViewState.SETTINGS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.SETTINGS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.settings}</button>
           </div>
         </div>
       </nav>

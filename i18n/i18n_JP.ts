@@ -292,6 +292,8 @@ export const i18n_JP = {
   // ============ Analysis Page - Operation Log ============
   operationLog: '操作ログ',
   feishuPasswordRequired: 'Feishu API設定は暗号化されています。表示するにはパスワードを入力してください。',
+  apiPasswordRequired: 'API設定は暗号化されています。表示するにはパスワードを入力してください。',
+  passwordError: 'パスワードが正しくありません。もう一度お試しください。',
   
   // ============ Settings - Messages ============
   dataCleared: 'データがクリアされました',
@@ -329,8 +331,14 @@ export const i18n_JP = {
   // ============ External Link Warning ============
   externalLinkWarningTitle: '外部リンク',
   externalLinkWarningMessage: '外部ウェブサイトにアクセスしようとしています：',
-  externalLinkContinue: '続行',
-  externalLinkCancel: 'キャンセル'
+  externalLinkContinue: '続ける',
+  externalLinkCancel: 'キャンセル',
+  
+  // ============ Error Boundary ============
+  somethingWentWrong: 'エラーが発生しました',
+  tryAgain: '再試行',
+  refreshPage: 'ページを更新',
+  errorDetails: 'エラーの詳細'
 };
 
 export type I18nJP = typeof i18n_JP;

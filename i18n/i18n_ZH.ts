@@ -292,6 +292,8 @@ export const i18n_ZH = {
   // ============ Analysis Page - Operation Log ============
   operationLog: '操作日志',
   feishuPasswordRequired: '飞书 API 设置已加密，请输入密码查看。',
+  apiPasswordRequired: 'API 设置已加密，请输入密码查看。',
+  passwordError: '密码错误，请重试。',
   
   // ============ Settings - Messages ============
   dataCleared: '数据已清除',
@@ -330,7 +332,13 @@ export const i18n_ZH = {
   externalLinkWarningTitle: '外部链接',
   externalLinkWarningMessage: '您即将访问外部网站：',
   externalLinkContinue: '继续',
-  externalLinkCancel: '取消'
+  externalLinkCancel: '取消',
+  
+  // ============ Error Boundary ============
+  somethingWentWrong: '出现了错误',
+  tryAgain: '重试',
+  refreshPage: '刷新页面',
+  errorDetails: '错误详情'
 };
 
 export type I18nZH = typeof i18n_ZH;

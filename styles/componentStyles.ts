@@ -116,6 +116,31 @@ export const POP_COMPONENT_STYLES = {
       `,
       inactive: 'opacity-60 hover:opacity-100',
     },
+    header: {
+      container: `
+        p-3 md:p-4 flex justify-between items-center bg-white border-4 border-black shrink-0 z-50
+      `,
+      title: `
+        font-display text-xl md:text-2xl tracking-wide cursor-pointer
+      `,
+      mobileSelect: `
+        border-2 border-black px-1 py-1 text-sm font-bold cursor-pointer
+      `,
+      mobileColorPicker: `
+        w-8 h-8 border-2 border-black cursor-pointer
+      `,
+      desktopNav: {
+        container: `
+          hidden md:flex items-center space-x-6
+        `,
+        item: `
+          font-bold uppercase border-b-2 border-transparent hover:border-black w-[100px] text-center
+        `,
+        active: `
+          border-black
+        `,
+      },
+    },
   },
 
   flipCard: {
@@ -188,6 +213,20 @@ export const POP_COMPONENT_STYLES = {
     quickStatus: `
       w-full shrink-0 h-[40px] flex items-center justify-center
     `,
+    smokeButton: {
+      container: `
+        relative group transition-all active:translate-y-1 active:translate-x-1 active:shadow-none w-40 h-40 md:w-44 md:h-44 lg:w-48 lg:h-48
+      `,
+      shadow: `
+        absolute inset-0 bg-black rounded-2xl translate-y-2 translate-x-2 group-hover:translate-y-1 group-hover:translate-x-1 transition-all duration-100
+      `,
+      button: `
+        relative w-full h-full rounded-2xl border-4 border-black flex flex-col items-center justify-center gap-0 overflow-hidden shadow-[inset_0_4px_0_rgba(255,255,255,0.4),inset_0_-4px_0_rgba(0,0,0,0.1)] transition-all duration-100 group-hover:translate-y-1 group-hover:translate-x-1 group-hover:shadow-[inset_0_2px_0_rgba(255,255,255,0.4),inset_0_-2px_0_rgba(0,0,0,0.1)]
+      `,
+      moreLink: `
+        text-sm font-bold underline hover:text-gray-600 hover:underline-offset-6 hover:scale-105 decoration-2 font-display tracking-wide uppercase p-2 cursor-pointer transition-all duration-200
+      `,
+    },
   },
 
   apiManagement: {
@@ -197,6 +236,17 @@ export const POP_COMPONENT_STYLES = {
     contentWrapper: `
       w-[600px] gap-[30px] flex flex-col
     `,
+  },
+
+  settings: {
+    dropdown: {
+      trigger: `
+        flex items-center border-2 border-black px-3 py-2 hover:bg-black hover:text-white transition-colors w-full justify-between
+      `,
+      colorPreview: `
+        w-6 h-6 border-2 border-black ml-2
+      `,
+    },
   },
 
   animations: {

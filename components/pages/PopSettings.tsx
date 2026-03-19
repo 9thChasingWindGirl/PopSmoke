@@ -8,9 +8,10 @@ import { PopExternalLinkWarning } from '../ui/PopExternalLinkWarning';
 import { THEME_PRESETS } from '../../constants';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, User, SmokeLog, OperationLog as OperationLogType } from '../../types';
+import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 
 import { authService } from '../../services/authService';
-import { supabase } from '../../services/apiService';
+import { getSupabase } from '../../services/apiService';
 import { avatarCacheService } from '../../services/storageAdapter';
 import { getStorageType, getStorageAdapter } from '../../services/storageAdapter';
 
@@ -119,7 +120,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       const fileName = `${user?.id}-${Date.now()}-${file.name}`;
       
       // 上传文件到Supabase Storage
-      const { data, error } = await supabase.storage
+      const { data, error } = await getSupabase().storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -139,7 +140,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       }
       
       // 获取文件URL
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = getSupabase().storage
         .from('avatars')
         .getPublicUrl(data.path);
       
@@ -185,7 +186,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     }
     
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error } = await getSupabase().auth.updateUser({
         email
       });
       
@@ -237,7 +238,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     
     try {
       // 直接更新密码（Supabase会自动验证当前会话）
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await getSupabase().auth.updateUser({
         password: newPwd
       });
       
@@ -449,10 +450,11 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
                         
                         {/* 语言选择 */}
                         <PopDropdown
+                          ref={languageMenuRef}
                           isOpen={showLanguageMenu}
                           onToggle={() => setShowLanguageMenu(!showLanguageMenu)}
                           trigger={
-                            <div className="flex items-center border-2 border-black px-3 py-2 hover:bg-black hover:text-white transition-colors w-full justify-between">
+                            <div className={POP_COMPONENT_STYLES.settings.dropdown.trigger}>
                               <span>{t.language}: {settings.language.toUpperCase()}</span>
                               <span>▼</span>
                             </div>
@@ -479,14 +481,15 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
                         
                         {/* 主题颜色选择 */}
                         <PopDropdown
+                          ref={themeMenuRef}
                           isOpen={showThemeMenu}
                           onToggle={() => setShowThemeMenu(!showThemeMenu)}
                           trigger={
-                            <div className="flex items-center border-2 border-black px-3 py-2 hover:bg-black hover:text-white transition-colors w-full justify-between">
+                            <div className={POP_COMPONENT_STYLES.settings.dropdown.trigger}>
                               <span className="flex items-center">
                                 {t.theme}: 
                                 <div 
-                                  className="w-6 h-6 border-2 border-black ml-2" 
+                                  className={POP_COMPONENT_STYLES.settings.dropdown.colorPreview} 
                                   style={{ backgroundColor: settings.themeColor }}
                                 />
                               </span>

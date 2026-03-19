@@ -34,7 +34,8 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
   const [exportStatus, setExportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showSyncSourceDialog, setShowSyncSourceDialog] = useState(false);
-  const [showFeishuPasswordDialog, setShowFeishuPasswordDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [pendingSyncSource, setPendingSyncSource] = useState<SyncSource>(null);
   const [feishuPassword, setFeishuPassword] = useState('');
   const [apiFetchedCount, setApiFetchedCount] = useState<number | undefined>(undefined);
   
@@ -155,7 +156,8 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         // 如果配置已加密且没有提供密码，显示密码输入对话框
         if (result.message && result.message.includes('encrypted')) {
           setIsSyncing(false);
-          setShowFeishuPasswordDialog(true);
+          setPendingSyncSource('feishu');
+          setShowPasswordDialog(true);
           return;
         }
         
@@ -211,6 +213,32 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
             onNavigateToSettings();
           }, 1500);
           return;
+        }
+
+        // 检查是否需要密码
+        const { isApiConfigEncrypted } = await import('../../services/apiService');
+        const needsPassword = await isApiConfigEncrypted('supabase');
+        if (needsPassword && !password) {
+          setIsSyncing(false);
+          setPendingSyncSource('supabase');
+          setShowPasswordDialog(true);
+          return;
+        }
+
+        // 如果提供了密码，先解密配置
+        if (password) {
+          const { decryptSupabaseConfig, createSupabaseClient } = await import('../../services/apiService');
+          const decrypted = await decryptSupabaseConfig(password);
+          if (!decrypted) {
+            setSyncStatus({
+              success: false,
+              message: (t as any).passwordError || 'Password incorrect'
+            });
+            setIsSyncing(false);
+            return;
+          }
+          // 使用解密的配置创建客户端
+          createSupabaseClient(decrypted.apiUrl, decrypted.anonKey);
         }
 
         const result = await apiService.syncWithCloud(user.id);
@@ -686,21 +714,25 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         />
       )}
       
-      {showFeishuPasswordDialog && (
+      {showPasswordDialog && pendingSyncSource && (
         <PopPrompt
           type="info"
           title={t.enterPassword || 'Enter Password'}
-          message={t.feishuPasswordRequired || 'Please enter your Feishu API password to decrypt settings'}
+          message={(t as any).apiPasswordRequired || `Please enter your API password to decrypt ${pendingSyncSource} settings`}
           placeholder={t.enterPassword || 'Enter password'}
           confirmText={t.confirm || 'Confirm'}
           cancelText={t.cancel || 'Cancel'}
           confirmThemeColor={settings.themeColor}
           isPassword={true}
           onConfirm={(value) => {
-            setShowFeishuPasswordDialog(false);
-            handleSync('feishu', value);
+            setShowPasswordDialog(false);
+            handleSync(pendingSyncSource, value);
+            setPendingSyncSource(null);
           }}
-          onCancel={() => setShowFeishuPasswordDialog(false)}
+          onCancel={() => {
+            setShowPasswordDialog(false);
+            setPendingSyncSource(null);
+          }}
         />
       )}
     
