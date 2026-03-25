@@ -354,7 +354,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
           } as SmokeLog,
           syncStatus: 'synced',
           timestamp: Date.now(),
-          message: '清除本地数据'
+          message: t.clearAll
         };
         onAddOperationLog(clearLog);
       }

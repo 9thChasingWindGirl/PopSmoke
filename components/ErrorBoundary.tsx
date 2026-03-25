@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 {t.somethingWentWrong}
               </h2>
               <p className="text-gray-600 mb-6">
-                {info?.userMessage || 'An unexpected error occurred'}
+                {info?.userMessage || t.unexpectedError}
               </p>
 
               {this.props.showDetails && this.state.error && (

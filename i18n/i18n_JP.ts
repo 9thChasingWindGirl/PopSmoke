@@ -45,6 +45,7 @@ export const i18n_JP = {
   exportCSV: 'CSV出力',
   csvNote: '日付、時間、月次タグが含まれます。',
   noDataToExport: 'この月にはエクスポートするデータがありません。',
+  export: 'エクスポート',
   exportSuccess: 'エクスポート成功',
   exportFailed: 'エクスポート失敗',
   
@@ -149,6 +150,26 @@ export const i18n_JP = {
   submitToFeishu: 'Feishuに送信',
   submitting: '送信中...',
   startSubmit: '送信開始',
+  syncFromSupabaseOnly: 'Supabaseと同期',
+  syncDiffSummary: '同期概要',
+  cloudOnlyRecords: 'クラウドのみのレコード',
+  confirmSync: '同期を確認',
+  localRecords: 'ローカルレコード',
+  cloudRecords: 'クラウドレコード',
+  localOnly: 'ローカルのみ',
+  cloudOnly: 'クラウドのみ',
+  conflicts: '競合',
+  upload: 'アップロード',
+  download: 'ダウンロード',
+  foundNewRecords: '{count}件の新しいレコードが見つかりました',
+  foundConflictingRecords: '{count}件の競合レコード',
+  needUploadRecords: '{count}件のレコードをアップロードする必要があります',
+  needDownloadRecords: '{count}件のレコードをダウンロードする必要があります',
+  uploadCount: '{count}件アップロード',
+  downloadCount: '{count}件ダウンロード',
+  syncCompleted: '{source}との同期が完了しました：{message}',
+  syncWithFeishuCompleted: 'Feishuとの同期が完了しました',
+  syncWithSupabaseCompleted: 'Supabaseとの同期が完了しました',
   
   // ============ API Management - Cloud Sync ============
   cloudSync: 'クラウド同期',
@@ -183,6 +204,11 @@ export const i18n_JP = {
   noAccount: 'アカウントがない場合: 登録',
   haveAccount: 'すでにアカウントがある場合: ログイン',
   loading: '読み込み中...',
+  initializing: '初期化中...',
+  connecting: '接続中...',
+  authenticating: '認証中...',
+  resetting: 'リセット中...',
+  restoring: '復元中...',
   skipLogin: 'ログインをスキップしてローカルモードを使用',
   verifyEmail: '登録成功！確認メールを確認し、リンクをクリックして確認を完了してください。',
   localModeHint: '現在ローカルモードを使用中。ログインしてクラウドにデータを同期',
@@ -234,7 +260,7 @@ export const i18n_JP = {
   apiUrlDisplay: '保存されたAPI設定',
   apiConfigRequired: 'API設定が必要',
   syncFromFeishuOnly: 'Feishuから同期',
-  syncFromSupabaseOnly: 'Supabaseから同期',
+
   deleteApiSettings: 'API設定を削除',
   confirmDeleteApiSettings: '保存されたAPI設定を削除してもよろしいですか？',
   renameApiSettings: 'API設定の名前を変更',
@@ -321,12 +347,12 @@ export const i18n_JP = {
   
   // ============ Operation Log Component ============
   noOperationRecords: '操作記録なし',
-  showRecent5: '最近5件を表示',
+  showRecent5: '直近5件を表示',
   showAll: 'すべて表示',
   clearAll: 'すべてクリア',
-  createLog: '作成',
-  updateLog: '更新',
-  deleteLog: '削除',
+  createRecord: '記録を作成',
+  updateRecord: '記録を更新',
+  deleteRecord: '記録を削除',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: '外部リンク',
@@ -336,6 +362,7 @@ export const i18n_JP = {
   
   // ============ Error Boundary ============
   somethingWentWrong: 'エラーが発生しました',
+  unexpectedError: '予期しないエラーが発生しました',
   tryAgain: '再試行',
   refreshPage: 'ページを更新',
   errorDetails: 'エラーの詳細'

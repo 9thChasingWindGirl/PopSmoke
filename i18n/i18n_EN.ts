@@ -45,6 +45,7 @@ export const i18n_EN = {
   exportCSV: 'Export CSV',
   csvNote: 'Contains Date, Time, and Monthly grouping tags.',
   noDataToExport: 'No data to export for this month.',
+  export: 'Export',
   exportSuccess: 'Export successful',
   exportFailed: 'Export failed',
   
@@ -149,6 +150,26 @@ export const i18n_EN = {
   submitToFeishu: 'Submit to Feishu',
   submitting: 'Submitting...',
   startSubmit: 'Start Submit',
+  syncFromSupabaseOnly: 'Sync with Supabase',
+  syncDiffSummary: 'Sync Summary',
+  cloudOnlyRecords: 'Cloud Only Records',
+  confirmSync: 'Confirm Sync',
+  localRecords: 'Local records',
+  cloudRecords: 'Cloud records',
+  localOnly: 'Local only',
+  cloudOnly: 'Cloud only',
+  conflicts: 'Conflicts',
+  upload: 'Upload',
+  download: 'Download',
+  foundNewRecords: 'Found {count} new records',
+  foundConflictingRecords: '{count} conflicting records',
+  needUploadRecords: 'Need to upload {count} records',
+  needDownloadRecords: 'Need to download {count} records',
+  uploadCount: 'Upload {count}',
+  downloadCount: 'Download {count}',
+  syncCompleted: 'Sync with {source} completed: {message}',
+  syncWithFeishuCompleted: 'Sync with Feishu completed',
+  syncWithSupabaseCompleted: 'Sync with Supabase completed',
   
   // ============ API Management - Cloud Sync ============
   cloudSync: 'Cloud Sync',
@@ -183,6 +204,7 @@ export const i18n_EN = {
   noAccount: "Don't have an account? Sign Up",
   haveAccount: 'Already have an account? Sign In',
   loading: 'Loading...',
+  initializing: 'Initializing...',
   connecting: 'Connecting...',
   authenticating: 'Authenticating...',
   resetting: 'Resetting...',
@@ -237,8 +259,8 @@ export const i18n_EN = {
   clearOldData: 'Clear Local Data',
   apiUrlDisplay: 'Saved API Settings',
   apiConfigRequired: 'API Configuration Required',
-  syncFromFeishuOnly: 'Sync from Feishu',
-  syncFromSupabaseOnly: 'Sync from Supabase',
+
+
   deleteApiSettings: 'Delete API Settings',
   confirmDeleteApiSettings: 'Are you sure you want to delete the saved API settings?',
   renameApiSettings: 'Rename API Settings',
@@ -328,9 +350,9 @@ export const i18n_EN = {
   showRecent5: 'Show recent 5',
   showAll: 'Show all',
   clearAll: 'Clear all',
-  createLog: 'Create',
-  updateLog: 'Update',
-  deleteLog: 'Delete',
+  createRecord: 'Create record',
+  updateRecord: 'Update record',
+  deleteRecord: 'Delete record',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: 'External Link',
@@ -340,6 +362,7 @@ export const i18n_EN = {
   
   // ============ Error Boundary ============
   somethingWentWrong: 'Something went wrong',
+  unexpectedError: 'An unexpected error occurred',
   tryAgain: 'Try Again',
   refreshPage: 'Refresh Page',
   errorDetails: 'Error Details'

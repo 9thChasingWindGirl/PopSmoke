@@ -15,7 +15,7 @@ import { PopAuthModal } from './components/ui/PopAuthModal';
 import { PopPasswordResetDialog } from './components/ui/PopPasswordResetDialog';
 import { PopCloudDataDialog } from './components/ui/PopCloudDataDialog';
 import { PopColorPicker } from './components/ui/PopColorPicker';
-import { PopLoading } from './components/ui/PopNotification';
+import { PopLoading } from './components/ui/PopLoading';
 import PopNav from './components/ui/PopNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
@@ -597,7 +597,7 @@ export default function App() {
       
       const decryptedSupabase = JSON.parse(simpleDecrypt(savedApiSettings.supabase || '', restorePassword));
       
-      if (isAndroidPlatform() && decryptedSupabase.apiUrl && decryptedSupabase.anonKey) {
+      if (decryptedSupabase.apiUrl && decryptedSupabase.anonKey) {
         const client = createSupabaseClient(decryptedSupabase.apiUrl, decryptedSupabase.anonKey);
         setSupabaseClient(client, decryptedSupabase);
         await persistSupabaseRuntimeConfig(decryptedSupabase.apiUrl, decryptedSupabase.anonKey);
@@ -606,6 +606,9 @@ export default function App() {
       setShowRestorePasswordDialog(false);
       setShowPreviousLoginDialog(false);
       setRestorePassword('');
+      
+      // 等待一小段时间，确保Supabase客户端已完全初始化
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       const result = await authService.getCurrentUser();
       setAuthState(result);
@@ -637,7 +640,7 @@ export default function App() {
     
     try {
       // 等待记录创建完成
-      await apiService.createRecord(authState.user?.id, logs);
+      const newLog = await apiService.createRecord(authState.user?.id, logs);
       
       // 记录创建完成后触发POW动画
       const newEffectId = effectIdCounter++;
@@ -650,13 +653,14 @@ export default function App() {
         setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
       }, 600);
       
+      const t = TRANSLATIONS[settings.language] || TRANSLATIONS.zh;
       const operationLog: OperationLogType = {
         id: crypto.randomUUID(),
         type: 'create',
-        data: {} as SmokeLog,
+        data: newLog,
         syncStatus: 'pending',
         timestamp: Date.now(),
-        message: `新增记录`
+        message: `${t.createRecord}: ${newLog.record_date} ${newLog.record_time}`
       };
       setOperationLogs(prev => [operationLog, ...prev]);
       
@@ -675,13 +679,14 @@ export default function App() {
       await apiService.deleteLog(id, authState.user?.id || 'local', logs);
       
       if (logToDelete) {
+        const t = TRANSLATIONS[settings.language] || TRANSLATIONS.zh;
         const operationLog: OperationLogType = {
           id: crypto.randomUUID(),
           type: 'delete',
           data: logToDelete,
           syncStatus: 'synced',
           timestamp: Date.now(),
-          message: `删除记录: ${logToDelete.record_date} ${logToDelete.record_time}`
+          message: `${t.deleteRecord}: ${logToDelete.record_date} ${logToDelete.record_time}`
         };
         setOperationLogs(prev => [operationLog, ...prev]);
         syncStateManager.addOperation(operationLog);
@@ -695,7 +700,15 @@ export default function App() {
 
   const handleUpdate = async (updatedLog: SmokeLog) => {
     try {
+      const oldLog = logs.find(l => l.id === updatedLog.id);
       await apiService.updateLog(updatedLog, logs);
+      
+      const t = TRANSLATIONS[settings.language] || TRANSLATIONS.zh;
+      let message = `${t.updateRecord}: ${updatedLog.record_date} ${updatedLog.record_time}`;
+      
+      if (oldLog) {
+        message = `${t.updateRecord}：${oldLog.record_date} ${oldLog.record_time} → ${updatedLog.record_date} ${updatedLog.record_time}`;
+      }
       
       const operationLog: OperationLogType = {
         id: crypto.randomUUID(),
@@ -703,7 +716,7 @@ export default function App() {
         data: updatedLog,
         syncStatus: 'pending',
         timestamp: Date.now(),
-        message: `编辑${updatedLog.record_date}第 ${updatedLog.record_index} 条记录`
+        message: message
       };
       setOperationLogs(prev => [operationLog, ...prev]);
       syncStateManager.addOperation(operationLog);
@@ -834,24 +847,24 @@ export default function App() {
   };
 
   if (isLoading) {
-    return <PopLoading settings={settings} status="loading" />;
-  }
-  
-  if (isConnecting) {
-    return <PopLoading settings={settings} status="connecting" />;
-  }
-  
-  if (isSyncing) {
-    return <PopLoading settings={settings} status="syncing" />;
-  }
-  
-  if (isAuthenticating) {
-    return <PopLoading settings={settings} status="authenticating" />;
-  }
-  
-  if (isRestoring) {
-    return <PopLoading settings={settings} status="restoring" />;
-  }
+        return <PopLoading settings={settings} status="initializing" isInitialize={true} />;
+      }
+      
+      if (isConnecting) {
+        return <PopLoading settings={settings} status="connecting" isInitialize={true} />;
+      }
+      
+      if (isSyncing) {
+        return <PopLoading settings={settings} status="syncing" isInitialize={true} />;
+      }
+      
+      if (isAuthenticating) {
+        return <PopLoading settings={settings} status="authenticating" isInitialize={true} />;
+      }
+      
+      if (isRestoring) {
+        return <PopLoading settings={settings} status="restoring" isInitialize={true} />;
+      }
 
   const handlePasswordReset = async () => {
     if (!newPassword.trim()) {

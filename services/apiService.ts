@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import EventHandle from '../event/EventHandle';
 import { EventType } from '../event/EventType';
+import { TRANSLATIONS } from '../i18n';
 
 const DEFAULT_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const DEFAULT_SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -25,6 +26,21 @@ export interface CloudSyncResult {
   uploadedCount: number;
   downloadedCount: number;
   totalCount: number;
+}
+
+export interface DataDiff {
+  localOnly: SmokeLog[];     // 仅本地有（需要上传）
+  cloudOnly: SmokeLog[];     // 仅云端有（需要下载）
+  conflicting: SmokeLog[];    // 冲突记录
+  totalLocal: number;
+  totalCloud: number;
+}
+
+export interface SyncDiffResult {
+  diff: DataDiff;
+  source: 'feishu' | 'supabase';
+  timestamp: number;
+  message: string;
 }
 
 export interface ApiServiceConfig {
@@ -241,6 +257,61 @@ const generateLogId = (userId: string, recordDate: string, recordTime: string, i
 
 const getUniqueKey = (log: SmokeLog): string => `${log.user_id}_${log.record_date}_${log.record_time}`;
 
+const compareData = (localLogs: SmokeLog[], cloudLogs: SmokeLog[]): DataDiff => {
+  const localKeys = new Map<string, SmokeLog>();
+  const cloudKeys = new Map<string, SmokeLog>();
+  
+  localLogs.forEach(log => {
+    localKeys.set(getUniqueKey(log), log);
+  });
+  
+  cloudLogs.forEach(log => {
+    cloudKeys.set(getUniqueKey(log), log);
+  });
+  
+  const localOnly: SmokeLog[] = [];
+  const cloudOnly: SmokeLog[] = [];
+  const conflicting: SmokeLog[] = [];
+  
+  // 检查仅本地有的记录
+  localKeys.forEach((log, key) => {
+    if (!cloudKeys.has(key)) {
+      localOnly.push(log);
+    }
+  });
+  
+  // 检查仅云端有的记录
+  cloudKeys.forEach((log, key) => {
+    if (!localKeys.has(key)) {
+      cloudOnly.push(log);
+    } else {
+      // 检查冲突记录（相同键但内容不同）
+      const localLog = localKeys.get(key);
+      if (localLog) {
+        // 比较关键属性，忽略可能不同的属性（如id、sync_status等）
+        const isConflicting = localLog.record_date !== log.record_date ||
+                            localLog.record_time !== log.record_time ||
+                            localLog.category !== log.category ||
+                            localLog.operation !== log.operation ||
+                            localLog.duration !== log.duration ||
+                            localLog.content !== log.content;
+        
+        if (isConflicting) {
+          conflicting.push(log);
+        }
+      }
+    }
+  });
+  
+  return {
+    localOnly,
+    cloudOnly,
+    conflicting,
+    totalLocal: localLogs.length,
+    totalCloud: cloudLogs.length
+  };
+};
+
 const formatTimestamp = (date: Date): string => {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -386,6 +457,11 @@ export const fetchAllTables = async (settings: FeishuApiSettings, refresh: boole
     url += (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
 
     const response = await fetch(url, { cache: 'no-store' });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data: FeishuApiResponse = await response.json();
 
     if (data.code !== 200) {
@@ -395,6 +471,15 @@ export const fetchAllTables = async (settings: FeishuApiSettings, refresh: boole
     return (data.data as FeishuTableData[]) || [];
   } catch (error) {
     console.error('Failed to fetch all tables:', error);
+    
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error('网络连接失败，请检查网络连接或API地址是否正确');
+    }
+    
+    if (error instanceof Error && error.message.includes('ERR_CONNECTION')) {
+      throw new Error('网络连接被关闭，请检查网络连接或API地址是否正确');
+    }
+    
     throw error;
   }
 };
@@ -714,42 +799,114 @@ export const apiService = {
     return id;
   },
 
-  async syncWithCloud(userId: string): Promise<CloudSyncResult> {
+  async getSyncDiff(source: 'feishu' | 'supabase', userId?: string, password?: string, language: string = 'zh'): Promise<SyncDiffResult> {
+    try {
+      const adapter = getStorageAdapter();
+      const localLogs = await adapter.getLogs();
+      let cloudLogs: SmokeLog[] = [];
+
+      if (source === 'feishu') {
+        // 从飞书获取数据
+        let feishuSettings = await getFeishuApiSettings();
+        if (password) {
+          feishuSettings = await getFeishuApiSettingsWithPassword(password);
+        }
+
+        if (feishuSettings.apiUrl === '__ENCRYPTED__') {
+          throw new Error('Feishu API settings are encrypted. Please provide password.');
+        }
+
+        if (!feishuSettings.apiUrl) {
+          throw new Error('Feishu API URL is not configured');
+        }
+
+        const tables = await fetchAllTables(feishuSettings, true);
+        for (const table of tables) {
+          const logs = convertToSmokeLogs(table, userId || 'local');
+          cloudLogs.push(...logs);
+        }
+      } else if (source === 'supabase') {
+        // 从supabase获取数据
+        cloudLogs = await this.getAllLogs(userId || 'local');
+      }
+
+      const diff = compareData(localLogs, cloudLogs);
+      
+      const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
+      let message = '';
+      if (source === 'feishu') {
+        message = t.foundNewRecords.replace('{count}', String(diff.cloudOnly.length)) + '，' + t.foundConflictingRecords.replace('{count}', String(diff.conflicting.length));
+      } else {
+        message = t.needUploadRecords.replace('{count}', String(diff.localOnly.length)) + '，' + t.needDownloadRecords.replace('{count}', String(diff.cloudOnly.length)) + '，' + t.foundConflictingRecords.replace('{count}', String(diff.conflicting.length));
+      }
+
+      return {
+        diff,
+        source,
+        timestamp: Date.now(),
+        message
+      };
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : '获取同步差异失败');
+    }
+  },
+
+  async executeSync(source: 'feishu' | 'supabase', diff: DataDiff, options: { upload?: boolean; download?: boolean } = {}, language: string = 'zh'): Promise<CloudSyncResult> {
     try {
       EventHandle.publish({
         type: EventType.SYNC_START,
         category: 'sync',
-        data: { userId },
+        data: { source, options },
         timestamp: Date.now()
       });
 
       const adapter = getStorageAdapter();
       const localLogs = await adapter.getLogs();
-      const cloudLogs = await this.getAllLogs(userId);
-
-      const cloudKeys = new Set(cloudLogs.map(getUniqueKey));
-      const localKeys = new Set(localLogs.map(getUniqueKey));
-
-      const localOnlyLogs = localLogs.filter((log) => !cloudKeys.has(getUniqueKey(log)));
-      const cloudOnlyLogs = cloudLogs.filter((log) => !localKeys.has(getUniqueKey(log)));
-
       let uploadedCount = 0;
-      if (localOnlyLogs.length > 0) {
-        const uploadResult = await this.saveLogs(localOnlyLogs);
+      let downloadedCount = 0;
+
+      // 执行上传（仅supabase）
+      if (source === 'supabase' && options.upload && diff.localOnly.length > 0) {
+        const uploadResult = await this.saveLogs(diff.localOnly);
         uploadedCount = uploadResult.count;
+        
+        EventHandle.publish({
+          type: EventType.CLOUD_UPLOAD,
+          category: 'sync',
+          data: { count: uploadedCount },
+          timestamp: Date.now()
+        });
       }
 
-      const mergedLogs = [...localLogs, ...cloudOnlyLogs].sort((a, b) => b.timestamp - a.timestamp);
-      await adapter.saveLogs(mergedLogs);
+      // 执行下载
+      if (options.download && diff.cloudOnly.length > 0) {
+        // 使用insert、replace模式合并数据
+        const existingKeys = new Set(localLogs.map(getUniqueKey));
+        const newLogs = diff.cloudOnly.filter(log => !existingKeys.has(getUniqueKey(log)));
+        
+        if (newLogs.length > 0) {
+          const mergedLogs = [...newLogs, ...localLogs].sort((a, b) => b.timestamp - a.timestamp);
+          await adapter.saveLogs(mergedLogs);
+          downloadedCount = newLogs.length;
+          
+          EventHandle.publish({
+            type: EventType.CLOUD_DOWNLOAD,
+            category: 'sync',
+            data: { count: downloadedCount },
+            timestamp: Date.now()
+          });
+        }
+      }
 
+      const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
       const result = {
         success: true,
-        message: `上传 ${uploadedCount} 条，下载 ${cloudOnlyLogs.length} 条`,
+        message: t.uploadCount.replace('{count}', String(uploadedCount)) + '，' + t.downloadCount.replace('{count}', String(downloadedCount)),
         localCount: localLogs.length,
-        cloudCount: cloudLogs.length,
+        cloudCount: diff.totalCloud,
         uploadedCount,
-        downloadedCount: cloudOnlyLogs.length,
-        totalCount: mergedLogs.length
+        downloadedCount,
+        totalCount: localLogs.length + downloadedCount - uploadedCount
       };
 
       EventHandle.publish({
@@ -760,6 +917,22 @@ export const apiService = {
       });
 
       return result;
+    } catch (error) {
+      const errorResult = { success: false, message: error instanceof Error ? error.message : '同步失败', localCount: 0, cloudCount: 0, uploadedCount: 0, downloadedCount: 0, totalCount: 0 };
+      EventHandle.publish({
+        type: EventType.SYNC_ERROR,
+        category: 'sync',
+        data: errorResult,
+        timestamp: Date.now()
+      });
+      return errorResult;
+    }
+  },
+
+  async syncWithCloud(userId: string): Promise<CloudSyncResult> {
+    try {
+      const diffResult = await this.getSyncDiff('supabase', userId);
+      return await this.executeSync('supabase', diffResult.diff, { upload: true, download: true });
     } catch (error) {
       const errorResult = { success: false, message: error instanceof Error ? error.message : '同步失败', localCount: 0, cloudCount: 0, uploadedCount: 0, downloadedCount: 0, totalCount: 0 };
       EventHandle.publish({

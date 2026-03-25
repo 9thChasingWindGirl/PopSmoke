@@ -3,10 +3,12 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { PopCard } from '../ui/PopCard';
 import { PopButton } from '../ui/PopButton';
 import { PopNotification, PopConfirm, PopSelect, PopPrompt } from '../ui/PopNotification';
+import { PopCloudDataDialog } from '../ui/PopCloudDataDialog';
+import { PopLoading } from '../ui/PopLoading';
 import { PopOperationLog } from '../ui/PopOperationLog';
 import { SmokeLog, AppSettings, User, OperationLog as OperationLogType } from '../../types';
 import { TRANSLATIONS } from '../../i18n';
-import { apiService, getFeishuApiSettings, syncFromFeishu } from '../../services/apiService';
+import { apiService, getFeishuApiSettings, syncFromFeishu, SyncDiffResult } from '../../services/apiService';
 import { getStorageKeys } from '../../utils/logUtils';
 import { getStorageAdapter, isWebPlatform, isAndroidPlatform } from '../../services/storageAdapter';
 import { POP_COMPONENT_STYLES } from '../../styles';
@@ -39,6 +41,12 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
   const [pendingSyncSource, setPendingSyncSource] = useState<SyncSource>(null);
   const [feishuPassword, setFeishuPassword] = useState('');
   const [apiFetchedCount, setApiFetchedCount] = useState<number | undefined>(undefined);
+  const [syncDiff, setSyncDiff] = useState<SyncDiffResult | null>(null);
+  const [showDiffDialog, setShowDiffDialog] = useState(false);
+  const [showSyncConfirmDialog, setShowSyncConfirmDialog] = useState(false);
+  const [syncOptions, setSyncOptions] = useState<{ upload: boolean; download: boolean }>({ upload: true, download: true });
+  const [isCalculatingDiff, setIsCalculatingDiff] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const [apiConfig, setApiConfig] = useState<{
     hasFeishuConfig: boolean;
@@ -146,62 +154,16 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
   const handleSync = async (source: SyncSource, password?: string) => {
     setShowSyncSourceDialog(false);
     setSyncStatus(null);
+    setIsCalculatingDiff(true);
+    setIsLoading(true);
 
     try {
       if (source === 'feishu') {
-        const options = { refresh: true };
         const userId = user?.id || 'local';
-        const result = await syncFromFeishu(options, userId, password);
+        const diffResult = await apiService.getSyncDiff('feishu', userId, password, settings.language);
         
-        // 如果配置已加密且没有提供密码，显示密码输入对话框
-        if (result.message && result.message.includes('encrypted')) {
-          setPendingSyncSource('feishu');
-          setShowPasswordDialog(true);
-          return;
-        }
-        
-        let displayMessage = result.message;
-        if (result.message === 'No new records to sync') {
-          displayMessage = t.noNewRecordsToSync;
-        } else if (result.message.startsWith('Synced ')) {
-          displayMessage = t.syncedRecordsFromFeishu
-            .replace('{newCount}', String(result.newCount || result.count))
-            .replace('{totalCount}', String(result.totalCount))
-            .replace('{duplicateCount}', String(result.duplicateCount));
-        }
-        
-        setSyncStatus({
-          success: result.success,
-          message: displayMessage
-        });
-        
-        if (result.success) {
-          setApiFetchedCount(result.totalCount);
-          
-          // 添加操作日志
-          if (onAddOperationLog && result.totalCount) {
-            const syncLog: OperationLogType = {
-              id: `sync_${Date.now()}`,
-              type: 'sync',
-              data: {
-                id: '',
-                user_id: userId || 'local',
-                record_date: new Date().toISOString().split('T')[0],
-                record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-                timestamp: Date.now()
-              } as SmokeLog,
-              syncStatus: 'synced',
-              timestamp: Date.now(),
-              message: `通过飞书API获取到 ${result.totalCount} 条记录`,
-              apiFetchedCount: result.totalCount
-            };
-            onAddOperationLog(syncLog);
-          }
-          
-          const adapter = getStorageAdapter();
-          const updatedLogs = await adapter.getLogs();
-          onRefreshLogs(updatedLogs);
-        }
+        setSyncDiff(diffResult);
+        setShowDiffDialog(true);
       } else if (source === 'supabase') {
         if (!user) {
           setSyncStatus({
@@ -225,70 +187,102 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
 
         // 如果提供了密码，先解密配置
         if (password) {
-          const { decryptSupabaseConfig, createSupabaseClient } = await import('../../services/apiService');
+          const { decryptSupabaseConfig } = await import('../../services/apiService');
           const decrypted = await decryptSupabaseConfig(password);
           if (!decrypted) {
             setSyncStatus({
               success: false,
-              message: (t as any).passwordError || 'Password incorrect'
+              message: t.passwordError
             });
             return;
           }
-          // 使用解密的配置创建客户端
-          createSupabaseClient(decrypted.apiUrl, decrypted.anonKey);
         }
 
-        let result;
-        if (onSyncWithCloud) {
-          result = await onSyncWithCloud(user.id);
-        } else {
-          //  fallback to direct call if onSyncWithCloud is not provided
-          const { apiService } = await import('../../services/apiService');
-          result = await apiService.syncWithCloud(user.id);
-        }
-        
+        const diffResult = await apiService.getSyncDiff('supabase', user.id, undefined, settings.language);
+        setSyncDiff(diffResult);
+        setShowDiffDialog(true);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      const errorMessage = error instanceof Error ? error.message : t.syncFailed;
+      
+      if (errorMessage.includes('encrypted')) {
+        setPendingSyncSource(source);
+        setShowPasswordDialog(true);
+      } else {
         setSyncStatus({
-          success: result.success,
-          message: result.message
+          success: false,
+          message: errorMessage
         });
-        if (result.success) {
-          setApiFetchedCount(result.totalCount);
-          
-          // 添加操作日志
-          if (onAddOperationLog && result.totalCount) {
-            const syncLog: OperationLogType = {
-              id: `sync_${Date.now()}`,
-              type: 'sync',
-              data: {
-                id: '',
-                user_id: user.id,
-                record_date: new Date().toISOString().split('T')[0],
-                record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-                timestamp: Date.now()
-              } as SmokeLog,
-              syncStatus: 'synced',
-              timestamp: Date.now(),
-              message: `通过Supabase同步完成: 上传${result.uploadedCount}条, 下载${result.downloadedCount}条`,
-              apiFetchedCount: result.totalCount
-            };
-            onAddOperationLog(syncLog);
-          }
-          
-          // 不需要再调用onRefreshLogs，因为handleSyncWithCloud已经处理了
+      }
+    } finally {
+      setIsCalculatingDiff(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!syncDiff) return;
+    
+    setShowDiffDialog(false);
+    setShowSyncConfirmDialog(false);
+    setIsLoading(true);
+    
+    try {
+      let result;
+      if (syncDiff.source === 'feishu') {
+        // 飞书只支持下载
+        result = await apiService.executeSync('feishu', syncDiff.diff, { download: true }, settings.language);
+      } else {
+        // Supabase支持上传和下载
+        result = await apiService.executeSync('supabase', syncDiff.diff, syncOptions, settings.language);
+      }
+      
+      setSyncStatus({
+        success: result.success,
+        message: result.message
+      });
+      
+      if (result.success) {
+        // 刷新本地日志
+        const adapter = getStorageAdapter();
+        const updatedLogs = await adapter.getLogs();
+        onRefreshLogs(updatedLogs);
+        
+        // 添加操作日志
+        if (onAddOperationLog) {
+          const syncLog: OperationLogType = {
+            id: `sync_${Date.now()}`,
+            type: 'sync',
+            data: {
+              id: '',
+              user_id: user?.id || 'local',
+              record_date: new Date().toISOString().split('T')[0],
+              record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+              timestamp: Date.now()
+            } as SmokeLog,
+            syncStatus: 'synced',
+            timestamp: Date.now(),
+            message: (syncDiff.source === 'feishu' ? t.syncWithFeishuCompleted : t.syncWithSupabaseCompleted) + '：' + result.message
+          };
+          onAddOperationLog(syncLog);
         }
       }
     } catch (error) {
+      console.error('Sync execution error:', error);
       setSyncStatus({
         success: false,
         message: error instanceof Error ? error.message : t.syncFailed
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const getSyncButtonText = () => {
     if (!hasAnyApiConfig) return t.cloudSync;
     if (needToSelectSource) return t.cloudSync;
-    if (apiConfig.hasFeishuConfig) return t.syncFromFeishuOnly;
+    if (apiConfig.hasFeishuConfig) return t.syncFromFeishu;
     if (apiConfig.hasSupabaseConfig) return t.syncFromSupabaseOnly;
     return t.cloudSync;
   };
@@ -516,12 +510,16 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         } as SmokeLog,
         syncStatus: 'synced',
         timestamp: Date.now(),
-        message: `导出CSV: ${fileName}`,
+        message: `${t.export} CSV: ${fileName}`,
         apiFetchedCount: Object.keys(logsByDate).length
       };
       onAddOperationLog(exportLog);
     }
   };
+
+  if (isLoading) {
+    return <PopLoading settings={settings} status="loading" isInitialize={false} />;
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
@@ -736,7 +734,33 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
           }}
         />
       )}
-    
+
+      <PopCloudDataDialog
+        visible={showDiffDialog}
+        mode="sync-diff"
+        syncDiff={syncDiff}
+        title={syncDiff?.source === 'feishu' ? t.syncFromFeishu : t.syncFromSupabaseOnly}
+        message=""
+        skipText={t.cancel}
+        onSkip={() => {
+          setShowDiffDialog(false);
+          setSyncDiff(null);
+        }}
+        onClose={() => {
+          setShowDiffDialog(false);
+          setSyncDiff(null);
+        }}
+        onSyncConfirm={handleSyncConfirm}
+        onSyncOptionChange={(option: 'upload' | 'download', value: boolean) => {
+          if (option === 'upload') {
+            setSyncOptions({ ...syncOptions, upload: value });
+          } else if (option === 'download') {
+            setSyncOptions({ ...syncOptions, download: value });
+          }
+        }}
+        themeColor={settings.themeColor}
+        language={settings.language}
+      />
 
     </div>
   );

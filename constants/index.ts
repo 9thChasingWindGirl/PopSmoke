@@ -39,7 +39,7 @@ export const DATE_FORMAT = 'YYYY-MM-DD';
 export const TIME_FORMAT = 'HH:mm:ss';
 export const DATETIME_FORMAT = 'YYYY-MM-DD HH:mm:ss';
 
-export const APP_NAME = 'POP SMOKE';
+export const APP_NAME = 'PopSmoke tracker';
 export const APP_VERSION = '0.3.9';
 
 export const TIMEOUT_MS = 10000;
