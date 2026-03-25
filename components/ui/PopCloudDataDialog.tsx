@@ -53,7 +53,7 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [password, setPassword] = useState('');
-  const [syncOptions, setSyncOptions] = useState({ upload: true, download: true });
+  const [syncOption, setSyncOption] = useState<'upload' | 'download'>('upload');
   
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
 
@@ -97,10 +97,10 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
     }, 300);
   };
 
-  const handleSyncOptionChange = (option: 'upload' | 'download', value: boolean) => {
-    const newOptions = { ...syncOptions, [option]: value };
-    setSyncOptions(newOptions);
-    onSyncOptionChange?.(option, value);
+  const handleSyncOptionChange = (option: 'upload' | 'download') => {
+    setSyncOption(option);
+    onSyncOptionChange?.(option, true);
+    onSyncOptionChange?.(option === 'upload' ? 'download' : 'upload', false);
   };
 
   const handleSyncConfirm = () => {
@@ -227,36 +227,59 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
             </>
           )}
           {mode === 'sync-diff' && syncDiff?.source === 'supabase' && (
-            <>
+            <div className="flex flex-col gap-3 w-full">
+              {/* 单选框选项 */}
+              <div className="space-y-2">
+                <label 
+                  className={`flex items-center gap-3 p-3 border-4 border-black cursor-pointer transition-all ${
+                    syncOption === 'upload' ? 'bg-opacity-20' : 'bg-white'
+                  }`}
+                  style={{ backgroundColor: syncOption === 'upload' ? themeColor : undefined }}
+                  onClick={() => handleSyncOptionChange('upload')}
+                >
+                  <div className={`w-5 h-5 border-2 border-black flex items-center justify-center ${
+                    syncOption === 'upload' ? 'bg-black' : 'bg-white'
+                  }`}>
+                    {syncOption === 'upload' && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <span className="font-display text-sm md:text-base">
+                    {t.uploadOnly} ({syncDiff.diff.localOnly.length})
+                  </span>
+                </label>
+                
+                <label 
+                  className={`flex items-center gap-3 p-3 border-4 border-black cursor-pointer transition-all ${
+                    syncOption === 'download' ? 'bg-opacity-20' : 'bg-white'
+                  }`}
+                  style={{ backgroundColor: syncOption === 'download' ? themeColor : undefined }}
+                  onClick={() => handleSyncOptionChange('download')}
+                >
+                  <div className={`w-5 h-5 border-2 border-black flex items-center justify-center ${
+                    syncOption === 'download' ? 'bg-black' : 'bg-white'
+                  }`}>
+                    {syncOption === 'download' && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <span className="font-display text-sm md:text-base">
+                    {t.downloadOnly} ({syncDiff.diff.cloudOnly.length})
+                  </span>
+                </label>
+                
+
+              </div>
+              
+              {/* 确认同步按钮 */}
               <PopButton
-                themeColor={syncOptions.upload ? themeColor : '#e0e0e0'}
-                onClick={() => handleSyncOptionChange('upload', !syncOptions.upload)}
-                className={`${POP_COMPONENT_STYLES.cloudDataDialog.button} ${syncOptions.upload ? 'border-4' : 'border-2'}`}
+                themeColor={themeColor}
+                onClick={handleSyncConfirm}
+                className={POP_COMPONENT_STYLES.cloudDataDialog.confirmButton}
               >
-                {t.upload} ({syncDiff.diff.localOnly.length})
+                {t.confirmSync}
               </PopButton>
-              <PopButton
-                themeColor={syncOptions.download ? themeColor : '#e0e0e0'}
-                onClick={() => handleSyncOptionChange('download', !syncOptions.download)}
-                className={`${POP_COMPONENT_STYLES.cloudDataDialog.button} ${syncOptions.download ? 'border-4' : 'border-2'}`}
-              >
-                {t.download} ({syncDiff?.diff.cloudOnly.length || 0})
-              </PopButton>
-            </>
+            </div>
           )}
         </div>
         
-        {mode === 'sync-diff' && (
-          <div>
-            <PopButton
-              themeColor={themeColor}
-              onClick={handleSyncConfirm}
-              className={POP_COMPONENT_STYLES.cloudDataDialog.confirmButton}
-            >
-              {t.confirmSync}
-            </PopButton>
-          </div>
-        )}
+
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import { PopCloudDataDialog } from './components/ui/PopCloudDataDialog';
 import { PopColorPicker } from './components/ui/PopColorPicker';
 import { PopLoading } from './components/ui/PopLoading';
 import PopNav from './components/ui/PopNav';
+import { PopSystemLog } from './components/ui/PopSystemLog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
 import { TRANSLATIONS } from './i18n';
@@ -78,6 +79,7 @@ export default function App() {
   const [showStorageErrorDialog, setShowStorageErrorDialog] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [showAuthErrorNotification, setShowAuthErrorNotification] = useState(false);
+  const [showSystemLog, setShowSystemLog] = useState(false);
   
   const [popEffects, setPopEffects] = useState<PopEffectItem[]>([]);
   const [operationLogs, setOperationLogs] = useState<OperationLogType[]>([]);
@@ -1258,6 +1260,7 @@ export default function App() {
                       onNavigateToDashboard={() => setView(ViewState.DASHBOARD)}
                       onRefreshLogs={(newLogs) => setLogs(newLogs)}
                       onAddOperationLog={(log) => setOperationLogs(prev => [log, ...prev])}
+                      onOpenSystemLog={() => setShowSystemLog(true)}
                     />
                 </div>
               )}
@@ -1336,6 +1339,14 @@ export default function App() {
         skipText={t.skipDownload}
         requirePassword={!!cloudDataSource}
         passwordPlaceholder={t.enterPassword || 'Enter password'}
+      />
+
+      {/* 系统日志组件 - 仅安卓端 */}
+      <PopSystemLog
+        visible={showSystemLog}
+        onClose={() => setShowSystemLog(false)}
+        themeColor={settings.themeColor}
+        language={settings.language}
       />
 
       </div>

@@ -161,6 +161,8 @@ export const i18n_EN = {
   conflicts: 'Conflicts',
   upload: 'Upload',
   download: 'Download',
+  uploadOnly: 'Upload Only',
+  downloadOnly: 'Download Only',
   foundNewRecords: 'Found {count} new records',
   foundConflictingRecords: '{count} conflicting records',
   needUploadRecords: 'Need to upload {count} records',
@@ -257,6 +259,7 @@ export const i18n_EN = {
   dataManagement: 'Data Management',
   storageUsage: 'Storage Usage',
   clearOldData: 'Clear Local Data',
+  systemLog: 'System Logs',
   apiUrlDisplay: 'Saved API Settings',
   apiConfigRequired: 'API Configuration Required',
 

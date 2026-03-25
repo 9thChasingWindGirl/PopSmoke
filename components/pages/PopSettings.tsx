@@ -12,7 +12,7 @@ import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 
 import { authService } from '../../services/authService';
 import { getSupabase } from '../../services/apiService';
-import { avatarCacheService } from '../../services/storageAdapter';
+import { avatarCacheService, isAndroidPlatform } from '../../services/storageAdapter';
 import { getStorageType, getStorageAdapter } from '../../services/storageAdapter';
 
 interface PopSettingsProps {
@@ -24,9 +24,10 @@ interface PopSettingsProps {
   onNavigateToDashboard?: () => void;
   onRefreshLogs?: (logs: SmokeLog[]) => void;
   onAddOperationLog?: (log: OperationLogType) => void;
+  onOpenSystemLog?: () => void;
 }
 
-export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user, onSignOut, onNavigateToAuth, onNavigateToDashboard, onRefreshLogs, onAddOperationLog }) => {
+export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user, onSignOut, onNavigateToAuth, onNavigateToDashboard, onRefreshLogs, onAddOperationLog, onOpenSystemLog }) => {
   const t = TRANSLATIONS[settings.language];
   
   // 语言和主题选择状态
@@ -572,10 +573,24 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
                               setShowClearDataDialog(true);
                             }}
                             themeColor="#ff6b6b"
-                            className="w-full"
+                            className="w-full mb-3"
                         >
                             {t.clearOldData || 'Clear Old Data'}
                         </PopButton>
+                        
+                        {/* 系统日志按钮 - 仅安卓端显示 */}
+                        {isAndroidPlatform() && (
+                            <PopButton
+                                onClick={() => {
+                                    triggerVibration();
+                                    onOpenSystemLog?.();
+                                }}
+                                themeColor="#636e72"
+                                className="w-full"
+                            >
+                                {t.systemLog || 'System Logs'}
+                            </PopButton>
+                        )}
                     </div>
                 </div>
             </PopCard>
