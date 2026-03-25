@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { PopButton } from './PopButton';
-import { POP_DESIGN_SYSTEM } from '../../styles/designSystem';
+import { POP_DESIGN_SYSTEM, POP_COMPONENT_STYLES } from '../../styles';
 import { SyncDiffResult } from '../../services/apiService';
 import { TRANSLATIONS } from '../../i18n';
 
@@ -53,6 +53,7 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [password, setPassword] = useState('');
+  const [syncOptions, setSyncOptions] = useState({ upload: true, download: true });
   
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
 
@@ -97,6 +98,8 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   };
 
   const handleSyncOptionChange = (option: 'upload' | 'download', value: boolean) => {
+    const newOptions = { ...syncOptions, [option]: value };
+    setSyncOptions(newOptions);
     onSyncOptionChange?.(option, value);
   };
 
@@ -112,48 +115,48 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
 
   const dialogContent = (
     <div 
-      className="fixed inset-0 z-[1050] flex items-center justify-center p-4"
+      className={POP_COMPONENT_STYLES.cloudDataDialog.overlay}
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
       // 点击外部不关闭对话框
       // onClick={handleClose}
     >
       <div
-        className={`bg-white border-4 border-black p-6 max-w-lg w-full shadow-pop-lg transition-all duration-300 ${
+        className={`${POP_COMPONENT_STYLES.cloudDataDialog.content} ${
           isClosing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">
-          <h2 className="font-display text-xl font-bold">
+          <h2 className={POP_COMPONENT_STYLES.cloudDataDialog.title}>
             {title}
           </h2>
           <button
             onClick={handleClose}
-            className="text-gray-500 hover:text-black font-bold text-xl leading-none"
+            className={POP_COMPONENT_STYLES.cloudDataDialog.closeButton}
           >
             ×
           </button>
         </div>
         
-        <p className="mb-4 text-gray-700 font-body">
+        <p className={POP_COMPONENT_STYLES.cloudDataDialog.message}>
           {message.replace('{count}', String(recordCount))}
         </p>
         
         {requirePassword && (
-          <div className="mb-4">
+          <div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={passwordPlaceholder}
-              className="w-full border-4 border-black p-2 font-display"
+              className={POP_COMPONENT_STYLES.cloudDataDialog.input}
             />
           </div>
         )}
         
         {mode === 'sync-diff' && syncDiff && (
           <div className="space-y-4 mb-6">
-            <div className="p-3 bg-gray-100 border-2 border-black">
+            <div className={POP_COMPONENT_STYLES.cloudDataDialog.diffSummary}>
               <p className="font-bold mb-2">{t.syncDiffSummary}</p>
               <p>{t.localRecords}: {syncDiff.diff.totalLocal}</p>
               <p>{t.cloudRecords}: {syncDiff.diff.totalCloud}</p>
@@ -171,14 +174,14 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
             {syncDiff.diff.cloudOnly.length > 0 && (
               <div>
                 <h4 className="font-bold mb-2">{t.cloudOnlyRecords}</h4>
-                <div className="max-h-32 overflow-y-auto p-2 border-2 border-black">
+                <div className={POP_COMPONENT_STYLES.cloudDataDialog.diffList}>
                   {syncDiff.diff.cloudOnly.slice(0, 5).map((log, index) => (
-                    <div key={index} className="mb-2 p-1 border-b border-gray-300">
+                    <div key={index} className={POP_COMPONENT_STYLES.cloudDataDialog.diffItem}>
                       <p>{new Date(log.timestamp).toLocaleString()}</p>
                     </div>
                   ))}
                   {syncDiff.diff.cloudOnly.length > 5 && (
-                    <p className="text-sm text-gray-500">... and {syncDiff.diff.cloudOnly.length - 5} more</p>
+                    <p className={POP_COMPONENT_STYLES.cloudDataDialog.diffMore}>... and {syncDiff.diff.cloudOnly.length - 5} more</p>
                   )}
                 </div>
               </div>
@@ -186,20 +189,20 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
           </div>
         )}
         
-        <div className="flex gap-3">
+        <div className={POP_COMPONENT_STYLES.cloudDataDialog.buttonGroup}>
           {mode === 'download' && (
             <>
               <PopButton
                 themeColor={themeColor}
                 onClick={handleDownload}
-                className="flex-1"
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
               >
                 {downloadText || 'Download'}
               </PopButton>
               <PopButton
                 variant="secondary"
                 onClick={handleSkip}
-                className="flex-1"
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
               >
                 {skipText}
               </PopButton>
@@ -210,14 +213,14 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
               <PopButton
                 themeColor={themeColor}
                 onClick={handleLogin}
-                className="flex-1"
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
               >
                 {loginText || 'Login'}
               </PopButton>
               <PopButton
                 variant="secondary"
                 onClick={handleSkip}
-                className="flex-1"
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
               >
                 {skipText}
               </PopButton>
@@ -226,16 +229,16 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
           {mode === 'sync-diff' && syncDiff?.source === 'supabase' && (
             <>
               <PopButton
-                themeColor={themeColor}
-                onClick={() => handleSyncOptionChange('upload', true)}
-                className="flex-1"
+                themeColor={syncOptions.upload ? themeColor : '#e0e0e0'}
+                onClick={() => handleSyncOptionChange('upload', !syncOptions.upload)}
+                className={`${POP_COMPONENT_STYLES.cloudDataDialog.button} ${syncOptions.upload ? 'border-4' : 'border-2'}`}
               >
                 {t.upload} ({syncDiff.diff.localOnly.length})
               </PopButton>
               <PopButton
-                themeColor={themeColor}
-                onClick={() => handleSyncOptionChange('download', true)}
-                className="flex-1"
+                themeColor={syncOptions.download ? themeColor : '#e0e0e0'}
+                onClick={() => handleSyncOptionChange('download', !syncOptions.download)}
+                className={`${POP_COMPONENT_STYLES.cloudDataDialog.button} ${syncOptions.download ? 'border-4' : 'border-2'}`}
               >
                 {t.download} ({syncDiff?.diff.cloudOnly.length || 0})
               </PopButton>
@@ -244,11 +247,11 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
         </div>
         
         {mode === 'sync-diff' && (
-          <div className="mt-4">
+          <div>
             <PopButton
               themeColor={themeColor}
               onClick={handleSyncConfirm}
-              className="w-full"
+              className={POP_COMPONENT_STYLES.cloudDataDialog.confirmButton}
             >
               {t.confirmSync}
             </PopButton>

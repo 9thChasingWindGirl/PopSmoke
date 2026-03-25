@@ -238,6 +238,48 @@ export const POP_COMPONENT_STYLES = {
     `,
   },
 
+  cloudDataDialog: {
+    overlay: `
+      fixed inset-0 z-[1050] flex items-center justify-center p-4
+    `,
+    content: `
+      bg-white border-4 border-black p-6 max-w-lg w-full shadow-pop-lg transition-all duration-300
+    `,
+    title: `
+      font-display text-xl font-bold
+    `,
+    closeButton: `
+      text-gray-500 hover:text-black font-bold text-xl leading-none
+    `,
+    message: `
+      mb-4 text-gray-700 font-body
+    `,
+    input: `
+      w-full border-4 border-black p-2 font-display mb-4
+    `,
+    diffSummary: `
+      p-3 bg-gray-100 border-2 border-black mb-4
+    `,
+    diffList: `
+      max-h-32 overflow-y-auto p-2 border-2 border-black
+    `,
+    diffItem: `
+      mb-2 p-1 border-b border-gray-300
+    `,
+    diffMore: `
+      text-sm text-gray-500
+    `,
+    buttonGroup: `
+      flex gap-3
+    `,
+    button: `
+      flex-1
+    `,
+    confirmButton: `
+      w-full mt-4
+    `,
+  },
+
   settings: {
     dropdown: {
       trigger: `

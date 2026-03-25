@@ -372,7 +372,7 @@ export default function App() {
         setSettingsState(result.settings);
       }
 
-      if (result.needCloudSync && result.cloudLogs && result.localLogs.length === 0) {
+      if (result.needCloudSync && result.cloudLogs && result.localLogs.length === 0 && !showCloudDataDialog) {
         systemLogService.info('storage', `发现 ${result.cloudLogs.length} 条云端日志，显示同步对话框`);
         setCloudDataSource('supabase');
         setCloudDialogMode('download');
