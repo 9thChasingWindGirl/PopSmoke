@@ -480,9 +480,17 @@ class SQLiteAdapter implements DataStorageAdapter {
       );
     `;
 
+    const createRuntimeConfigTable = `
+      CREATE TABLE IF NOT EXISTS runtime_config (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `;
+
     await this.db.execute(createLogsTable);
     await this.db.execute(createSettingsTable);
     await this.db.execute(createApiSettingsTable);
+    await this.db.execute(createRuntimeConfigTable);
   }
 
   async getLogs(): Promise<SmokeLog[]> {
@@ -643,6 +651,50 @@ class SQLiteAdapter implements DataStorageAdapter {
       console.log('Cleared logs from SQLite (settings and API settings preserved)');
     } catch (error) {
       console.error('Failed to clear logs from SQLite:', error);
+      throw error;
+    }
+  }
+
+  async getRuntimeConfig(key: string): Promise<string | null> {
+    try {
+      await this.initDB();
+      if (!this.db) return null;
+      const result: DBSQLiteValues = await this.db.query("SELECT value FROM runtime_config WHERE key = ?", [key]);
+      
+      if (result.values && result.values.length > 0) {
+        const value = result.values[0].value || result.values[0];
+        return typeof value === 'string' ? value : null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Failed to get runtime config from SQLite:', error);
+      return null;
+    }
+  }
+
+  async saveRuntimeConfig(key: string, value: string): Promise<void> {
+    try {
+      await this.initDB();
+      if (!this.db) throw new Error('Database not initialized');
+      
+      await this.db.run(
+        "INSERT OR REPLACE INTO runtime_config (key, value) VALUES (?, ?)",
+        [key, value]
+      );
+    } catch (error) {
+      console.error('Failed to save runtime config to SQLite:', error);
+      throw error;
+    }
+  }
+
+  async deleteRuntimeConfig(key: string): Promise<void> {
+    try {
+      await this.initDB();
+      if (!this.db) throw new Error('Database not initialized');
+      await this.db.run("DELETE FROM runtime_config WHERE key = ?", [key]);
+    } catch (error) {
+      console.error('Failed to delete runtime config from SQLite:', error);
       throw error;
     }
   }
@@ -1086,10 +1138,47 @@ export interface SupabaseRuntimeConfig {
   anonKey: string;
 }
 
+const RUNTIME_CONFIG_KEY = 'popsmoke_supabase_runtime_config';
+
 export const getSupabaseRuntimeConfig = async (): Promise<SupabaseRuntimeConfig | null> => {
   const authStorage = getAuthStorageAdapter();
+  
   try {
-    const value = await authStorage.getAuthItem('popsmoke_supabase_runtime_config');
+    // 安卓端：优先从 Preferences 读取
+    if (isAndroidPlatform()) {
+      const value = await authStorage.getAuthItem(RUNTIME_CONFIG_KEY);
+      if (value) {
+        const parsed = JSON.parse(value);
+        if (parsed?.apiUrl && parsed?.anonKey) {
+          return {
+            apiUrl: parsed.apiUrl,
+            anonKey: parsed.anonKey,
+          };
+        }
+      }
+      
+      // Preferences 中没有，从 SQLite 读取
+      const adapter = getStorageAdapter();
+      if (adapter instanceof SQLiteAdapter) {
+        const sqliteValue = await adapter.getRuntimeConfig(RUNTIME_CONFIG_KEY);
+        if (sqliteValue) {
+          const parsed = JSON.parse(sqliteValue);
+          if (parsed?.apiUrl && parsed?.anonKey) {
+            // 同步回 Preferences
+            await authStorage.setAuthItem(RUNTIME_CONFIG_KEY, sqliteValue);
+            return {
+              apiUrl: parsed.apiUrl,
+              anonKey: parsed.anonKey,
+            };
+          }
+        }
+      }
+      
+      return null;
+    }
+    
+    // 非安卓端：直接从 Preferences/localStorage 读取
+    const value = await authStorage.getAuthItem(RUNTIME_CONFIG_KEY);
     if (!value) return null;
 
     const parsed = JSON.parse(value);
@@ -1108,12 +1197,41 @@ export const getSupabaseRuntimeConfig = async (): Promise<SupabaseRuntimeConfig 
 
 export const setSupabaseRuntimeConfig = async (config: SupabaseRuntimeConfig): Promise<void> => {
   const authStorage = getAuthStorageAdapter();
-  await authStorage.setAuthItem('popsmoke_supabase_runtime_config', JSON.stringify(config));
+  const configJson = JSON.stringify(config);
+  
+  // 保存到 Preferences
+  await authStorage.setAuthItem(RUNTIME_CONFIG_KEY, configJson);
+  
+  // 安卓端：同时保存到 SQLite
+  if (isAndroidPlatform()) {
+    try {
+      const adapter = getStorageAdapter();
+      if (adapter instanceof SQLiteAdapter) {
+        await adapter.saveRuntimeConfig(RUNTIME_CONFIG_KEY, configJson);
+      }
+    } catch (error) {
+      console.error('Failed to save runtime config to SQLite:', error);
+    }
+  }
 };
 
 export const clearSupabaseRuntimeConfig = async (): Promise<void> => {
   const authStorage = getAuthStorageAdapter();
-  await authStorage.removeAuthItem('popsmoke_supabase_runtime_config');
+  
+  // 清除 Preferences
+  await authStorage.removeAuthItem(RUNTIME_CONFIG_KEY);
+  
+  // 安卓端：同时清除 SQLite
+  if (isAndroidPlatform()) {
+    try {
+      const adapter = getStorageAdapter();
+      if (adapter instanceof SQLiteAdapter) {
+        await adapter.deleteRuntimeConfig(RUNTIME_CONFIG_KEY);
+      }
+    } catch (error) {
+      console.error('Failed to delete runtime config from SQLite:', error);
+    }
+  }
 };
 
 export const createSupabaseAuthStorage = () => {
