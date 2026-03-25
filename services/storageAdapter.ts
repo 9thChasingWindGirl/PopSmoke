@@ -4,7 +4,6 @@ import { Capacitor } from '@capacitor/core';
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection, DBSQLiteValues, capSQLiteResult } from '@capacitor-community/sqlite';
 import { safeSetItem } from '../utils/storageUtils';
 import { Preferences } from '@capacitor/preferences';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { apiService } from './apiService';
 
 const STORAGE_KEY_API_SETTINGS = 'popsmoke_api_settings';
@@ -649,278 +648,6 @@ class SQLiteAdapter implements DataStorageAdapter {
   }
 }
 
-class MultiLevelStorageAdapter implements DataStorageAdapter {
-  private memoryCache: Map<string, any> = new Map();
-  private sqliteAdapter: SQLiteAdapter = new SQLiteAdapter();
-  private cacheExpiry = 5 * 60 * 1000; // 5分钟缓存过期
-  private cacheTimestamps: Map<string, number> = new Map();
-  private coldStorageThreshold = 30 * 24 * 60 * 60 * 1000; // 30天前的数据移至冷存储
-  private isMigrating = false;
-  private lastMigrationTime = 0;
-  private migrationCooldown = 24 * 60 * 60 * 1000; // 24小时迁移冷却期
-
-  private getCacheKey(prefix: string, ...args: string[]): string {
-    return `${prefix}:${args.join(':')}`;
-  }
-
-  private isCacheValid(key: string): boolean {
-    const timestamp = this.cacheTimestamps.get(key);
-    if (!timestamp) return false;
-    return Date.now() - timestamp < this.cacheExpiry;
-  }
-
-  private setCache(key: string, value: any): void {
-    this.memoryCache.set(key, value);
-    this.cacheTimestamps.set(key, Date.now());
-  }
-
-  private getCache(key: string): any {
-    if (this.isCacheValid(key)) {
-      return this.memoryCache.get(key);
-    }
-    this.memoryCache.delete(key);
-    this.cacheTimestamps.delete(key);
-    return null;
-  }
-
-  private async moveToColdStorage(logs: SmokeLog[]): Promise<void> {
-    // 检查是否正在迁移或处于冷却期
-    if (this.isMigrating) {
-      console.log('[MultiLevelStorageAdapter] 冷存储迁移正在进行中，跳过');
-      return;
-    }
-    
-    if (Date.now() - this.lastMigrationTime < this.migrationCooldown) {
-      console.log('[MultiLevelStorageAdapter] 冷存储迁移处于冷却期，跳过');
-      return;
-    }
-    
-    this.isMigrating = true;
-    
-    try {
-      const coldLogs = logs.filter(log => 
-        Date.now() - log.timestamp > this.coldStorageThreshold
-      );
-      
-      if (coldLogs.length > 0) {
-        console.log(`[MultiLevelStorageAdapter] 准备将 ${coldLogs.length} 条旧记录移至冷存储`);
-        
-        // 创建冷存储目录
-        const coldStorageDir = 'cold_storage';
-        
-        try {
-          // 检查目录是否存在
-          await Filesystem.stat({
-            path: coldStorageDir,
-            directory: Directory.Data
-          });
-        } catch (error) {
-          // 目录不存在，创建目录
-          await Filesystem.mkdir({
-            path: coldStorageDir,
-            directory: Directory.Data,
-            recursive: true
-          });
-          console.log('[MultiLevelStorageAdapter] 创建冷存储目录');
-        }
-        
-        // 按月份分组存储
-        const logsByMonth: { [key: string]: SmokeLog[] } = {};
-        
-        coldLogs.forEach(log => {
-          const date = new Date(log.timestamp);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          
-          if (!logsByMonth[monthKey]) {
-            logsByMonth[monthKey] = [];
-          }
-          logsByMonth[monthKey].push(log);
-        });
-        
-        // 保存到文件系统
-        for (const [month, monthLogs] of Object.entries(logsByMonth)) {
-          const filePath = `${coldStorageDir}/logs_${month}.json`;
-          
-          try {
-            // 检查文件是否存在
-            await Filesystem.stat({
-              path: filePath,
-              directory: Directory.Data
-            });
-            
-            // 文件存在，读取现有数据
-            const existingContent = await Filesystem.readFile({
-              path: filePath,
-              directory: Directory.Data,
-              encoding: Encoding.UTF8
-            });
-            
-            if (typeof existingContent.data === 'string') {
-              const existingLogs: SmokeLog[] = JSON.parse(existingContent.data);
-              const mergedLogs = [...existingLogs, ...monthLogs];
-              
-              // 去重
-              const uniqueLogs = this.removeDuplicateLogs(mergedLogs);
-              
-              // 保存合并后的数据
-              await Filesystem.writeFile({
-                path: filePath,
-                directory: Directory.Data,
-                data: JSON.stringify(uniqueLogs),
-                encoding: Encoding.UTF8
-              });
-              
-              console.log(`[MultiLevelStorageAdapter] 更新冷存储文件: ${filePath}, 记录数: ${uniqueLogs.length}`);
-            } else {
-              console.warn('[MultiLevelStorageAdapter] 冷存储文件数据格式错误，跳过更新');
-            }
-          } catch (error) {
-            // 文件不存在，创建新文件
-            await Filesystem.writeFile({
-              path: filePath,
-              directory: Directory.Data,
-              data: JSON.stringify(monthLogs),
-              encoding: Encoding.UTF8
-            });
-            
-            console.log(`[MultiLevelStorageAdapter] 创建冷存储文件: ${filePath}, 记录数: ${monthLogs.length}`);
-          }
-        }
-        
-        console.log('[MultiLevelStorageAdapter] 冷存储迁移完成');
-        this.lastMigrationTime = Date.now();
-      }
-    } catch (error) {
-      console.error('[MultiLevelStorageAdapter] 冷存储迁移失败:', error);
-    } finally {
-      this.isMigrating = false;
-    }
-  }
-
-  private removeDuplicateLogs(logs: SmokeLog[]): SmokeLog[] {
-    const seenIds = new Set<string>();
-    return logs.filter(log => {
-      if (seenIds.has(log.id)) {
-        return false;
-      }
-      seenIds.add(log.id);
-      return true;
-    });
-  }
-
-  async getLogs(): Promise<SmokeLog[]> {
-    const cacheKey = this.getCacheKey('logs');
-    const cachedLogs = this.getCache(cacheKey);
-    
-    if (cachedLogs) {
-      console.log('[MultiLevelStorageAdapter] 从内存缓存获取日志');
-      return cachedLogs;
-    }
-
-    console.log('[MultiLevelStorageAdapter] 从SQLite获取日志');
-    const logs = await this.sqliteAdapter.getLogs();
-    
-    // 异步处理冷存储迁移
-    this.moveToColdStorage(logs);
-    
-    // 缓存结果
-    this.setCache(cacheKey, logs);
-    return logs;
-  }
-
-  async saveLogs(logs: SmokeLog[]): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 保存日志到SQLite');
-    await this.sqliteAdapter.saveLogs(logs);
-    
-    // 更新缓存
-    const cacheKey = this.getCacheKey('logs');
-    this.setCache(cacheKey, logs);
-  }
-
-  async getSettings(): Promise<AppSettings> {
-    const cacheKey = this.getCacheKey('settings');
-    const cachedSettings = this.getCache(cacheKey);
-    
-    if (cachedSettings) {
-      console.log('[MultiLevelStorageAdapter] 从内存缓存获取设置');
-      return cachedSettings;
-    }
-
-    console.log('[MultiLevelStorageAdapter] 从SQLite获取设置');
-    const settings = await this.sqliteAdapter.getSettings();
-    
-    // 缓存结果
-    this.setCache(cacheKey, settings);
-    return settings;
-  }
-
-  async saveSettings(settings: AppSettings): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 保存设置到SQLite');
-    await this.sqliteAdapter.saveSettings(settings);
-    
-    // 更新缓存
-    const cacheKey = this.getCacheKey('settings');
-    this.setCache(cacheKey, settings);
-  }
-
-  async getApiSettings(): Promise<EncryptedApiSettings | null> {
-    const cacheKey = this.getCacheKey('api_settings');
-    const cachedSettings = this.getCache(cacheKey);
-    
-    if (cachedSettings) {
-      console.log('[MultiLevelStorageAdapter] 从内存缓存获取API设置');
-      return cachedSettings;
-    }
-
-    console.log('[MultiLevelStorageAdapter] 从SQLite获取API设置');
-    const settings = await this.sqliteAdapter.getApiSettings();
-    
-    // 缓存结果
-    if (settings) {
-      this.setCache(cacheKey, settings);
-    }
-    return settings;
-  }
-
-  async saveApiSettings(settings: EncryptedApiSettings): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 保存API设置到SQLite');
-    await this.sqliteAdapter.saveApiSettings(settings);
-    
-    // 更新缓存
-    const cacheKey = this.getCacheKey('api_settings');
-    this.setCache(cacheKey, settings);
-  }
-
-  async deleteApiSettings(): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 删除API设置');
-    await this.sqliteAdapter.deleteApiSettings();
-    
-    // 清除缓存
-    const cacheKey = this.getCacheKey('api_settings');
-    this.memoryCache.delete(cacheKey);
-    this.cacheTimestamps.delete(cacheKey);
-  }
-
-  async clearAll(): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 清除所有数据');
-    await this.sqliteAdapter.clearAll();
-    
-    // 清除所有缓存
-    this.memoryCache.clear();
-    this.cacheTimestamps.clear();
-  }
-
-  async clearLogsOnly(): Promise<void> {
-    console.log('[MultiLevelStorageAdapter] 仅清除日志');
-    await this.sqliteAdapter.clearLogsOnly();
-    
-    // 清除日志缓存
-    const cacheKey = this.getCacheKey('logs');
-    this.memoryCache.delete(cacheKey);
-    this.cacheTimestamps.delete(cacheKey);
-  }
-}
-
 let storageAdapter: DataStorageAdapter | null = null;
 let migrationChecked = false;
 
@@ -1071,8 +798,8 @@ export const getStorageAdapter = (): DataStorageAdapter => {
 
   // 首次选择存储适配器
   if (isAndroidPlatform()) {
-    console.log('[getStorageAdapter] 选择多级存储适配器 (Android)');
-    storageAdapter = new MultiLevelStorageAdapter();
+    console.log('[getStorageAdapter] 选择SQLite存储适配器 (Android)');
+    storageAdapter = new SQLiteAdapter();
   } else {
     // Web端优先使用IndexedDB，即使初始化失败也尝试使用
     try {
@@ -1107,7 +834,7 @@ export const getStorageAdapter = (): DataStorageAdapter => {
 
 export const getStorageType = (): string => {
   if (isAndroidPlatform()) {
-    return 'MultiLevel';
+    return 'SQLite';
   } else if (isIndexedDBAvailable()) {
     return 'IndexedDB';
   } else {
@@ -1171,11 +898,27 @@ export const getAuthStorageAdapter = (): DataStorageAdapter & {
     },
 
     async hasLoggedIn(): Promise<boolean> {
-      const value = await this.getAuthItem(STORAGE_KEY_HAS_LOGGED_IN);
-      return value === 'true';
+      // 统一使用SQLite存储登录状态，确保与API设置同步
+      try {
+        const apiSettings = await adapter.getApiSettings();
+        // 如果存在API设置且包含supabase配置，认为已登录
+        if (apiSettings && apiSettings.supabase) {
+          return true;
+        }
+        // 回退到Preferences检查（兼容旧数据）
+        const value = await this.getAuthItem(STORAGE_KEY_HAS_LOGGED_IN);
+        return value === 'true';
+      } catch (error) {
+        console.error('[hasLoggedIn] 检查登录状态失败:', error);
+        // 出错时回退到Preferences
+        const value = await this.getAuthItem(STORAGE_KEY_HAS_LOGGED_IN);
+        return value === 'true';
+      }
     },
 
     async setLoggedIn(value: boolean): Promise<void> {
+      // 登录状态现在由API设置的存在性决定，不再单独存储
+      // 但为了兼容性，仍然更新Preferences
       if (value) {
         await this.setAuthItem(STORAGE_KEY_HAS_LOGGED_IN, 'true');
       } else {

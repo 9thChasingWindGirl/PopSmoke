@@ -20,7 +20,7 @@ import PopNav from './components/ui/PopNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
 import { TRANSLATIONS } from './i18n';
-import { getStorageAdapter, getAuthStorageAdapter, getSyncQueueManager, simpleDecrypt, isAndroidPlatform, hasLoggedInBefore, setLoggedInFlag, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, createSupabaseAuthStorage } from './services/storageAdapter';
+import { getStorageAdapter, getAuthStorageAdapter, getSyncQueueManager, simpleEncrypt, simpleDecrypt, isAndroidPlatform, hasLoggedInBefore, setLoggedInFlag, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, createSupabaseAuthStorage } from './services/storageAdapter';
 import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs, getSupabase } from './services/apiService';
 import EventHandle from './event/EventHandle';
 import { EventType } from './event/EventType';
@@ -302,6 +302,43 @@ export default function App() {
         setShowRestorePasswordDialog(false);
         setIsLocalMode(false);
         setLoggedInFlag(true);
+        
+        // 保存API设置到SQLite，确保重启后能恢复登录
+        const saveApiSettingsOnLogin = async () => {
+          try {
+            const adapter = getStorageAdapter();
+            const existingSettings = await adapter.getApiSettings();
+            
+            // 如果已经保存了API设置，跳过
+            if (existingSettings && existingSettings.supabase) {
+              console.log('[App] API设置已存在，跳过保存');
+              return;
+            }
+            
+            // 使用环境变量中的Supabase配置创建加密设置
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+            
+            if (!supabaseUrl || !supabaseAnonKey) {
+              console.warn('[App] 环境变量中未找到Supabase配置');
+              return;
+            }
+            
+            // 使用用户密码作为加密密钥
+            const password = session.user.email || 'default';
+            const encryptedSettings = {
+              supabase: simpleEncrypt(JSON.stringify({ apiUrl: supabaseUrl, anonKey: supabaseAnonKey }), password),
+              securityPassword: simpleEncrypt(password, password)
+            };
+            
+            await adapter.saveApiSettings(encryptedSettings);
+            console.log('[App] 登录成功，已保存API设置到SQLite');
+          } catch (error) {
+            console.error('[App] 保存API设置失败:', error);
+          }
+        };
+        
+        saveApiSettingsOnLogin();
         loadUserData(session.user as User);
       } else if (event === 'SIGNED_OUT') {
         systemLogService.info('auth', '用户登出');
@@ -523,6 +560,39 @@ export default function App() {
           setOperationLogs(prev => [loginLog, ...prev]);
           setShowAuthModal(false);
           setIsLocalMode(false);
+          
+          // 保存API设置到SQLite，确保重启后能恢复登录
+          const saveApiSettingsOnAuth = async () => {
+            try {
+              const adapter = getStorageAdapter();
+              const existingSettings = await adapter.getApiSettings();
+              
+              if (existingSettings && existingSettings.supabase) {
+                console.log('[App] API设置已存在，跳过保存');
+                return;
+              }
+              
+              const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+              const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+              
+              if (!supabaseUrl || !supabaseAnonKey) {
+                console.warn('[App] 环境变量中未找到Supabase配置');
+                return;
+              }
+              
+              const encryptedSettings = {
+                supabase: simpleEncrypt(JSON.stringify({ apiUrl: supabaseUrl, anonKey: supabaseAnonKey }), password),
+                securityPassword: simpleEncrypt(password, password)
+              };
+              
+              await adapter.saveApiSettings(encryptedSettings);
+              console.log('[App] 登录成功，已保存API设置到SQLite');
+            } catch (error) {
+              console.error('[App] 保存API设置失败:', error);
+            }
+          };
+          
+          saveApiSettingsOnAuth();
         }
       } else {
         result = await authService.signUp(email, password);
