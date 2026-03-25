@@ -84,4 +84,12 @@ export interface DataStorageAdapter {
   deleteApiSettings: () => Promise<void>;
   clearAll: () => Promise<void>;
   clearLogsOnly: () => Promise<void>;
+  // 安卓端扩展方法
+  getAuthItem?: (key: string) => Promise<string | null>;
+  setAuthItem?: (key: string, value: string) => Promise<void>;
+  removeAuthItem?: (key: string) => Promise<void>;
+  getSystemLogs?: () => Promise<string | null>;
+  saveSystemLogs?: (value: string) => Promise<void>;
+  getNativeRuntimeLogs?: () => Promise<string | null>;
+  saveNativeRuntimeLogs?: (value: string) => Promise<void>;
 }

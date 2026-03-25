@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { LogEntry, LogLevel, LogCategory, LogFilter, LogStats, DiagnosticConfig } from '../types';
+import { getStorageAdapter, isAndroidPlatform } from './storageAdapter';
 
 const NATIVE_LOGS_KEY = 'popsmoke_runtime_logs';
 const NATIVE_LOGS_MAX_CHARS = 200000;
@@ -33,7 +34,18 @@ class SystemLogService {
 
   private async loadLogsFromStorage(): Promise<void> {
     try {
-      if (this.isNativePlatform()) {
+      if (isAndroidPlatform()) {
+        // 安卓端使用SQLite存储
+        const adapter = getStorageAdapter();
+        if ('getSystemLogs' in adapter) {
+          const value = await adapter.getSystemLogs();
+          if (value) {
+            this.logs = JSON.parse(value);
+          }
+        }
+        return;
+      } else if (this.isNativePlatform()) {
+        // 其他原生平台使用Preferences
         const { value } = await Preferences.get({ key: 'system_logs' });
         if (value) {
           this.logs = JSON.parse(value);
@@ -41,6 +53,7 @@ class SystemLogService {
         return;
       }
 
+      // Web端使用localStorage
       const stored = localStorage.getItem('system_logs');
       if (stored) {
         this.logs = JSON.parse(stored);
@@ -58,13 +71,28 @@ class SystemLogService {
       const line = `[${timestamp}] [${entry.level.toUpperCase()}] [${entry.category}] ${entry.message}`;
       const payload = `${line}${entry.data ? ` | data=${JSON.stringify(entry.data)}` : ''}${entry.error ? ` | error=${entry.error.message}` : ''}\n`;
 
-      const { value: existing } = await Preferences.get({ key: NATIVE_LOGS_KEY });
-      const merged = `${existing || ''}${payload}`;
-      const trimmed = merged.length > NATIVE_LOGS_MAX_CHARS
-        ? merged.slice(merged.length - NATIVE_LOGS_MAX_CHARS)
-        : merged;
+      if (isAndroidPlatform()) {
+        // 安卓端使用SQLite存储
+        const adapter = getStorageAdapter();
+        if ('getNativeRuntimeLogs' in adapter && 'saveNativeRuntimeLogs' in adapter) {
+          const existing = await adapter.getNativeRuntimeLogs();
+          const merged = `${existing || ''}${payload}`;
+          const trimmed = merged.length > NATIVE_LOGS_MAX_CHARS
+            ? merged.slice(merged.length - NATIVE_LOGS_MAX_CHARS)
+            : merged;
 
-      await Preferences.set({ key: NATIVE_LOGS_KEY, value: trimmed });
+          await adapter.saveNativeRuntimeLogs(trimmed);
+        }
+      } else {
+        // 其他原生平台使用Preferences
+        const { value: existing } = await Preferences.get({ key: NATIVE_LOGS_KEY });
+        const merged = `${existing || ''}${payload}`;
+        const trimmed = merged.length > NATIVE_LOGS_MAX_CHARS
+          ? merged.slice(merged.length - NATIVE_LOGS_MAX_CHARS)
+          : merged;
+
+        await Preferences.set({ key: NATIVE_LOGS_KEY, value: trimmed });
+      }
     } catch (error) {
       console.error('Failed to append native runtime log:', error);
     }
@@ -75,9 +103,17 @@ class SystemLogService {
       if (!this.config.enableStorage) return;
 
       const serialized = JSON.stringify(this.logs);
-      if (this.isNativePlatform()) {
+      if (isAndroidPlatform()) {
+        // 安卓端使用SQLite存储
+        const adapter = getStorageAdapter();
+        if ('saveSystemLogs' in adapter) {
+          void adapter.saveSystemLogs(serialized);
+        }
+      } else if (this.isNativePlatform()) {
+        // 其他原生平台使用Preferences
         void Preferences.set({ key: 'system_logs', value: serialized });
       } else {
+        // Web端使用localStorage
         localStorage.setItem('system_logs', serialized);
       }
     } catch (error) {

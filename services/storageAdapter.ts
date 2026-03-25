@@ -698,6 +698,69 @@ class SQLiteAdapter implements DataStorageAdapter {
       throw error;
     }
   }
+
+  async getAuthItem(key: string): Promise<string | null> {
+    try {
+      return await this.getRuntimeConfig(key);
+    } catch (error) {
+      console.error(`[SQLiteAdapter.getAuthItem] Failed to get auth item for key "${key}":`, error);
+      return null;
+    }
+  }
+
+  async setAuthItem(key: string, value: string): Promise<void> {
+    try {
+      await this.saveRuntimeConfig(key, value);
+    } catch (error) {
+      console.error(`[SQLiteAdapter.setAuthItem] Failed to set auth item for key "${key}":`, error);
+      throw error;
+    }
+  }
+
+  async removeAuthItem(key: string): Promise<void> {
+    try {
+      await this.deleteRuntimeConfig(key);
+    } catch (error) {
+      console.error(`[SQLiteAdapter.removeAuthItem] Failed to remove auth item for key "${key}":`, error);
+      throw error;
+    }
+  }
+
+  async getSystemLogs(): Promise<string | null> {
+    try {
+      return await this.getRuntimeConfig('system_logs');
+    } catch (error) {
+      console.error('[SQLiteAdapter.getSystemLogs] Failed to get system logs:', error);
+      return null;
+    }
+  }
+
+  async saveSystemLogs(value: string): Promise<void> {
+    try {
+      await this.saveRuntimeConfig('system_logs', value);
+    } catch (error) {
+      console.error('[SQLiteAdapter.saveSystemLogs] Failed to save system logs:', error);
+      throw error;
+    }
+  }
+
+  async getNativeRuntimeLogs(): Promise<string | null> {
+    try {
+      return await this.getRuntimeConfig('popsmoke_runtime_logs');
+    } catch (error) {
+      console.error('[SQLiteAdapter.getNativeRuntimeLogs] Failed to get native runtime logs:', error);
+      return null;
+    }
+  }
+
+  async saveNativeRuntimeLogs(value: string): Promise<void> {
+    try {
+      await this.saveRuntimeConfig('popsmoke_runtime_logs', value);
+    } catch (error) {
+      console.error('[SQLiteAdapter.saveNativeRuntimeLogs] Failed to save native runtime logs:', error);
+      throw error;
+    }
+  }
 }
 
 let storageAdapter: DataStorageAdapter | null = null;
@@ -911,10 +974,18 @@ export const getAuthStorageAdapter = (): DataStorageAdapter & {
     ...adapter,
     async getAuthItem(key: string): Promise<string | null> {
       try {
-        if (Capacitor.isNativePlatform()) {
+        if (isAndroidPlatform()) {
+          // 安卓端使用SQLite存储
+          if (!('getAuthItem' in adapter) || typeof adapter.getAuthItem !== 'function') {
+            throw new Error('SQLiteAdapter does not implement getAuthItem');
+          }
+          return await adapter.getAuthItem(key);
+        } else if (Capacitor.isNativePlatform()) {
+          // 其他原生平台使用Preferences
           const { value } = await Preferences.get({ key });
           return value;
         } else {
+          // Web端使用localStorage
           return localStorage.getItem(key) || authMemoryStorage.get(key) || null;
         }
       } catch (error) {
@@ -925,9 +996,17 @@ export const getAuthStorageAdapter = (): DataStorageAdapter & {
 
     async setAuthItem(key: string, value: string): Promise<void> {
       try {
-        if (Capacitor.isNativePlatform()) {
+        if (isAndroidPlatform()) {
+          // 安卓端使用SQLite存储
+          if (!('setAuthItem' in adapter) || typeof adapter.setAuthItem !== 'function') {
+            throw new Error('SQLiteAdapter does not implement setAuthItem');
+          }
+          await adapter.setAuthItem(key, value);
+        } else if (Capacitor.isNativePlatform()) {
+          // 其他原生平台使用Preferences
           await Preferences.set({ key, value });
         } else {
+          // Web端使用localStorage
           localStorage.setItem(key, value);
         }
       } catch (error) {
@@ -938,9 +1017,17 @@ export const getAuthStorageAdapter = (): DataStorageAdapter & {
 
     async removeAuthItem(key: string): Promise<void> {
       try {
-        if (Capacitor.isNativePlatform()) {
+        if (isAndroidPlatform()) {
+          // 安卓端使用SQLite存储
+          if (!('removeAuthItem' in adapter) || typeof adapter.removeAuthItem !== 'function') {
+            throw new Error('SQLiteAdapter does not implement removeAuthItem');
+          }
+          await adapter.removeAuthItem(key);
+        } else if (Capacitor.isNativePlatform()) {
+          // 其他原生平台使用Preferences
           await Preferences.remove({ key });
         } else {
+          // Web端使用localStorage
           localStorage.removeItem(key);
         }
       } catch (error) {
