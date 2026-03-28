@@ -225,7 +225,7 @@ export const PopHistory: React.FC<PopHistoryProps> = ({ logs, settings, onLoadMo
   };
   
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 pt-8 pb-8">
+    <div className="w-full max-w-3xl mx-auto space-y-6 pt-8 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-8">
       <div className="text-center">
         <h1 className="font-display text-4xl md:text-5xl mb-2">
           {t.history}
@@ -287,14 +287,14 @@ export const PopHistory: React.FC<PopHistoryProps> = ({ logs, settings, onLoadMo
             <PopButton
               onClick={() => handleSortChange('date')}
               themeColor={sort.field === 'date' ? settings.themeColor : '#e0e0e0'}
-              className="flex-1"
+              className={`flex-1 transition-all duration-300 ${sort.field === 'date' ? 'scale-105 font-bold md:text-lg lg:text-2xl py-4 md:py-5' : ''}`}
             >
               {t.sortByDate} {sort.field === 'date' && (sort.direction === 'asc' ? '↑' : '↓')}
             </PopButton>
             <PopButton
               onClick={() => handleSortChange('count')}
               themeColor={sort.field === 'count' ? settings.themeColor : '#e0e0e0'}
-              className="flex-1"
+              className={`flex-1 transition-all duration-300 ${sort.field === 'count' ? 'scale-105 font-bold md:text-lg lg:text-2xl py-4 md:py-5' : ''}`}
             >
               {t.sortByCount} {sort.field === 'count' && (sort.direction === 'asc' ? '↑' : '↓')}
             </PopButton>
@@ -315,7 +315,7 @@ export const PopHistory: React.FC<PopHistoryProps> = ({ logs, settings, onLoadMo
             <div key={monthSummary.month} className="space-y-3">
               <PopCard className="overflow-hidden">
                 <div 
-                  className="p-4 flex justify-between items-center bg-gray-50 border-b-2 border-black cursor-pointer shadow-pop transition-all transform hover:shadow-pop-hover hover:translate-x-[2px] hover:translate-y-[2px]"
+                  className="p-4 flex justify-between items-center bg-gray-50 border-b-2 border-black cursor-pointer shadow-pop transition-all transform hover:shadow-pop-hover hover:translate-x-0 hover:translate-y-0 active:shadow-pop-hover active:translate-x-[2px] active:translate-y-[2px]"
                   onClick={() => toggleMonth(monthSummary.month)}
                 >
                   <div className="flex items-center space-x-3">

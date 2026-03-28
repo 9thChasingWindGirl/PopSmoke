@@ -18,11 +18,23 @@ export const i18n_KO = {
   // ============ Dashboard ============
   lastRecord: '마지막 기록',
   smokeButton: '흡연',
-  clickToLog: '기록하기',
+  clickToLog: '아래 버튼을 클릭하여 기록',
   todayLogs: '오늘의 기록',
   noRecords: '오늘 기록 없음',
+  recentLogs: '최근 기록',
+  last24Hours: '최근 24시간 활동',
   currentGaugeLevel: '오늘의 흡연 수',
   smokeUnit: '개',
+  consecutiveDaysWithinLimit: '연속 달성 일수',
+  days: '일',
+  
+  // ============ Time Periods ============
+  lateNight: '심야',
+  earlyMorning: '새벽',
+  morning: '오전',
+  noon: '점심',
+  afternoon: '오후',
+  evening: '저녘',
   
   // ============ Settings - Threshold ============
   dailyLimit: '일일 한도',

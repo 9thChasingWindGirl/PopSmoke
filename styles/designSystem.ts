@@ -51,7 +51,53 @@ export const POP_DESIGN_SYSTEM = {
       default: '4px 4px 0px 0px rgba(0,0,0,1)',
       hover: '2px 2px 0px 0px rgba(0,0,0,1)',
       large: '8px 8px 0px 0px rgba(0,0,0,1)',
+      xs: '1px 1px 0px 0px rgba(0,0,0,1)',
     },
+    inset: {
+      default: 'inset 0 4px 0 rgba(255,255,255,0.4), inset 0 -4px 0 rgba(0,0,0,0.1)',
+    },
+  },
+
+  layout: {
+    containerWidth: {
+      xs: '100%',
+      sm: '100%',
+      md: '728px',
+      lg: '1200px',
+    },
+    contentPadding: {
+      xs: '1rem',
+      sm: '1rem',
+      md: '1.5rem',
+      lg: '2rem',
+    },
+    cardSpacing: {
+      xs: '0.75rem',
+      sm: '0.75rem',
+      md: '1rem',
+      lg: '1.5rem',
+    },
+    gridColumns: {
+      xs: 1,
+      sm: 1,
+      md: 2,
+      lg: 3,
+    },
+  },
+
+  responsiveFont: {
+    h1: { xs: '1.5rem', sm: '1.875rem', md: '2.25rem', lg: '3rem' },
+    h2: { xs: '1.25rem', sm: '1.5rem', md: '1.875rem', lg: '2.25rem' },
+    h3: { xs: '1rem', sm: '1.125rem', md: '1.25rem', lg: '1.5rem' },
+    body: { xs: '0.875rem', sm: '0.875rem', md: '1rem', lg: '1rem' },
+    small: { xs: '0.75rem', sm: '0.75rem', md: '0.875rem', lg: '0.875rem' },
+  },
+
+  icon: {
+    xs: '1.5rem',
+    sm: '1.5rem',
+    md: '2rem',
+    lg: '2rem',
   },
 
   typography: {
@@ -159,3 +205,6 @@ export type PopShadows = typeof POP_DESIGN_SYSTEM.shadows;
 export type PopTypography = typeof POP_DESIGN_SYSTEM.typography;
 export type PopSpacing = typeof POP_DESIGN_SYSTEM.spacing;
 export type PopAnimation = typeof POP_DESIGN_SYSTEM.animation;
+export type PopLayout = typeof POP_DESIGN_SYSTEM.layout;
+export type PopResponsiveFont = typeof POP_DESIGN_SYSTEM.responsiveFont;
+export type PopIcon = typeof POP_DESIGN_SYSTEM.icon;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PopCard } from './PopCard';
 import { PopButton } from './PopButton';
+import { isLightColor } from '../../utils/colorUtils';
 
 interface PopSupabaseGuideProps {
   themeColor: string;
@@ -16,6 +17,8 @@ interface GuideStep {
 export const PopSupabaseGuide: React.FC<PopSupabaseGuideProps> = ({ themeColor, onClose }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
+
+  const textColor = isLightColor(themeColor) ? '#000000' : '#FFFFFF';
 
   const steps: GuideStep[] = [
     {

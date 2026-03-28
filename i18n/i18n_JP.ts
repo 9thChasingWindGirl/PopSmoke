@@ -18,11 +18,23 @@ export const i18n_JP = {
   // ============ Dashboard ============
   lastRecord: '前回の記録',
   smokeButton: '喫煙',
-  clickToLog: '記録する',
+  clickToLog: '下のボタンをクリックして記録',
   todayLogs: '今日の記録',
   noRecords: '今日の記録はありません',
+  recentLogs: '最近の記録',
+  last24Hours: '過去24時間のアクティビティ',
   currentGaugeLevel: '今日の喫煙数',
   smokeUnit: '本',
+  consecutiveDaysWithinLimit: '連続達成日数',
+  days: '日',
+  
+  // ============ Time Periods ============
+  lateNight: '深夜',
+  earlyMorning: '早朝',
+  morning: '午前',
+  noon: '昼',
+  afternoon: '午後',
+  evening: '夜',
   
   // ============ Settings - Threshold ============
   dailyLimit: '1日の制限',

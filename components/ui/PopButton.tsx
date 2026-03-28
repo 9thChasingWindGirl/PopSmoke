@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { getButtonStyle } from '../../styles/componentStyles';
 
 interface PopButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -6,7 +6,7 @@ interface PopButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   themeColor?: string;
 }
 
-export const PopButton: React.FC<PopButtonProps> = ({ 
+export const PopButton: React.FC<PopButtonProps> = memo(({ 
   children, 
   variant = 'primary', 
   themeColor,
@@ -24,4 +24,4 @@ export const PopButton: React.FC<PopButtonProps> = ({
       {children}
     </button>
   );
-};
+});

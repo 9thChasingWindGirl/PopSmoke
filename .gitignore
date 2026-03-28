@@ -30,6 +30,7 @@ dist-ssr
 ANDROID_BUILD.md
 ANDROID_ICONS.md
 ANDROID_PACKAGE_CHECK.md
+stitch/
 
 # Android / Capacitor (仅 android 分支需要)
 #android/

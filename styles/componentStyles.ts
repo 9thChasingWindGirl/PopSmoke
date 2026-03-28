@@ -1,4 +1,6 @@
 import { POP_DESIGN_SYSTEM } from './designSystem';
+import { LAYOUT_PATTERNS } from './componentPatterns';
+import { isLightColor } from '../utils/colorUtils';
 
 export const POP_COMPONENT_STYLES = {
   button: {
@@ -6,7 +8,8 @@ export const POP_COMPONENT_STYLES = {
       relative px-3 py-2 md:px-4 md:py-3 lg:px-6 lg:py-3 
       font-display text-sm md:text-base lg:text-xl uppercase tracking-wider
       border-4 border-black shadow-pop transition-all transform
-      hover:shadow-pop-hover hover:translate-x-[2px] hover:translate-y-[2px]
+      hover:shadow-pop-hover hover:translate-x-0 hover:translate-y-0
+      active:shadow-pop-hover active:translate-x-[2px] active:translate-y-[2px]
       disabled:opacity-50 disabled:cursor-not-allowed
       overflow-hidden text-ellipsis whitespace-nowrap
       min-w-[80px] max-w-full
@@ -118,7 +121,7 @@ export const POP_COMPONENT_STYLES = {
     },
     header: {
       container: `
-        p-3 md:p-4 flex justify-between items-center bg-white border-4 border-black shrink-0 z-50
+        px-3 md:px-4 flex justify-center items-center border-4 border-black shrink-0 z-50 h-full gap-4
       `,
       title: `
         font-display text-xl md:text-2xl tracking-wide cursor-pointer
@@ -313,9 +316,10 @@ export const getButtonStyle = (
   const variantConfig = POP_COMPONENT_STYLES.button.variants[variant];
   
   if (variant === 'primary' && themeColor) {
+    const textColor = isLightColor(themeColor) ? '#000000' : '#FFFFFF';
     return {
       className: base,
-      style: { backgroundColor: themeColor },
+      style: { backgroundColor: themeColor, color: textColor },
     };
   }
   

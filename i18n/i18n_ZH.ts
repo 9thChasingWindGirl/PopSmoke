@@ -21,8 +21,20 @@ export const i18n_ZH = {
   clickToLog: '点击记录',
   todayLogs: '今日记录',
   noRecords: '今日暂无记录',
+  recentLogs: '最近记录',
+  last24Hours: '过去24小时的活动',
   currentGaugeLevel: '今日吸烟数量',
   smokeUnit: '支',
+  consecutiveDaysWithinLimit: '连续达标',
+  days: '天',
+  
+  // ============ Time Periods ============
+  lateNight: '深夜',
+  earlyMorning: '清晨',
+  morning: '上午',
+  noon: '中午',
+  afternoon: '下午',
+  evening: '晚上',
   
   // ============ Settings - Threshold ============
   dailyLimit: '每日上限',

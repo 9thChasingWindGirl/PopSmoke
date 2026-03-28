@@ -18,11 +18,23 @@ export const i18n_EN = {
   // ============ Dashboard ============
   lastRecord: 'LAST RECORD',
   smokeButton: 'SMOKE',
-  clickToLog: 'CLICK TO LOG',
+  clickToLog: 'Click the button below to log',
   todayLogs: "TODAY'S LOGS",
-  noRecords: 'No records today',
+  noRecords: 'No records yet',
+  recentLogs: 'RECENT LOGS',
+  last24Hours: 'The last 24 hours of activity',
   currentGaugeLevel: "Today's Smoking Count",
   smokeUnit: 'Smokes',
+  consecutiveDaysWithinLimit: 'Consecutive Days Within Limit',
+  days: 'days',
+  
+  // ============ Time Periods ============
+  lateNight: 'Late Night',
+  earlyMorning: 'Early Morning',
+  morning: 'Morning',
+  noon: 'Noon',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
   
   // ============ Settings - Threshold ============
   dailyLimit: 'Daily Limit',

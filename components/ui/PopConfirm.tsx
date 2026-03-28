@@ -1,30 +1,42 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { createPortal } from 'react-dom';
-import { POP_COMPONENT_STYLES, getModalTitleColor } from '../../styles/componentStyles';
 import { POP_DESIGN_SYSTEM } from '../../styles/designSystem';
 
-interface PopExternalLinkWarningProps {
-  url: string;
-  onConfirm: () => void;
-  onCancel: () => void;
+type NotificationType = 'success' | 'error' | 'info' | 'warning';
+
+interface PopConfirmProps {
+  type?: NotificationType;
+  title: string;
+  message: string;
   confirmText?: string;
   cancelText?: string;
-  title?: string;
-  message?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmThemeColor?: string;
 }
 
-export const PopExternalLinkWarning: React.FC<PopExternalLinkWarningProps> = ({
-  url,
+export const PopConfirm: React.FC<PopConfirmProps> = memo(({
+  type = 'warning',
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   onConfirm,
   onCancel,
-  confirmText = 'Continue',
-  cancelText = 'Cancel',
-  title = 'External Link',
-  message = 'You are about to visit an external website:'
+  confirmThemeColor = '#FFD700'
 }) => {
+  const getTitleColor = () => {
+    switch (type) {
+      case 'success': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      case 'warning': return 'text-yellow-600';
+      default: return 'text-blue-600';
+    }
+  };
+
   const content = (
     <div 
-      className={POP_COMPONENT_STYLES.modal.overlay}
+      className="fixed bg-black bg-opacity-50 flex items-center justify-center"
       style={{ 
         top: 0, 
         left: 0, 
@@ -33,22 +45,16 @@ export const PopExternalLinkWarning: React.FC<PopExternalLinkWarningProps> = ({
         zIndex: POP_DESIGN_SYSTEM.zIndex.modal 
       }}
     >
-      <div className={`${POP_COMPONENT_STYLES.modal.content} relative`}>
-        <div className="absolute -top-4 -right-4 bg-black border-4 border-white px-3 py-1 transform rotate-6">
-          <span className="font-display text-lg tracking-wide text-white">POP<span style={{ color: '#8EDDD3' }}>SMOKE</span></span>
-        </div>
-        <h3 className={`font-display text-2xl mb-4 border-b-2 border-black pb-2 ${getModalTitleColor('warning')}`}>
-          ⚠️ {title}
+      <div className="bg-white border-4 border-black p-6 max-w-sm w-full mx-4 transform transition-all duration-300">
+        <h3 className={`font-display text-2xl mb-4 border-b-2 border-black pb-2 ${getTitleColor()}`}>
+          {title}
         </h3>
-        <p className="mb-4 text-lg">{message}</p>
-        <div className="mb-6 p-4 bg-gray-100 border-2 border-black break-all font-mono text-sm">
-          {url}
-        </div>
+        <p className="mb-6 text-lg">{message}</p>
         <div className="flex space-x-3">
           <button
             onClick={onConfirm}
             className="relative px-3 py-2 md:px-4 md:py-3 lg:px-6 lg:py-3 font-display text-sm md:text-base lg:text-xl uppercase tracking-wider border-4 border-black shadow-pop transition-all transform hover:shadow-pop-hover hover:translate-x-[2px] hover:translate-y-[2px] text-black flex-1"
-            style={{ backgroundColor: '#FFD700' }}
+            style={{ backgroundColor: confirmThemeColor }}
           >
             {confirmText}
           </button>
@@ -65,4 +71,6 @@ export const PopExternalLinkWarning: React.FC<PopExternalLinkWarningProps> = ({
   );
 
   return createPortal(content, document.body);
-};
+});
+
+export type { PopConfirmProps, NotificationType };

@@ -2,7 +2,10 @@ import React, { useState, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { PopCard } from '../ui/PopCard';
 import { PopButton } from '../ui/PopButton';
-import { PopNotification, PopConfirm, PopSelect, PopPrompt } from '../ui/PopNotification';
+import { PopNotification } from '../ui/PopNotification';
+import { PopConfirm } from '../ui/PopConfirm';
+import { PopSelect } from '../ui/PopSelect';
+import { PopPrompt } from '../ui/PopPrompt';
 import { PopCloudDataDialog } from '../ui/PopCloudDataDialog';
 import { PopLoading } from '../ui/PopLoading';
 import { PopOperationLog } from '../ui/PopOperationLog';
@@ -522,7 +525,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
+    <div className="w-full max-w-2xl mx-auto space-y-6 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-0">
        <PopCard className="relative pt-20 mb-8">
          <div className="absolute top-0 left-0 w-full flex flex-col border-b-4 border-black bg-gray-100 z-10">
             <div className="flex justify-between items-center px-4 py-2">
@@ -572,14 +575,26 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
             )}
          </div>
 
-         <div className="h-64 w-full mt-4">
+         <div className="min-h-[200px] sm:min-h-[300px] md:min-h-[350px] lg:min-h-[400px] w-full mt-12 sm:mt-10 md:mt-8" style={{ height: '300px', minHeight: '250px' }}>
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <XAxis 
                         dataKey="date" 
-                        tick={{fontSize: 10, fontFamily: 'Public Sans', fontWeight: 'bold'}} 
-                        interval={viewMode === 'month' ? 'preserveStartEnd' : 0}
-                        minTickGap={10}
+                        tick={{fontSize: 8, fontFamily: 'Public Sans', fontWeight: 'bold'}} 
+                        interval={(index: number, value: string) => {
+                            if (viewMode === 'month') {
+                                // 根据屏幕宽度调整显示的日期
+                                const dateNum = parseInt(value);
+                                // 在移动视图中只显示 5 的倍数日期，在桌面视图中显示奇数日期
+                                if (window.innerWidth < 640) {
+                                    return dateNum % 5 === 0;
+                                } else {
+                                    return dateNum % 2 !== 0;
+                                }
+                            }
+                            return true;
+                        }}
+                        minTickGap={15}
                         axisLine={{strokeWidth: 2}} 
                         tickLine={false} 
                     />
@@ -587,8 +602,8 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
                         allowDecimals={false} 
                         axisLine={{strokeWidth: 2}} 
                         tickLine={{strokeWidth: 2}} 
-                        width={40} 
-                        minTickGap={20}
+                        width={30} 
+                        minTickGap={15}
                     />
                     <Tooltip 
                         cursor={{fill: '#f0f0f0'}}
@@ -617,8 +632,8 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
          </div>
        </PopCard>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-           <PopCard title={t.stats} className="mb-8 min-h-[220px]">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+           <PopCard title={t.stats} className="mb-8 min-h-[200px]">
                <div className="space-y-3">
                  {viewMode === 'week' && weekStats && (
                    <>
@@ -651,7 +666,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
                </div>
            </PopCard>
 
-           <PopCard title={t.data} className="mb-8 min-h-[220px]">
+           <PopCard title={t.data} className="mb-8 min-h-[180px] sm:min-h-[200px] md:min-h-[220px]">
                <div className="flex flex-col space-y-3 items-center justify-center h-full">
                 <PopButton 
                   themeColor={settings.themeColor} 

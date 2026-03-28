@@ -51,6 +51,7 @@ export default function App() {
     loading: true,
     error: null
   });
+  const mainRef = useRef<HTMLElement>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -483,6 +484,18 @@ export default function App() {
       setShowCloudDataDialog(true);
       return;
     }
+
+    console.log('No cloud data source configured, staying in local mode');
+  };
+
+  // 切换视图并重置滚动位置
+  const handleSetView = (newView: ViewState) => {
+    setView(newView);
+    // 重置主容器的滚动位置到顶部
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
   };
 
   const handleDownloadCloudData = async (password?: string) => {
@@ -1165,7 +1178,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div 
-        className="min-h-screen md:h-auto pb-[calc(70px+env(safe-area-inset-bottom))] md:pb-0 font-body text-black overflow-y-auto md:overflow-visible selection:bg-black selection:text-white flex flex-col"
+        className="h-screen md:h-auto font-body text-black selection:bg-black selection:text-white flex flex-col"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -1174,14 +1187,14 @@ export default function App() {
 
         <PopNav
           view={view}
-          setView={setView}
+          setView={handleSetView}
           settings={settings}
           handleUpdateSettings={handleUpdateSettings}
           t={t}
           isAndroid={isAndroid}
         />
 
-      <main className="flex-1 w-full max-w-4xl mx-auto px-2 relative flex justify-start md:justify-center gap-2 md:gap-4 overflow-y-auto md:overflow-visible py-4 md:py-8">
+      <main ref={mainRef} className="flex-1 w-full max-w-4xl mx-auto px-2 relative flex justify-start md:justify-center gap-2 md:gap-4 overflow-y-auto md:overflow-visible pt-28 md:pt-32 pb-[calc(60px+env(safe-area-inset-bottom))]">
         
         <div className="hidden md:flex flex-col justify-center shrink-0 z-40 fixed left-4 top-1/2 -translate-y-1/2">
            <button 
@@ -1193,7 +1206,7 @@ export default function App() {
            </button>
         </div>
 
-        <div className="flex-1 w-full max-w-3xl relative flex flex-col justify-start md:justify-center md:block">
+        <div className="flex-1 w-full max-w-3xl relative flex flex-col justify-start md:justify-center md:block h-full">
             {popEffects.map(effect => (
                 <div 
                     key={effect.id}
@@ -1206,9 +1219,9 @@ export default function App() {
                 </div>
             ))}
 
-            <div key={view} className="animate-slide-in w-full flex flex-col justify-start md:justify-center md:block">
+            <div key={view} className="animate-slide-in w-full flex flex-col justify-start md:justify-center md:block h-full">
               {view === ViewState.DASHBOARD && (
-                <div className="md:min-h-[calc(100vh-140px)] md:flex md:flex-col md:justify-center">
+                <div className="h-full md:min-h-[calc(100vh-140px)] md:flex md:flex-col md:justify-center">
                     <PopDashboard 
                       logs={logs} 
                       settings={settings} 
@@ -1289,39 +1302,6 @@ export default function App() {
         </div>
 
       </main>
-
-      <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t-4 border-black flex justify-around p-3 z-50 shadow-[0px_-4px_0px_0px_rgba(0,0,0,0.1)] h-[calc(60px+env(safe-area-inset-bottom))] items-start pb-[env(safe-area-inset-bottom)] box-content">
-        <button 
-            onClick={() => setView(ViewState.DASHBOARD)}
-            className={`flex flex-col items-center mt-1 ${view === ViewState.DASHBOARD ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
-        >
-            <span className="font-display text-lg tracking-wide">{t.tracker}</span>
-        </button>
-        <button 
-            onClick={() => setView(ViewState.ANALYSIS)}
-            className={`flex flex-col items-center mt-1 ${view === ViewState.ANALYSIS ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
-        >
-            <span className="font-display text-lg tracking-wide">{t.analysis}</span>
-        </button>
-        <button 
-            onClick={() => setView(ViewState.HISTORY)}
-            className={`flex flex-col items-center mt-1 ${view === ViewState.HISTORY ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
-        >
-            <span className="font-display text-lg tracking-wide">{t.history}</span>
-        </button>
-        <button 
-            onClick={() => setView(ViewState.API)}
-            className={`flex flex-col items-center mt-1 ${view === ViewState.API ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
-        >
-            <span className="font-display text-lg tracking-wide">{t.api}</span>
-        </button>
-        <button 
-            onClick={() => setView(ViewState.SETTINGS)}
-            className={`flex flex-col items-center mt-1 ${view === ViewState.SETTINGS ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
-        >
-            <span className="font-display text-lg tracking-wide">{t.settings}</span>
-        </button>
-      </div>
 
       <PopCloudDataDialog
         visible={showCloudDataDialog}

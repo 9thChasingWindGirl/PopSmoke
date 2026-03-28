@@ -263,8 +263,6 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
                     {t.downloadOnly} ({syncDiff.diff.cloudOnly.length})
                   </span>
                 </label>
-                
-
               </div>
               
               {/* 确认同步按钮 */}
@@ -274,6 +272,24 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
                 className={POP_COMPONENT_STYLES.cloudDataDialog.confirmButton}
               >
                 {t.confirmSync}
+              </PopButton>
+            </div>
+          )}
+          {mode === 'sync-diff' && syncDiff?.source === 'feishu' && (
+            <div className="flex gap-3 w-full">
+              <PopButton
+                themeColor={themeColor}
+                onClick={handleSyncConfirm}
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
+              >
+                {t.downloadFromCloud}
+              </PopButton>
+              <PopButton
+                variant="secondary"
+                onClick={handleSkip}
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
+              >
+                {skipText}
               </PopButton>
             </div>
           )}

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { PopCard } from '../ui/PopCard';
 import { PopButton } from '../ui/PopButton';
-import { PopConfirm, PopPrompt, PopForm } from '../ui/PopNotification';
+import { PopConfirm } from '../ui/PopConfirm';
+import { PopPrompt } from '../ui/PopPrompt';
+import { PopForm } from '../ui/PopForm';
 import { PopSupabaseGuide } from '../ui/PopSupabaseGuide';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, ApiSettings, User, EncryptedApiSettings } from '../../types';
@@ -480,7 +482,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                       </div>
                     )}
                     
-                    <div className="flex space-x-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                       <PopButton
                         onClick={handleSaveApiSettings}
                         disabled={isSaving}
@@ -528,7 +530,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                         </div>
                       </div>
                     )}
-                    <div className="flex space-x-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                       <PopButton
                         onClick={handleEditClick}
                         themeColor={settings.themeColor}

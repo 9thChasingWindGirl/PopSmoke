@@ -3,12 +3,15 @@ import { PopCard } from '../ui/PopCard';
 import { PopButton } from '../ui/PopButton';
 import { PopColorPicker } from '../ui/PopColorPicker';
 import { PopDropdown, PopDropdownItem } from '../ui/PopDropdown';
-import { PopNotification, PopConfirm, PopForm } from '../ui/PopNotification';
+import { PopNotification } from '../ui/PopNotification';
+import { PopConfirm } from '../ui/PopConfirm';
+import { PopForm } from '../ui/PopForm';
 import { PopExternalLinkWarning } from '../ui/PopExternalLinkWarning';
 import { THEME_PRESETS } from '../../constants';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, User, SmokeLog, OperationLog as OperationLogType } from '../../types';
 import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
+import { isLightColor } from '../../utils/colorUtils';
 
 import { authService } from '../../services/authService';
 import { getSupabase } from '../../services/apiService';
@@ -29,6 +32,8 @@ interface PopSettingsProps {
 
 export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user, onSignOut, onNavigateToAuth, onNavigateToDashboard, onRefreshLogs, onAddOperationLog, onOpenSystemLog }) => {
   const t = TRANSLATIONS[settings.language];
+  
+  const textColor = isLightColor(settings.themeColor) ? '#000000' : '#FFFFFF';
   
   // 语言和主题选择状态
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
@@ -368,7 +373,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
   };
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6 pt-8 pb-8">
+    <div className="w-full max-w-md mx-auto space-y-6 pt-8 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-8">
         {/* 页面导航 */}
         {activePage === 'main' ? (
             <PopCard title={t.settings} className="mb-8">
