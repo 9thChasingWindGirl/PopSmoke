@@ -581,19 +581,11 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
                     <XAxis 
                         dataKey="date" 
                         tick={{fontSize: 8, fontFamily: 'Public Sans', fontWeight: 'bold'}} 
-                        interval={(index: number, value: string) => {
-                            if (viewMode === 'month') {
-                                // 根据屏幕宽度调整显示的日期
-                                const dateNum = parseInt(value);
-                                // 在移动视图中只显示 5 的倍数日期，在桌面视图中显示奇数日期
-                                if (window.innerWidth < 640) {
-                                    return dateNum % 5 === 0;
-                                } else {
-                                    return dateNum % 2 !== 0;
-                                }
-                            }
-                            return true;
-                        }}
+                        interval={viewMode === 'month' ? 
+                            // 简单的间隔设置，避免类型错误
+                            (window.innerWidth < 640 ? 5 : 2)
+                            : 0
+                        }
                         minTickGap={15}
                         axisLine={{strokeWidth: 2}} 
                         tickLine={false} 

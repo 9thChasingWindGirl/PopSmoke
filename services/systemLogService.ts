@@ -37,7 +37,7 @@ class SystemLogService {
       if (isAndroidPlatform()) {
         // 安卓端使用SQLite存储
         const adapter = getStorageAdapter();
-        if ('getSystemLogs' in adapter) {
+        if (typeof adapter.getSystemLogs === 'function') {
           const value = await adapter.getSystemLogs();
           if (value) {
             this.logs = JSON.parse(value);
@@ -74,7 +74,7 @@ class SystemLogService {
       if (isAndroidPlatform()) {
         // 安卓端使用SQLite存储
         const adapter = getStorageAdapter();
-        if ('getNativeRuntimeLogs' in adapter && 'saveNativeRuntimeLogs' in adapter) {
+        if (typeof adapter.getNativeRuntimeLogs === 'function' && typeof adapter.saveNativeRuntimeLogs === 'function') {
           const existing = await adapter.getNativeRuntimeLogs();
           const merged = `${existing || ''}${payload}`;
           const trimmed = merged.length > NATIVE_LOGS_MAX_CHARS
@@ -106,7 +106,7 @@ class SystemLogService {
       if (isAndroidPlatform()) {
         // 安卓端使用SQLite存储
         const adapter = getStorageAdapter();
-        if ('saveSystemLogs' in adapter) {
+        if (typeof adapter.saveSystemLogs === 'function') {
           void adapter.saveSystemLogs(serialized);
         }
       } else if (this.isNativePlatform()) {

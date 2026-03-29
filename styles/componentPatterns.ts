@@ -3,8 +3,9 @@ import { POP_DESIGN_SYSTEM } from './designSystem';
 export const LAYOUT_PATTERNS = {
   container: {
     responsive: `
-      w-full mx-auto px-4 sm:px-4 md:px-6 lg:px-8
+      w-full mx-auto px-3 xs:px-3 sm:px-4 md:px-6 lg:px-8
       max-w-[${POP_DESIGN_SYSTEM.layout.containerWidth.xs}]
+      xs:max-w-[${POP_DESIGN_SYSTEM.layout.containerWidth.xs}]
       sm:max-w-[${POP_DESIGN_SYSTEM.layout.containerWidth.sm}]
       md:max-w-[${POP_DESIGN_SYSTEM.layout.containerWidth.md}]
       lg:max-w-[${POP_DESIGN_SYSTEM.layout.containerWidth.lg}]
@@ -14,40 +15,40 @@ export const LAYOUT_PATTERNS = {
   card: {
     responsive: `
       bg-white border-4 border-black rounded-2xl shadow-pop
-      p-4 sm:p-4 md:p-6 lg:p-8
+      p-3 xs:p-3 sm:p-4 md:p-6 lg:p-8
     `,
   },
 
   grid: {
     responsive: `
-      grid grid-cols-1 gap-3 sm:gap-3 md:gap-4 lg:gap-6
-      sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+      grid grid-cols-1 gap-2 xs:gap-2 sm:gap-3 md:gap-4 lg:gap-6
+      xs:grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3
     `,
   },
 
   twoColumn: {
     responsive: `
-      grid grid-cols-1 gap-3 sm:gap-3 md:gap-4 lg:gap-6
-      sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2
+      grid grid-cols-1 gap-2 xs:gap-2 sm:gap-3 md:gap-4 lg:gap-6
+      xs:grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2
     `,
   },
 
   buttonGroup: {
     responsive: `
-      flex flex-col gap-2 sm:gap-2 md:gap-3
+      flex flex-col gap-2 xs:gap-2 sm:gap-2 md:gap-3
       sm:flex-row
     `,
   },
 
   form: {
     responsive: `
-      space-y-4 sm:space-y-4 md:space-y-6
+      space-y-3 xs:space-y-3 sm:space-y-4 md:space-y-6
     `,
   },
 
   input: {
     responsive: `
-      w-full border-4 border-black p-2 sm:p-2 md:p-3 font-display
+      w-full border-4 border-black p-2 xs:p-2 sm:p-2 md:p-3 font-display
       text-sm sm:text-sm md:text-base
     `,
   },

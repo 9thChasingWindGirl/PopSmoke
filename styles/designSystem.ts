@@ -179,8 +179,9 @@ export const POP_DESIGN_SYSTEM = {
   },
 
   breakpoints: {
-    sm: '640px',
-    md: '768px',
+    xs: '320px',
+    sm: '600px',
+    md: '840px',
     lg: '1024px',
     xl: '1280px',
     '2xl': '1536px',
