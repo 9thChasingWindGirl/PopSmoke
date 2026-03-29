@@ -92,4 +92,6 @@ export interface DataStorageAdapter {
   saveSystemLogs?: (value: string) => Promise<void>;
   getNativeRuntimeLogs?: () => Promise<string | null>;
   saveNativeRuntimeLogs?: (value: string) => Promise<void>;
+  // 连接管理方法
+  closeConnection?: () => Promise<void>;
 }

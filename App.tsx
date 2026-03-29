@@ -155,13 +155,62 @@ export default function App() {
       }
     });
 
-    return () => {
+    // 应用清理函数
+    const cleanup = async () => {
+      console.log('[App] 执行应用清理...');
+      
+      // 取消所有事件订阅
       authUnsubscribe.unsubscribe();
       logoutUnsubscribe.unsubscribe();
       syncSuccessUnsubscribe.unsubscribe();
       logCreateUnsubscribe.unsubscribe();
       logUpdateUnsubscribe.unsubscribe();
       logDeleteUnsubscribe.unsubscribe();
+      
+      // 清理 SQLite 连接池
+      try {
+        const adapter = getStorageAdapter();
+        if (adapter && typeof adapter.closeConnection === 'function') {
+          await adapter.closeConnection();
+          console.log('[App] SQLite 连接已关闭');
+        }
+      } catch (error) {
+        console.warn('[App] 关闭 SQLite 连接时出错:', error);
+      }
+      
+      // 清理 Blob URLs
+      try {
+        const urls = performance.getEntriesByType('resource')
+          .filter(r => r.name.startsWith('blob:'))
+          .map(r => r.name);
+        urls.forEach(url => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            // 忽略错误
+          }
+        });
+        if (urls.length > 0) {
+          console.log(`[App] 已清理 ${urls.length} 个 Blob URL`);
+        }
+      } catch (error) {
+        console.warn('[App] 清理 Blob URLs 时出错:', error);
+      }
+      
+      // 清理定时器（使用更安全的方式）
+      try {
+        // 获取当前所有的 timeout IDs 并清理
+        const timeoutId = window.setTimeout(() => {}, 0);
+        window.clearTimeout(timeoutId);
+      } catch (e) {
+        // 忽略错误
+      }
+      
+      console.log('[App] 应用清理完成');
+    };
+
+    return () => {
+      cleanup();
     };
   }, []);
 

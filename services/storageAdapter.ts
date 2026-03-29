@@ -416,21 +416,201 @@ class SQLiteAdapter implements DataStorageAdapter {
   private sqlite!: SQLiteConnection;
   private db: SQLiteDBConnection | null = null;
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
+  
+  // 连接池管理
+  private connectionPool: {
+    maxRetries: number;
+    retryDelay: number;
+    lastError: Error | null;
+    errorCount: number;
+    lastRetryTime: number;
+  } = {
+    maxRetries: 3,
+    retryDelay: 1000,
+    lastError: null,
+    errorCount: 0,
+    lastRetryTime: 0
+  };
+
+  // 检查数据库连接是否有效
+  private async isConnectionValid(): Promise<boolean> {
+    if (!this.db || !this.isInitialized) {
+      return false;
+    }
+    try {
+      // 尝试执行一个简单的查询来验证连接
+      await this.db.query("SELECT 1");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 智能重试机制
+  private async withRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = this.connectionPool.maxRetries
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 检查是否需要延迟重试
+        const timeSinceLastRetry = Date.now() - this.connectionPool.lastRetryTime;
+        if (attempt > 0 && timeSinceLastRetry < this.connectionPool.retryDelay) {
+          await new Promise(resolve => 
+            setTimeout(resolve, this.connectionPool.retryDelay - timeSinceLastRetry)
+          );
+        }
+        
+        const result = await operation();
+        
+        // 成功时重置错误计数
+        this.connectionPool.errorCount = 0;
+        this.connectionPool.lastError = null;
+        
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        this.connectionPool.lastError = lastError;
+        this.connectionPool.errorCount++;
+        this.connectionPool.lastRetryTime = Date.now();
+        
+        console.warn(`[SQLiteAdapter] ${operationName} 失败 (尝试 ${attempt + 1}/${maxRetries}):`, error);
+        
+        // 如果是连接问题，尝试重新连接
+        if (this.isConnectionError(error)) {
+          console.log('[SQLiteAdapter] 检测到连接错误，尝试重新连接...');
+          await this.resetConnection();
+        }
+        
+        // 最后一次尝试失败，抛出错误
+        if (attempt === maxRetries - 1) {
+          throw lastError;
+        }
+        
+        // 指数退避延迟
+        const delay = this.connectionPool.retryDelay * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError || new Error(`${operationName} 失败`);
+  }
+
+  // 检查是否是连接相关错误
+  private isConnectionError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    const errorMessage = error.message.toLowerCase();
+    return (
+      errorMessage.includes('connection') ||
+      errorMessage.includes('no available connection') ||
+      errorMessage.includes('already exists') ||
+      errorMessage.includes('closed') ||
+      errorMessage.includes('database is locked')
+    );
+  }
+
+  // 重置连接
+  private async resetConnection(): Promise<void> {
+    console.log('[SQLiteAdapter] 重置数据库连接...');
+    
+    // 关闭现有连接
+    if (this.db) {
+      try {
+        await this.db.close();
+      } catch (e) {
+        // 忽略关闭错误
+      }
+    }
+    
+    // 重置状态
+    this.isInitialized = false;
+    this.db = null;
+    this.initPromise = null;
+    
+    // 短暂延迟后重新初始化
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  // 确保数据库连接有效，如果无效则重新初始化
+  private async ensureConnection(): Promise<void> {
+    const isValid = await this.isConnectionValid();
+    if (!isValid) {
+      await this.resetConnection();
+      await this.initDB();
+    }
+  }
 
   private async initDB(): Promise<void> {
+    // 如果正在初始化中，等待初始化完成
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    // 如果已经初始化且连接有效，直接返回
+    if (this.isInitialized && this.db) {
+      const isValid = await this.isConnectionValid();
+      if (isValid) {
+        return;
+      }
+      // 连接无效，需要重新初始化
+      await this.resetConnection();
+    }
+
+    // 创建新的初始化 Promise
+    this.initPromise = this.doInitDB();
+    
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async doInitDB(): Promise<void> {
     if (this.isInitialized && this.db) {
       return;
     }
 
     try {
-      this.sqlite = new SQLiteConnection(CapacitorSQLite);
+      // 确保 sqlite 实例已创建
+      if (!this.sqlite) {
+        this.sqlite = new SQLiteConnection(CapacitorSQLite);
+      }
 
-      const ret: capSQLiteResult = await this.sqlite.checkConnectionsConsistency();
-      const isConn = (await this.sqlite.isConnection("popsmoke_db", false)).result;
+      // 检查连接一致性
+      let ret: capSQLiteResult;
+      try {
+        ret = await this.sqlite.checkConnectionsConsistency();
+      } catch (e) {
+        // 如果检查失败，假设没有连接
+        ret = { result: false };
+      }
 
-      if (ret.result && isConn) {
-        this.db = await this.sqlite.retrieveConnection("popsmoke_db", false);
-      } else {
+      let isConn = false;
+      try {
+        const connResult = await this.sqlite.isConnection("popsmoke_db", false);
+        isConn = connResult.result || false;
+      } catch (e) {
+        // 如果检查失败，假设没有连接
+        isConn = false;
+      }
+
+      // 如果连接已存在，先尝试关闭并清理
+      if (isConn) {
+        try {
+          const existingConn = await this.sqlite.retrieveConnection("popsmoke_db", false);
+          await existingConn.close();
+        } catch (e) {
+          // 忽略关闭错误
+        }
+      }
+
+      // 创建新连接
+      try {
         this.db = await this.sqlite.createConnection(
           "popsmoke_db",
           false,
@@ -438,6 +618,22 @@ class SQLiteAdapter implements DataStorageAdapter {
           1,
           false
         );
+      } catch (createError: any) {
+        // 如果创建失败因为连接已存在，尝试检索现有连接
+        if (createError?.message?.includes('already exists')) {
+          try {
+            this.db = await this.sqlite.retrieveConnection("popsmoke_db", false);
+          } catch (retrieveError) {
+            console.error('Failed to retrieve existing connection:', retrieveError);
+            throw createError;
+          }
+        } else {
+          throw createError;
+        }
+      }
+
+      if (!this.db) {
+        throw new Error('Failed to create or retrieve database connection');
       }
 
       await this.db.open();
@@ -445,6 +641,9 @@ class SQLiteAdapter implements DataStorageAdapter {
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize SQLite database:', error);
+      // 重置状态以便下次重试
+      this.isInitialized = false;
+      this.db = null;
       throw error;
     }
   }
@@ -494,20 +693,17 @@ class SQLiteAdapter implements DataStorageAdapter {
   }
 
   async getLogs(): Promise<SmokeLog[]> {
-    try {
-      await this.initDB();
+    return this.withRetry(async () => {
+      await this.ensureConnection();
       if (!this.db) return [];
       const result: DBSQLiteValues = await this.db.query("SELECT * FROM logs ORDER BY timestamp DESC");
       return result.values || [];
-    } catch (error) {
-      console.error('Failed to get logs from SQLite:', error);
-      return [];
-    }
+    }, 'getLogs');
   }
 
   async saveLogs(logs: SmokeLog[]): Promise<void> {
-    try {
-      await this.initDB();
+    return this.withRetry(async () => {
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
 
       // 避免手动 BEGIN/COMMIT 在插件内部事务下触发“no current transaction”异常
@@ -542,15 +738,12 @@ class SQLiteAdapter implements DataStorageAdapter {
           await this.db.run(insertQuery, flatValues);
         }
       }
-    } catch (error) {
-      console.error('Failed to save logs to SQLite:', error);
-      throw error;
-    }
+    }, 'saveLogs');
   }
 
   async getSettings(): Promise<AppSettings> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) return DEFAULT_SETTINGS;
       const result: DBSQLiteValues = await this.db.query("SELECT value FROM settings WHERE key = 'app_settings'");
       
@@ -567,7 +760,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async saveSettings(settings: AppSettings): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       const settingsJson = JSON.stringify(settings);
       
@@ -583,7 +776,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async getApiSettings(): Promise<EncryptedApiSettings | null> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) return null;
       const result: DBSQLiteValues = await this.db.query("SELECT value FROM api_settings WHERE key = 'api_settings'");
       
@@ -601,7 +794,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async saveApiSettings(settings: EncryptedApiSettings): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       const settingsJson = JSON.stringify(settings);
       
@@ -621,7 +814,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async deleteApiSettings(): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       await this.db.execute("DELETE FROM api_settings");
     } catch (error) {
@@ -632,7 +825,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async clearAll(): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       await this.db.execute("DELETE FROM logs");
       await this.db.execute("DELETE FROM settings");
@@ -645,7 +838,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async clearLogsOnly(): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       await this.db.execute("DELETE FROM logs");
       console.log('Cleared logs from SQLite (settings and API settings preserved)');
@@ -657,7 +850,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async getRuntimeConfig(key: string): Promise<string | null> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) return null;
       const result: DBSQLiteValues = await this.db.query("SELECT value FROM runtime_config WHERE key = ?", [key]);
       
@@ -675,7 +868,7 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async saveRuntimeConfig(key: string, value: string): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       
       await this.db.run(
@@ -690,12 +883,38 @@ class SQLiteAdapter implements DataStorageAdapter {
 
   async deleteRuntimeConfig(key: string): Promise<void> {
     try {
-      await this.initDB();
+      await this.ensureConnection();
       if (!this.db) throw new Error('Database not initialized');
       await this.db.run("DELETE FROM runtime_config WHERE key = ?", [key]);
     } catch (error) {
       console.error('Failed to delete runtime config from SQLite:', error);
       throw error;
+    }
+  }
+
+  // 关闭数据库连接（用于应用清理）
+  async closeConnection(): Promise<void> {
+    console.log('[SQLiteAdapter] 关闭数据库连接...');
+    
+    try {
+      if (this.db) {
+        await this.db.close();
+        console.log('[SQLiteAdapter] 数据库连接已关闭');
+      }
+    } catch (error) {
+      console.warn('[SQLiteAdapter] 关闭数据库连接时出错:', error);
+    } finally {
+      // 重置所有状态
+      this.isInitialized = false;
+      this.db = null;
+      this.initPromise = null;
+      this.connectionPool = {
+        maxRetries: 3,
+        retryDelay: 1000,
+        lastError: null,
+        errorCount: 0,
+        lastRetryTime: 0
+      };
     }
   }
 

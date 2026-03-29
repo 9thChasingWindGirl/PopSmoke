@@ -118,18 +118,84 @@ export const PopSystemLog: React.FC<PopSystemLogProps> = ({
     setLogs([]);
   };
 
-  const exportLogs = () => {
+  const exportLogs = async () => {
     const logText = filteredLogs.map(log => 
       `[${new Date(log.timestamp).toLocaleString()}] [${log.level.toUpperCase()}] ${log.message}`
     ).join('\n');
     
-    const blob = new Blob([logText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `system-logs-${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const fileName = `system-logs-${new Date().toISOString().split('T')[0]}.txt`;
+    
+    try {
+      if (isAndroidPlatform()) {
+        // 安卓端使用 Filesystem API 保存到下载目录
+        const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+        
+        // 保存到应用的文档目录
+        await Filesystem.writeFile({
+          path: fileName,
+          data: logText,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+          recursive: true
+        });
+        
+        // 显示成功提示
+        console.log(`日志已导出到: Documents/${fileName}`);
+        
+        // 尝试使用分享功能（如果可用）
+        try {
+          // 动态导入 Share 插件
+          const ShareModule = await import('@capacitor/share').catch(() => null);
+          if (ShareModule && ShareModule.Share) {
+            const fileUri = await Filesystem.getUri({
+              path: fileName,
+              directory: Directory.Documents
+            });
+            
+            await ShareModule.Share.share({
+              title: '系统日志',
+              text: `系统日志文件: ${fileName}`,
+              url: fileUri.uri,
+              dialogTitle: '分享日志文件'
+            });
+          } else {
+            throw new Error('Share plugin not available');
+          }
+        } catch (shareError) {
+          // 分享失败时，尝试用浏览器下载
+          console.log('分享功能不可用，使用浏览器下载');
+          const blob = new Blob([logText], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } else {
+        // Web 端使用传统下载方式
+        const blob = new Blob([logText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('导出日志失败:', error);
+      // 降级方案：复制到剪贴板
+      try {
+        await navigator.clipboard.writeText(logText);
+        console.log('日志已复制到剪贴板');
+      } catch (clipboardError) {
+        console.error('复制到剪贴板也失败了:', clipboardError);
+      }
+    }
   };
 
   const filteredLogs = logs.filter(log => {
