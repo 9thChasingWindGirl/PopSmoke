@@ -246,11 +246,6 @@ export const setSupabaseClient = (client: SupabaseClient, config: { apiUrl: stri
   clientManager.setClient(config.apiUrl, config.anonKey);
 };
 
-// 导出一个函数来获取最新的客户端实例，而不是直接导出变量
-export const getSupabase = (): SupabaseClient => {
-  return clientManager.getClient();
-};
-
 const generateLogId = (userId: string, recordDate: string, recordTime: string, index?: number): string => {
   return crypto.randomUUID();
 };

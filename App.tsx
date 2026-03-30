@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { builder, BuilderComponent } from '@builder.io/react';
-import { ViewState, SmokeLog, AppSettings, User, AuthState, OperationLog as OperationLogType, Language } from './types';
+import { ViewState, SmokeLog, AppSettings, User, AuthState, AuthError, OperationLog as OperationLogType, Language } from './types';
 import { authService } from './services/authService';
 import { systemLogService } from './services/systemLogService';
 import { PopDashboard } from './components/pages/PopDashboard';
@@ -22,7 +22,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
 import { TRANSLATIONS } from './i18n';
 import { getStorageAdapter, getAuthStorageAdapter, getSyncQueueManager, simpleEncrypt, simpleDecrypt, isAndroidPlatform, hasLoggedInBefore, setLoggedInFlag, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, createSupabaseAuthStorage } from './services/storageAdapter';
-import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs, getSupabase } from './services/apiService';
+import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs } from './services/apiService';
 import EventHandle from './event/EventHandle';
 import { EventType } from './event/EventType';
 import { getStorageKeys } from './utils/logUtils';
@@ -48,7 +48,7 @@ export default function App() {
   });
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    loading: true,
+    status: 'loading',
     error: null
   });
   const mainRef = useRef<HTMLElement>(null);
@@ -109,18 +109,24 @@ export default function App() {
     builder.init('6c1e65c12fc04d159fa60bbc198d7183');
 
     const authUnsubscribe = EventHandle.subscribe(EventType.AUTH_LOGIN, (event) => {
-      const data = event.data as { success?: boolean; user?: User; error?: string };
+      const data = event.data as { success?: boolean; user?: User; error?: string | { code: string; message: string; type: string } };
       if (data?.success && data?.user) {
-        setAuthState({ user: data.user, loading: false, error: null });
+        setAuthState({ user: data.user, status: 'authenticated', error: null });
       } else if (data?.success === false) {
-        setAuthState({ user: null, loading: false, error: data?.error || '登录失败' });
+        if (typeof data?.error === 'string') {
+          setAuthState({ user: null, status: 'error', error: { code: 'AUTH_ERROR', message: data?.error || '登录失败', type: 'auth' } });
+        } else if (data?.error) {
+          setAuthState({ user: null, status: 'error', error: data.error as AuthError });
+        } else {
+          setAuthState({ user: null, status: 'error', error: { code: 'AUTH_ERROR', message: '登录失败', type: 'auth' } });
+        }
       }
     });
 
     const logoutUnsubscribe = EventHandle.subscribe(EventType.AUTH_LOGOUT, (event) => {
       const data = event.data as { success?: boolean };
       if (data?.success) {
-        setAuthState({ user: null, loading: false, error: null });
+        setAuthState({ user: null, status: 'unauthenticated', error: null });
         setLogs([]);
       }
     });
@@ -220,7 +226,7 @@ export default function App() {
     initStartedRef.current = true;
     
     setIsLocalMode(true);
-    setAuthState({ user: null, loading: false, error: null });
+    setAuthState({ user: null, status: 'unauthenticated', error: null });
 
     const initializeApp = async () => {
       systemLogService.info('init', '开始初始化应用');
@@ -307,142 +313,156 @@ export default function App() {
 
     initializeApp();
 
-    const { unsubscribe } = authService.onAuthEvent((event, session) => {
-      systemLogService.info('auth', `认证事件: ${event}`);
-      
-      if (event === 'PASSWORD_RECOVERY') {
-        systemLogService.info('auth', '密码恢复检测');
-        setShowPasswordReset(true);
-        setShowAuthModal(false);
-        if (session?.user?.email) {
-          setResetEmail(session.user.email);
-          systemLogService.debug('auth', '设置密码重置邮箱', { email: session.user.email });
-        }
-        return;
-      }
-      
-      if (session?.user && session.user.email_confirmed_at) {
-        systemLogService.info('auth', '用户登录成功', { userId: session.user.id });
-        
-        // 更新认证状态
-        setAuthState({
-          user: session.user as User,
-          loading: false,
-          error: null
-        });
-        
-        // 添加登录成功的操作日志
-        const loginLog: OperationLogType = {
-          id: `login_${Date.now()}`,
-          type: 'sync',
-          data: {
-            id: '',
-            user_id: session.user.id,
-            record_date: new Date().toISOString().split('T')[0],
-            record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-            timestamp: Date.now()
-          } as SmokeLog,
-          syncStatus: 'synced',
-          timestamp: Date.now(),
-          message: `登录成功: ${session.user.email}`
-        };
-        setOperationLogs(prev => [loginLog, ...prev]);
-        
-        setShowAuthModal(false);
-        setShowPasswordReset(false);
-        setShowPreviousLoginDialog(false);
-        setShowRestorePasswordDialog(false);
-        setIsLocalMode(false);
-        setLoggedInFlag(true);
-        
-        // 保存API设置到SQLite，确保重启后能恢复登录
-        const saveApiSettingsOnLogin = async () => {
-          try {
-            const adapter = getStorageAdapter();
-            const existingSettings = await adapter.getApiSettings();
-            
-            // 如果已经保存了API设置，跳过
-            if (existingSettings && existingSettings.supabase) {
-              console.log('[App] API设置已存在，跳过保存');
-              return;
+    const setupAuthSubscription = async () => {
+      try {
+        const { data: { subscription }, unsubscribe } = await authService.onAuthStateChange((event, session, user) => {
+          systemLogService.info('auth', `认证事件: ${event}`);
+          
+          if (event === 'PASSWORD_RECOVERY') {
+            systemLogService.info('auth', '密码恢复检测');
+            setShowPasswordReset(true);
+            setShowAuthModal(false);
+            if (session?.user?.email) {
+              setResetEmail(session.user.email);
+              systemLogService.debug('auth', '设置密码重置邮箱', { email: session.user.email });
             }
+            return;
+          }
+          
+          if (session?.user && session.user.email_confirmed_at) {
+            systemLogService.info('auth', '用户登录成功', { userId: session.user.id });
             
-            // 使用环境变量中的Supabase配置创建加密设置
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+            // 更新认证状态
+            setAuthState({
+              user: session.user as User,
+              status: 'authenticated',
+              error: null
+            });
             
-            if (!supabaseUrl || !supabaseAnonKey) {
-              console.warn('[App] 环境变量中未找到Supabase配置');
-              return;
-            }
+            // 添加登录成功的操作日志
+            const loginLog: OperationLogType = {
+              id: `login_${Date.now()}`,
+              type: 'sync',
+              data: {
+                id: '',
+                user_id: session.user.id,
+                record_date: new Date().toISOString().split('T')[0],
+                record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+                timestamp: Date.now()
+              } as SmokeLog,
+              syncStatus: 'synced',
+              timestamp: Date.now(),
+              message: `登录成功: ${session.user.email}`
+            };
+            setOperationLogs(prev => [loginLog, ...prev]);
             
-            // 使用用户密码作为加密密钥
-            const password = session.user.email || 'default';
-            const encryptedSettings = {
-              supabase: simpleEncrypt(JSON.stringify({ apiUrl: supabaseUrl, anonKey: supabaseAnonKey }), password),
-              securityPassword: simpleEncrypt(password, password)
+            setShowAuthModal(false);
+            setShowPasswordReset(false);
+            setShowPreviousLoginDialog(false);
+            setShowRestorePasswordDialog(false);
+            setIsLocalMode(false);
+            setLoggedInFlag(true);
+            
+            // 保存API设置到SQLite，确保重启后能恢复登录
+            const saveApiSettingsOnLogin = async () => {
+              try {
+                const adapter = getStorageAdapter();
+                const existingSettings = await adapter.getApiSettings();
+                
+                // 如果已经保存了API设置，跳过
+                if (existingSettings && existingSettings.supabase) {
+                  console.log('[App] API设置已存在，跳过保存');
+                  return;
+                }
+                
+                // 使用环境变量中的Supabase配置创建加密设置
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+                const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+                
+                if (!supabaseUrl || !supabaseAnonKey) {
+                  console.warn('[App] 环境变量中未找到Supabase配置');
+                  return;
+                }
+                
+                // 使用用户密码作为加密密钥
+                const password = session.user.email || 'default';
+                const encryptedSettings = {
+                  supabase: simpleEncrypt(JSON.stringify({ apiUrl: supabaseUrl, anonKey: supabaseAnonKey }), password),
+                  securityPassword: simpleEncrypt(password, password)
+                };
+                
+                await adapter.saveApiSettings(encryptedSettings);
+                console.log('[App] 登录成功，已保存API设置到SQLite');
+              } catch (error) {
+                console.error('[App] 保存API设置失败:', error);
+              }
             };
             
-            await adapter.saveApiSettings(encryptedSettings);
-            console.log('[App] 登录成功，已保存API设置到SQLite');
-          } catch (error) {
-            console.error('[App] 保存API设置失败:', error);
+            saveApiSettingsOnLogin();
+            loadUserData(session.user as User);
+          } else if (event === 'SIGNED_OUT') {
+            systemLogService.info('auth', '用户登出');
+            
+            // 添加登出成功的操作日志
+            const logoutLog: OperationLogType = {
+              id: `logout_${Date.now()}`,
+              type: 'sync',
+              data: {
+                id: '',
+                user_id: 'local',
+                record_date: new Date().toISOString().split('T')[0],
+                record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+                timestamp: Date.now()
+              } as SmokeLog,
+              syncStatus: 'synced',
+              timestamp: Date.now(),
+              message: '已登出，切换到本地模式'
+            };
+            setOperationLogs(prev => [logoutLog, ...prev]);
+            
+            setAuthState({ user: null, status: 'unauthenticated', error: null });
+            setIsLocalMode(true);
+            
+            const loadLocalData = async () => {
+              systemLogService.info('storage', '加载本地数据');
+              const adapter = getStorageAdapter();
+              const localSettings = await adapter.getSettings();
+              if (localSettings) {
+                setSettingsState(localSettings);
+                systemLogService.debug('settings', '应用本地设置');
+              } else {
+                setSettingsState({
+                  user_id: '',
+                  dailyLimit: 10,
+                  warningLimit: 7,
+                  themeColor: '#FFD700',
+                  language: 'en'
+                });
+                systemLogService.debug('settings', '应用默认设置');
+              }
+              const localLogs = await adapter.getLogs();
+              if (localLogs) {
+                setLogs(localLogs);
+                systemLogService.debug('storage', '应用本地日志数据');
+              } else {
+                setLogs([]);
+                systemLogService.debug('storage', '无本地日志数据');
+              }
+            };
+            loadLocalData();
           }
-        };
+        });
         
-        saveApiSettingsOnLogin();
-        loadUserData(session.user as User);
-      } else if (event === 'SIGNED_OUT') {
-        systemLogService.info('auth', '用户登出');
-        
-        // 添加登出成功的操作日志
-        const logoutLog: OperationLogType = {
-          id: `logout_${Date.now()}`,
-          type: 'sync',
-          data: {
-            id: '',
-            user_id: 'local',
-            record_date: new Date().toISOString().split('T')[0],
-            record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-            timestamp: Date.now()
-          } as SmokeLog,
-          syncStatus: 'synced',
-          timestamp: Date.now(),
-          message: '已登出，切换到本地模式'
-        };
-        setOperationLogs(prev => [logoutLog, ...prev]);
-        
-        setAuthState({ user: null, loading: false, error: null });
-        setIsLocalMode(true);
-        
-        const loadLocalData = async () => {
-          systemLogService.info('storage', '加载本地数据');
-          const adapter = getStorageAdapter();
-          const localSettings = await adapter.getSettings();
-          if (localSettings) {
-            setSettingsState(localSettings);
-            systemLogService.debug('settings', '应用本地设置');
-          } else {
-            setSettingsState({
-              user_id: '',
-              dailyLimit: 10,
-              warningLimit: 7,
-              themeColor: '#FFD700',
-              language: 'en'
-            });
-            systemLogService.debug('settings', '应用默认设置');
-          }
-          const localLogs = await adapter.getLogs();
-          if (localLogs) {
-            setLogs(localLogs);
-            systemLogService.debug('storage', '应用本地日志数据');
-          } else {
-            setLogs([]);
-            systemLogService.debug('storage', '无本地日志数据');
-          }
-        };
-        loadLocalData();
+        return unsubscribe;
+      } catch (error) {
+        console.error('Failed to set up auth subscription:', error);
+        return () => {};
       }
+    };
+    
+    let unsubscribe: (() => void) = () => {};
+    setupAuthSubscription().then(unsub => {
+      unsubscribe = unsub;
     });
 
     return () => {
@@ -670,7 +690,7 @@ export default function App() {
             message: `注册成功: ${email}，请验证邮箱`
           };
           setOperationLogs(prev => [signUpLog, ...prev]);
-          setAuthState({ user: null, loading: false, error: t.verifyEmail || '注册成功！请查收验证邮件并点击链接完成验证。' });
+          setAuthState({ user: null, status: 'unauthenticated', error: null });
           setShowAuthErrorNotification(true);
           return;
         }
@@ -1184,8 +1204,8 @@ export default function App() {
         mode={authMode}
         email={email}
         password={password}
-        error={authState.error}
-        loading={authState.loading}
+        error={authState.error?.message || null}
+        loading={authState.status === 'loading'}
         showErrorNotification={showAuthErrorNotification}
         onEmailChange={setEmail}
         onPasswordChange={setPassword}
@@ -1198,7 +1218,7 @@ export default function App() {
         }}
         onCloseError={() => {
           setShowAuthErrorNotification(false);
-          setAuthState({ user: null, loading: false, error: null });
+          setAuthState({ user: null, status: 'unauthenticated', error: null });
         }}
         themeColor={settings.themeColor}
         t={t}

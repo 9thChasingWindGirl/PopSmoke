@@ -5,10 +5,18 @@ export interface User {
   email_confirmed_at?: string;
 }
 
+export type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated' | 'error';
+
+export interface AuthError {
+  code: string;
+  message: string;
+  type: 'network' | 'auth' | 'validation' | 'unknown';
+}
+
 export interface AuthState {
+  status: AuthStatus;
   user: User | null;
-  loading: boolean;
-  error: string | null;
+  error: AuthError | null;
 }
 
 export interface AuthSession {

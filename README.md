@@ -59,18 +59,14 @@ popsmoking/
 │       ├── PopSupabaseGuide.tsx   # Supabase 配置引导
 │       └── PopExternalLinkWarning.tsx # 外部链接警示
 ├── services/               # 服务层
+│   ├── apiService.ts           # API 服务
 │   ├── authService.ts          # 认证服务
-│   ├── authStorageAdapter.ts   # 认证存储适配器
-│   ├── avatarCacheService.ts   # 头像缓存服务
-│   ├── feishuService.ts        # 飞书 API 服务
 │   ├── storageAdapter.ts       # 存储适配器
-│   ├── supabase.ts             # Supabase 客户端
-│   ├── supabaseStorageService.ts # Supabase 存储服务
-│   ├── syncStateManager.ts     # 同步状态管理
 │   └── systemLogService.ts     # 系统日志服务
 ├── styles/                 # 样式系统
 │   ├── designSystem.ts         # 设计系统定义
 │   ├── componentStyles.ts      # 组件样式
+│   ├── componentPatterns.ts    # 布局模式
 │   └── themePresets.ts         # 主题预设
 ├── i18n/                   # 国际化
 │   ├── i18n_ZH.ts              # 中文
@@ -91,6 +87,53 @@ popsmoking/
 │   └── fonts/                  # HarmonyOS Sans 字体
 └── .github/                # GitHub 配置
     └── workflows/              # CI/CD 工作流
+```
+
+## 响应式断点设计
+
+项目采用新的断点设计，确保在各种设备上都有良好的用户体验：
+
+| 断点 | 值 | 用途 | 典型设备 |
+|------|-----|------|----------|
+| `xs` | 320px | 小屏手机 | iPhone SE, 小型安卓手机 |
+| `sm` | 600px | 大屏手机 | iPhone 12/13/14, 大型安卓手机 |
+| `md` | 840px | 平板/小桌面 | iPad Mini, 小型平板 |
+| `lg` | 1024px | 桌面 | iPad Pro, 小型笔记本 |
+| `xl` | 1280px | 大桌面 | 标准桌面显示器 |
+| `2xl` | 1536px | 超大桌面 | 大屏显示器 |
+
+### 断点使用示例
+
+```tsx
+// 容器响应式
+<div className="w-full mx-auto px-3 xs:px-3 sm:px-4 md:px-6 lg:px-8">
+
+// 网格布局
+<div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+
+// 间距调整
+<div className="p-3 xs:p-3 sm:p-4 md:p-6 lg:p-8">
+```
+
+## 数据库连接管理
+
+项目实现了智能的数据库连接管理系统，特别针对 Android 端的 SQLite 连接：
+
+### 核心特性
+- **连接池管理**：跟踪连接状态、错误计数、重试次数
+- **智能重试机制**：自动重试失败的数据库操作（最多3次，指数退避）
+- **连接验证**：定期验证连接有效性，自动重新连接
+- **错误恢复**：检测连接错误并自动重置连接
+- **资源清理**：应用关闭时正确释放数据库连接
+
+### 使用方法
+```typescript
+// 数据库操作会自动使用重试机制
+const logs = await adapter.getLogs();
+await adapter.saveLogs(logs);
+
+// 应用关闭时清理连接
+await adapter.closeConnection();
 ```
 
 ## 快速开始
@@ -241,6 +284,7 @@ cd android
 - **类型安全**：TypeScript 严格模式
 - **样式系统**：统一的设计系统和组件样式
 - **国际化**：所有文本支持多语言
+- **响应式设计**：使用新的断点体系（xs, sm, md, lg, xl, 2xl）
 
 ## 许可证
 

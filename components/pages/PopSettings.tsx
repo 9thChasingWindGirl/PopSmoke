@@ -14,7 +14,7 @@ import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 import { isLightColor } from '../../utils/colorUtils';
 
 import { authService } from '../../services/authService';
-import { getSupabase } from '../../services/apiService';
+import { getSupabaseClient } from '../../services/apiService';
 import { avatarCacheService, isAndroidPlatform } from '../../services/storageAdapter';
 import { getStorageType, getStorageAdapter } from '../../services/storageAdapter';
 
@@ -126,7 +126,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       const fileName = `${user?.id}-${Date.now()}-${file.name}`;
       
       // 上传文件到Supabase Storage
-      const { data, error } = await getSupabase().storage
+      const { data, error } = await getSupabaseClient().storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -146,7 +146,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       }
       
       // 获取文件URL
-      const { data: urlData } = getSupabase().storage
+      const { data: urlData } = getSupabaseClient().storage
         .from('avatars')
         .getPublicUrl(data.path);
       
@@ -192,7 +192,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     }
     
     try {
-      const { error } = await getSupabase().auth.updateUser({
+      const { error } = await getSupabaseClient().auth.updateUser({
         email
       });
       
@@ -244,7 +244,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     
     try {
       // 直接更新密码（Supabase会自动验证当前会话）
-      const { error: updateError } = await getSupabase().auth.updateUser({
+      const { error: updateError } = await getSupabaseClient().auth.updateUser({
         password: newPwd
       });
       

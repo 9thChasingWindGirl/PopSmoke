@@ -1,8 +1,6 @@
 name: PopSmoke Android 构建
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       create_release:
@@ -22,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.build_info.outputs.version_code }}
       build_number: ${{ steps.build_info.outputs.build_number }}
 
     steps:
@@ -57,13 +56,23 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
 
       - name: 获取构建信息
         id: build_info
         run: |
+          VERSION_CODE=$(date +%s)
           BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "版本代码: $VERSION_CODE"
           echo "构建编号: $BUILD_NUMBER"
 
       - name: 构建 APK
@@ -144,7 +153,7 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: inputs.create_release == true
     
     steps:
       - uses: actions/checkout@v4
@@ -176,10 +185,12 @@ jobs:
             | 项目 | 内容 |
             |------|------|
             | **版本** | v${{ needs.build.outputs.version }} |
+            | **版本代码** | ${{ needs.build.outputs.version_code }} |
             | **构建编号** | ${{ needs.build.outputs.build_number }} |
-            | **构建时间** | ${{ github.event.head_commit.timestamp }} |
+            | **构建时间** | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
             | **构建分支** | ${{ github.ref_name }} |
             | **触发方式** | ${{ github.event_name }} |
+            | **触发者** | ${{ github.actor }} |
             
             ## 📱 下载
             
@@ -197,7 +208,7 @@ jobs:
             - Capacitor 8
             - Supabase
             
-            ---
+            ---            
             
             **完整更新日志**: https://github.com/${{ github.repository }}/compare/v${{ needs.build.outputs.version }}...v${{ needs.build.outputs.version }}-${{ needs.build.outputs.build_number }}
           files: ./apk/*.apk

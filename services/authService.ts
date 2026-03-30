@@ -1,17 +1,67 @@
-import { getSupabaseClient, getSupabase } from './apiService';
-import { User, AuthState } from '../types';
+import { getSupabaseClient } from './apiService';
+import { User, AuthState, AuthError } from '../types';
 import EventHandle from '../event/EventHandle';
 import { EventType } from '../event/EventType';
+
+// 类型守卫函数
+function isSupabaseError(error: unknown): error is { code: string; message: string } {
+  return error !== null && typeof error === 'object' && 'code' in error && 'message' in error;
+}
+
+// 错误处理函数
+function handleAuthError(error: unknown): AuthError {
+  if (error instanceof Error) {
+    // 网络错误
+    if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Network'))) {
+      return {
+        code: 'NETWORK_ERROR',
+        message: '网络连接失败，请检查网络设置',
+        type: 'network'
+      };
+    }
+    
+    // 超时错误
+    if (error.name === 'AbortError') {
+      return {
+        code: 'TIMEOUT',
+        message: '请求超时，请检查网络连接',
+        type: 'network'
+      };
+    }
+    
+    // Supabase 错误
+    if (isSupabaseError(error)) {
+      return {
+        code: error.code,
+        message: error.message,
+        type: 'auth'
+      };
+    }
+    
+    // 其他错误
+    return {
+      code: 'UNKNOWN_ERROR',
+      message: error.message,
+      type: 'unknown'
+    };
+  }
+  
+  return {
+    code: 'UNKNOWN_ERROR',
+    message: '未知错误',
+    type: 'unknown'
+  };
+}
 
 // 获取当前使用的Supabase客户端
 const getClient = async () => {
   return await getSupabaseClient();
 };
 
-// 认证服务单例管理
+// 认证服务单例管理（简化版）
 class AuthServiceManager {
   private static instance: AuthServiceManager;
-  private activeSubscriptions: Set<{ unsubscribe: () => void }> = new Set();
+  private subscriptions: Set<{ unsubscribe: () => void }> = new Set();
 
   private constructor() {}
 
@@ -23,22 +73,26 @@ class AuthServiceManager {
   }
 
   public addSubscription(subscription: { unsubscribe: () => void }): void {
-    this.activeSubscriptions.add(subscription);
+    this.subscriptions.add(subscription);
   }
 
   public removeSubscription(subscription: { unsubscribe: () => void }): void {
-    this.activeSubscriptions.delete(subscription);
+    this.subscriptions.delete(subscription);
   }
 
-  public unsubscribeAll(): void {
-    this.activeSubscriptions.forEach(sub => {
+  public clearSubscriptions(): void {
+    this.subscriptions.forEach(sub => {
       try {
         sub.unsubscribe();
       } catch (e) {
         console.warn('Error unsubscribing:', e);
       }
     });
-    this.activeSubscriptions.clear();
+    this.subscriptions.clear();
+  }
+
+  public getSubscriptionCount(): number {
+    return this.subscriptions.size;
   }
 }
 
@@ -56,41 +110,42 @@ export const authService = {
 
       if (error) {
         EventHandle.publish({
-          type: EventType.AUTH_LOGIN,
+          type: EventType.AUTH_SIGNUP,
           category: 'auth',
           data: { success: false, error: error.message, email },
           timestamp: Date.now()
         });
         return {
+          status: 'error',
           user: null,
-          loading: false,
-          error: error.message,
+          error: handleAuthError(error)
         };
       }
 
       EventHandle.publish({
-        type: EventType.AUTH_LOGIN,
+        type: EventType.AUTH_SIGNUP,
         category: 'auth',
         data: { success: true, user: data.user, email },
         timestamp: Date.now()
       });
 
       return {
+        status: 'authenticated',
         user: data.user as User,
-        loading: false,
         error: null,
       };
     } catch (error) {
+      const authError = handleAuthError(error);
       EventHandle.publish({
-        type: EventType.AUTH_LOGIN,
+        type: EventType.AUTH_SIGNUP,
         category: 'auth',
-        data: { success: false, error: error instanceof Error ? error.message : '注册失败' },
+        data: { success: false, error: authError.message },
         timestamp: Date.now()
       });
       return {
+        status: 'error',
         user: null,
-        loading: false,
-        error: error instanceof Error ? error.message : '注册失败',
+        error: authError
       };
     }
   },
@@ -106,49 +161,49 @@ export const authService = {
 
       if (error) {
         EventHandle.publish({
-          type: EventType.AUTH_LOGIN,
+          type: EventType.AUTH_SIGNIN,
           category: 'auth',
           data: { success: false, error: error.message, email },
           timestamp: Date.now()
         });
         return {
+          status: 'error',
           user: null,
-          loading: false,
-          error: error.message,
+          error: handleAuthError(error)
         };
       }
 
       EventHandle.publish({
-        type: EventType.AUTH_LOGIN,
+        type: EventType.AUTH_SIGNIN,
         category: 'auth',
         data: { success: true, user: data.user, email },
         timestamp: Date.now()
       });
 
       return {
+        status: 'authenticated',
         user: data.user as User,
-        loading: false,
         error: null,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '登录失败';
+      const authError = handleAuthError(error);
       EventHandle.publish({
-        type: EventType.AUTH_LOGIN,
+        type: EventType.AUTH_SIGNIN,
         category: 'auth',
-        data: { success: false, error: errorMessage, email },
+        data: { success: false, error: authError.message, email },
         timestamp: Date.now()
       });
-      if (errorMessage.includes('failed to fetch') || errorMessage.includes('Network error')) {
+      if (authError.type === 'network') {
         return {
+          status: 'error',
           user: null,
-          loading: false,
-          error: 'API配置无效，请先进入API管理页面验证安全密码并查看已保存的API设置',
+          error: authError // 使用原始错误信息
         };
       }
       return {
+        status: 'error',
         user: null,
-        loading: false,
-        error: errorMessage,
+        error: authError
       };
     }
   },
@@ -167,9 +222,9 @@ export const authService = {
           timestamp: Date.now()
         });
         return {
+          status: 'error',
           user: null,
-          loading: false,
-          error: error.message,
+          error: handleAuthError(error)
         };
       }
 
@@ -181,21 +236,22 @@ export const authService = {
       });
 
       return {
+        status: 'unauthenticated',
         user: null,
-        loading: false,
         error: null,
       };
     } catch (error) {
+      const authError = handleAuthError(error);
       EventHandle.publish({
         type: EventType.AUTH_LOGOUT,
         category: 'auth',
-        data: { success: false, error: error instanceof Error ? error.message : '登出失败' },
+        data: { success: false, error: authError.message },
         timestamp: Date.now()
       });
       return {
+        status: 'error',
         user: null,
-        loading: false,
-        error: error instanceof Error ? error.message : '登出失败',
+        error: authError
       };
     }
   },
@@ -206,58 +262,42 @@ export const authService = {
       const client = await getClient();
       
       // 添加超时处理
-      const timeoutPromise = new Promise<{ user: any }>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 10000);
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
-      const userPromise = client.auth.getUser();
-      
-      const { data: { user } } = await Promise.race([userPromise, timeoutPromise]) as { data: { user: any } };
+      const { data: { user } } = await client.auth.getUser();
+      clearTimeout(timeoutId);
 
       return {
+        status: user ? 'authenticated' : 'unauthenticated',
         user: user as User,
-        loading: false,
         error: null,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取用户信息失败';
-      // 检查是否是网络错误或超时
-      if (errorMessage.includes('failed to fetch') || errorMessage.includes('Network error') || errorMessage.includes('timeout')) {
+      const authError = handleAuthError(error);
+      if (authError.type === 'network' || authError.code === 'TIMEOUT') {
         return {
+          status: 'error',
           user: null,
-          loading: false,
-          error: '网络连接超时，请检查网络设置或API配置',
+          error: {
+            ...authError,
+            message: '网络连接超时，请检查网络设置或API配置'
+          }
         };
       }
       return {
+        status: 'error',
         user: null,
-        loading: false,
-        error: errorMessage,
+        error: authError
       };
     }
   },
 
-  // 监听认证状态变化
-  onAuthStateChange(callback: (user: User | null) => void) {
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
-      callback(session?.user as User | null);
-    });
-    
-    authManager.addSubscription(subscription);
-    
-    return {
-      data: { subscription },
-      unsubscribe: () => {
-        authManager.removeSubscription(subscription);
-        subscription.unsubscribe();
-      }
-    };
-  },
-
-  // 监听认证事件（包括密码重置等）
-  onAuthEvent(callback: (event: string, session: any) => void) {
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
-      callback(event, session);
+  // 监听认证状态变化（合并版本）
+  async onAuthStateChange(callback: (event: string, session: any, user: User | null) => void) {
+    const client = await getClient();
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+      callback(event, session, session?.user as User | null);
     });
     
     authManager.addSubscription(subscription);
@@ -273,7 +313,83 @@ export const authService = {
 
   // 清理所有活跃的订阅
   cleanup() {
-    authManager.unsubscribeAll();
+    authManager.clearSubscriptions();
+  },
+
+  // React hook for auth state changes with automatic cleanup
+  useAuthStateChange(callback: (user: User | null) => void) {
+    const { useEffect } = require('react');
+    
+    useEffect(() => {
+      let subscription: { unsubscribe: () => void } | null = null;
+      let isMounted = true;
+
+      const setupSubscription = async () => {
+        try {
+          const client = await getClient();
+          if (!isMounted) return;
+          
+          const { data: { subscription: sub } } = client.auth.onAuthStateChange((event, session) => {
+            if (isMounted) {
+              callback(session?.user as User | null);
+            }
+          });
+          
+          subscription = sub;
+          authManager.addSubscription(sub);
+        } catch (error) {
+          console.error('Failed to set up auth state change subscription:', error);
+        }
+      };
+
+      setupSubscription();
+
+      return () => {
+        isMounted = false;
+        if (subscription) {
+          authManager.removeSubscription(subscription);
+          subscription.unsubscribe();
+        }
+      };
+    }, [callback]);
+  },
+
+  // React hook for auth events with automatic cleanup
+  useAuthEvent(callback: (event: string, session: any) => void) {
+    const { useEffect } = require('react');
+    
+    useEffect(() => {
+      let subscription: { unsubscribe: () => void } | null = null;
+      let isMounted = true;
+
+      const setupSubscription = async () => {
+        try {
+          const client = await getClient();
+          if (!isMounted) return;
+          
+          const { data: { subscription: sub } } = client.auth.onAuthStateChange((event, session) => {
+            if (isMounted) {
+              callback(event, session);
+            }
+          });
+          
+          subscription = sub;
+          authManager.addSubscription(sub);
+        } catch (error) {
+          console.error('Failed to set up auth event subscription:', error);
+        }
+      };
+
+      setupSubscription();
+
+      return () => {
+        isMounted = false;
+        if (subscription) {
+          authManager.removeSubscription(subscription);
+          subscription.unsubscribe();
+        }
+      };
+    }, [callback]);
   },
 
   // 更新用户密码
