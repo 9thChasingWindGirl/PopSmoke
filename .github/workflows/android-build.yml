@@ -18,7 +18,7 @@ on:
           - stable
 
 env:
-  APP_NAME: 'PopSmoke'
+  APP_NAME: 'PopSmoke tracker'
 
 permissions:
   contents: write
@@ -76,20 +76,39 @@ jobs:
           echo "version_code=$(date +%s)" >> $GITHUB_OUTPUT
           echo "build_number=$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-      # ✅ 合并构建（性能优化）
-      - name: 构建全部产物
+      # ✅ 根据通道选择构建
+      - name: 构建 APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease bundleRelease \
-            -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
-            -PVERSION_NAME=${{ steps.version.outputs.version }}
 
+          if [ "${{ inputs.channel }}" = "beta" ]; then
+            ./gradlew assembleDebug \
+              -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
+              -PVERSION_NAME=${{ steps.version.outputs.version }}
+          else
+            ./gradlew assembleRelease \
+              -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
+              -PVERSION_NAME=${{ steps.version.outputs.version }}
+          fi
+
+      # ✅ 统一命名产物
       - name: 整理产物
         run: |
           mkdir -p output
-          find android -name "*.apk" -exec cp {} output/ \;
-          find android -name "*.aab" -exec cp {} output/ \;
+
+          VERSION=${{ steps.version.outputs.version }}
+          CHANNEL=${{ inputs.channel }}
+
+          if [ "$CHANNEL" = "beta" ]; then
+            FILE=$(find android -name "*debug.apk" | head -1)
+          else
+            FILE=$(find android -name "*release*.apk" | head -1)
+          fi
+
+          TARGET="PopSmoke-tracker-v${VERSION}-${CHANNEL}.apk"
+
+          cp "$FILE" "output/$TARGET"
 
       - name: 上传 Artifact（唯一命名）
         uses: actions/upload-artifact@v4
@@ -114,7 +133,6 @@ jobs:
           name: build-${{ github.run_id }}
           path: ./artifacts
 
-      # ✅ 精确匹配旧 Release（修复误删）
       - name: 处理旧 Release
         id: old_release
         run: |
@@ -126,8 +144,6 @@ jobs:
             | head -1)
 
           if [ -n "$OLD_TAG" ]; then
-            echo "发现旧 Release: $OLD_TAG"
-
             BODY=$(gh release view $OLD_TAG --json body -q .body)
 
             echo "old_body<<EOF" >> $GITHUB_OUTPUT
@@ -136,13 +152,10 @@ jobs:
 
             gh release delete $OLD_TAG -y
             git push origin :refs/tags/$OLD_TAG
-          else
-            echo "无旧 Release"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ✅ 获取“同通道”上一个 tag（关键修复）
       - name: 获取上一个 Tag
         id: prev_tag
         run: |
@@ -150,8 +163,7 @@ jobs:
           TAG=$(git tag --list "v*-${CHANNEL}.*" --sort=-v:refname | head -1)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      # ✅ 生成干净 changelog
-      - name: 生成版本更迭变化
+      - name: 生成 changelog
         id: changelog
         run: |
           if [ -z "${{ steps.prev_tag.outputs.tag }}" ]; then
@@ -191,9 +203,14 @@ jobs:
           prerelease: ${{ inputs.channel == 'beta' }}
           body: |
             ## 📦 构建信息
+            - 应用: ${{ env.APP_NAME }}
             - 版本: v${{ needs.build.outputs.version }}
             - 通道: ${{ inputs.channel }}
             - 构建号: ${{ needs.build.outputs.build_number }}
+
+            ## 📱 产物说明
+            - beta：Debug 构建（用于测试，未优化，体积较大）
+            - stable：Release 构建（性能优化版本，适合正式使用）
 
             ## 🔄 版本更迭变化
             ${{ steps.changelog.outputs.log }}
@@ -205,27 +222,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ✅ 只清理当前 run 的 Artifact
       - name: 清理当前构建 Artifact
         if: always()
         run: |
-          echo "清理当前 run 的 artifacts..."
-
           RUN_ID=${{ github.run_id }}
 
           IDS=$(gh api repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts \
             --jq '.artifacts[].id')
 
-          if [ -z "$IDS" ]; then
-            echo "没有需要清理的 artifact"
-            exit 0
-          fi
-
           for id in $IDS; do
-            echo "删除 artifact: $id"
             gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$id
           done
-
-          echo "清理完成"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
