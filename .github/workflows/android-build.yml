@@ -55,7 +55,6 @@ jobs:
           echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
 
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -76,39 +75,41 @@ jobs:
           echo "version_code=$(date +%s)" >> $GITHUB_OUTPUT
           echo "build_number=$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-      # ✅ 根据通道选择构建
+      # 构建 APK（多架构）
       - name: 构建 APK
         run: |
           cd android
           chmod +x gradlew
 
           if [ "${{ inputs.channel }}" = "beta" ]; then
-            ./gradlew assembleDebug \
-              -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
-              -PVERSION_NAME=${{ steps.version.outputs.version }}
+            ./gradlew assembleDebug
           else
-            ./gradlew assembleRelease \
-              -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
-              -PVERSION_NAME=${{ steps.version.outputs.version }}
+            ./gradlew assembleRelease
           fi
 
-      # ✅ 统一命名产物
+      # 收集多架构 APK
       - name: 整理产物
         run: |
           mkdir -p output
 
           VERSION=${{ steps.version.outputs.version }}
           CHANNEL=${{ inputs.channel }}
+          BUILD_NUMBER=${{ steps.build_info.outputs.build_number }}
 
           if [ "$CHANNEL" = "beta" ]; then
-            FILE=$(find android -name "*debug.apk" | head -1)
+            APK_DIR="android/app/build/outputs/apk/debug"
           else
-            FILE=$(find android -name "*release*.apk" | head -1)
+            APK_DIR="android/app/build/outputs/apk/release"
           fi
 
-          TARGET="PopSmoke-tracker-v${VERSION}-${CHANNEL}.apk"
-
-          cp "$FILE" "output/$TARGET"
+          # 遍历各 ABI
+          for APK in $(find $APK_DIR -name "*.apk" -type f); do
+            BASENAME=$(basename $APK)
+            ABI=$(echo $BASENAME | sed -E 's/.*-(arm64-v8a|armeabi-v7a|x86|x86_64).*\.apk/\1/')
+            [ -z "$ABI" ] && ABI="universal"
+            TARGET="PopSmoke-tracker-v${VERSION}-${CHANNEL}-${ABI}.apk"
+            cp "$APK" "output/$TARGET"
+          done
 
       - name: 上传 Artifact（唯一命名）
         uses: actions/upload-artifact@v4
@@ -120,7 +121,7 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: inputs.create_release == true
+    if: ${{ inputs.create_release == 'true' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -144,17 +145,18 @@ jobs:
             | head -1)
 
           if [ -n "$OLD_TAG" ]; then
-            BODY=$(gh release view $OLD_TAG --json body -q .body)
-
-            echo "old_body<<EOF" >> $GITHUB_OUTPUT
-            echo "$BODY" >> $GITHUB_OUTPUT
+            OLD_LOG=$(gh release view $OLD_TAG --json body -q '.body' | sed -n '/## 🔄 版本更迭变化/,/##/p' | sed '$d')
+            echo "old_log<<EOF" >> $GITHUB_OUTPUT
+            echo "$OLD_LOG" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
 
             gh release delete $OLD_TAG -y
             git push origin :refs/tags/$OLD_TAG
+          else
+            echo "old_log<<" >> $GITHUB_OUTPUT
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: 获取上一个 Tag
         id: prev_tag
@@ -173,7 +175,6 @@ jobs:
           fi
 
           LOG=$(git log $RANGE --pretty=format:"%s" --no-merges)
-
           FEAT=$(echo "$LOG" | grep "^feat" || true)
           FIX=$(echo "$LOG" | grep "^fix" || true)
           OTHER=$(echo "$LOG" | grep -vE "^(feat|fix)" || true)
@@ -182,18 +183,14 @@ jobs:
           [ -z "$FIX" ] && FIX="无"
           [ -z "$OTHER" ] && OTHER="无"
 
-          {
-            echo "log<<EOF"
-            echo "### ✨ 新功能"
-            echo "$FEAT"
-            echo ""
-            echo "### 🐛 修复"
-            echo "$FIX"
-            echo ""
-            echo "### 🧩 其他"
-            echo "$OTHER"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          NEW_LOG=$(printf "### ✨ 新功能\n%s\n\n### 🐛 修复\n%s\n\n### 🧩 其他\n%s\n" "$FEAT" "$FIX" "$OTHER")
+
+          # 合并旧 release 的版本更迭变化
+          MERGED_LOG="${{ steps.old_release.outputs.old_log }}"$'\n'"$NEW_LOG"
+
+          echo "log<<EOF" >> $GITHUB_OUTPUT
+          echo "$MERGED_LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
@@ -215,12 +212,9 @@ jobs:
             ## 🔄 版本更迭变化
             ${{ steps.changelog.outputs.log }}
 
-            ## 📜 历史合并
-            ${{ steps.old_release.outputs.old_body }}
-
-          files: ./artifacts/*
+        files: ./artifacts/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: 清理当前构建 Artifact
         if: always()
@@ -234,4 +228,4 @@ jobs:
             gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$id
           done
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
