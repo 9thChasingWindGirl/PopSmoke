@@ -211,8 +211,8 @@ jobs:
 
             ## 🔄 版本更迭变化
             ${{ steps.changelog.outputs.log }}
-
-        files: ./artifacts/*
+          # ✅ 新参数 assets 代替 files
+          assets: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
