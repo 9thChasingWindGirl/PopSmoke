@@ -8,6 +8,14 @@ on:
         required: false
         default: 'true'
         type: boolean
+      channel:
+        description: '发布通道'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - beta
+          - stable
 
 env:
   APP_NAME: 'PopSmoke'
@@ -31,34 +39,24 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "版本号: $VERSION"
 
-      - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
 
-      - name: 设置 Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
 
-      - name: 安装依赖
-        run: pnpm install
+      - run: pnpm install
+      - run: pnpm build
+      - run: pnpm exec cap sync android
 
-      - name: 构建 Web 应用
-        run: pnpm build
-
-      - name: 同步 Capacitor
-        run: pnpm exec cap sync android
-
-      - name: 设置 Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -68,12 +66,13 @@ jobs:
       - name: 获取构建信息
         id: build_info
         run: |
-          VERSION_CODE=$(date +%s)
-          BUILD_NUMBER=$(date +%Y%m%d%H%M)
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "版本代码: $VERSION_CODE"
-          echo "构建编号: $BUILD_NUMBER"
+          echo "version_code=$(date +%s)" >> $GITHUB_OUTPUT
+          echo "build_number=$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
+
+      - name: 注入版本号
+        run: |
+          echo "VERSION_CODE=${{ steps.build_info.outputs.version_code }}" >> android/gradle.properties
+          echo "VERSION_NAME=${{ steps.version.outputs.version }}" >> android/gradle.properties
 
       - name: 构建 APK
         run: |
@@ -81,138 +80,138 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: 检查并复制 APK
+      - name: 复制 APK
         run: |
-          # 查找所有 APK 文件
-          APK_FILES=$(find android/app/build -type f -name "*.apk")
-          
-          if [ -z "$APK_FILES" ]; then
-            echo "错误：未找到任何 APK 文件！"
-            exit 1
-          fi
-          
-          echo "找到以下 APK 文件："
-          echo "$APK_FILES"
-          
-          # 创建输出目录
           mkdir -p android/app/build/outputs/apk/final
-          
-          # 提取架构名称的函数
-          get_arch_name() {
-            local filename="$1"
-            if echo "$filename" | grep -qi "universal"; then
-              echo "universal"
-            elif echo "$filename" | grep -qi "arm64-v8a"; then
-              echo "arm64-v8a"
-            elif echo "$filename" | grep -qi "armeabi-v7a"; then
-              echo "armeabi-v7a"
-            elif echo "$filename" | grep -qi "x86_64"; then
-              echo "x86_64"
-            elif echo "$filename" | grep -qi "x86"; then
-              echo "x86"
-            else
-              echo ""
-            fi
-          }
-          
-          # 复制所有 APK 到最终目录并重命名（带架构信息）
-          for APK in $APK_FILES; do
-            BASENAME=$(basename "$APK")
-            EXT="${BASENAME##*.}"
-            ARCH=$(get_arch_name "$BASENAME")
-            
-            if [ -n "$ARCH" ]; then
-              NEW_NAME="${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}-${ARCH}.${EXT}"
-            else
-              NEW_NAME="${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.${EXT}"
-            fi
-            
-            cp "$APK" "android/app/build/outputs/apk/final/$NEW_NAME"
-            echo "已复制: $BASENAME -> $NEW_NAME"
-          done
-          
-          # 也复制 universal APK（如果存在）作为主 APK
-          UNIVERSAL_APK=$(echo "$APK_FILES" | grep -i "universal" | head -1)
-          if [ -n "$UNIVERSAL_APK" ]; then
-            cp "$UNIVERSAL_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.apk"
-            echo "已复制 universal APK 作为主 APK"
-          else
-            # 如果没有 universal APK，使用第一个找到的
-            FIRST_APK=$(echo "$APK_FILES" | head -1)
-            cp "$FIRST_APK" "android/app/build/outputs/apk/final/${{ env.APP_NAME }}-v${{ steps.version.outputs.version }}-${{ steps.build_info.outputs.build_number }}.apk"
-            echo "已复制第一个 APK 作为主 APK"
-          fi
+          cp android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/final/
 
-      - name: 上传 APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: PopSmoke-APK
           path: android/app/build/outputs/apk/final/*.apk
-          retention-days: 7
 
   create-release:
     needs: build
     runs-on: ubuntu-latest
     if: inputs.create_release == true
-    
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: 下载 APK
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: PopSmoke-APK
           path: ./apk
 
-      - name: 获取提交历史
-        id: commits
+      # ✅ 设置 channel
+      - name: 设置发布通道
+        id: channel
         run: |
-          COMMITS=$(git log --pretty=format:"- %s (%h)" -10 | head -10)
+          echo "channel=${{ inputs.channel }}" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.channel }}" = "beta" ]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ✅ 当前 tag
+      - name: 生成 tag
+        id: tag
+        run: |
+          TAG="v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}.${{ needs.build.outputs.build_number }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # ✅ 找到上一个 release（同 channel）
+      - name: 获取上一个 Release
+        id: last_release
+        run: |
+          LAST=$(gh release list --limit 50 \
+            | grep "v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}" \
+            | head -1 \
+            | awk '{print $1}')
+
+          echo "last=$LAST" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ 获取 commit 变更（核心）
+      - name: 生成版本更迭变化
+        id: changelog
+        run: |
+          if [ -z "${{ steps.last_release.outputs.last }}" ]; then
+            LOG=$(git log --pretty=format:"- %s (%h)")
+          else
+            LOG=$(git log ${{ steps.last_release.outputs.last }}..HEAD --pretty=format:"- %s (%h)")
+          fi
+
           {
-            echo "commits<<EOF"
-            echo "$COMMITS"
+            echo "log<<EOF"
+            echo "$LOG"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      # ✅ 获取旧 release body（用于合并）
+      - name: 获取旧版本变更历史
+        id: old_body
+        run: |
+          BODY=""
+          for tag in $(gh release list --limit 50 | grep "v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}" | awk '{print $1}'); do
+            OLD=$(gh release view "$tag" --json body -q .body)
+            BODY="$BODY\n\n$OLD"
+          done
+
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ 删除旧 release（同版本）
+      - name: 删除旧 Release
+        run: |
+          gh release list --limit 50 | while read tag rest; do
+            if [[ "$tag" == v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}* ]]; then
+              gh release delete "$tag" -y
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ 合并最终 body
+      - name: 合并 Release 内容
+        id: final
+        run: |
+          FINAL="## 🚀 版本更迭变化
+
+${{ steps.changelog.outputs.log }}
+
+---
+
+${{ steps.old_body.outputs.body }}
+
+## 📦 构建信息
+
+版本: v${{ needs.build.outputs.version }}
+构建号: ${{ needs.build.outputs.build_number }}
+通道: ${{ steps.channel.outputs.channel }}
+"
+
+          {
+            echo "body<<EOF"
+            echo "$FINAL"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      # ✅ 创建 Release
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}-${{ needs.build.outputs.build_number }}
-          name: ${{ env.APP_NAME }} v${{ needs.build.outputs.version }}
-          body: |
-            ## 📦 构建信息
-            
-            | 项目 | 内容 |
-            |------|------|
-            | **版本** | v${{ needs.build.outputs.version }} |
-            | **版本代码** | ${{ needs.build.outputs.version_code }} |
-            | **构建编号** | ${{ needs.build.outputs.build_number }} |
-            | **构建时间** | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
-            | **构建分支** | ${{ github.ref_name }} |
-            | **触发方式** | ${{ github.event_name }} |
-            | **触发者** | ${{ github.actor }} |
-            
-            ## 📱 下载
-            
-            下载 APK 文件：`PopSmoke-v${{ needs.build.outputs.version }}-${{ needs.build.outputs.build_number }}.apk`
-            
-            ## 📝 最近提交记录
-            
-            ${{ steps.commits.outputs.commits }}
-            
-            ## 🔧 技术栈
-            
-            - React 19 + TypeScript
-            - Vite 6
-            - Tailwind CSS 4
-            - Capacitor 8
-            - Supabase
-            
-            ---            
-            
-            **完整更新日志**: https://github.com/${{ github.repository }}/compare/v${{ needs.build.outputs.version }}...v${{ needs.build.outputs.version }}-${{ needs.build.outputs.build_number }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ env.APP_NAME }} ${{ steps.tag.outputs.tag }}
+          body: ${{ steps.final.outputs.body }}
           files: ./apk/*.apk
-          draft: false
-          prerelease: false
+          prerelease: ${{ steps.channel.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
