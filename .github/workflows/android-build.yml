@@ -33,12 +33,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 读取版本号
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 设置发布通道
+        id: channel
+        run: |
+          CHANNEL="${{ inputs.channel }}"
+          if [ "$CHANNEL" = "beta" ]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
 
       - uses: pnpm/action-setup@v4
 
@@ -56,39 +70,33 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
-
       - name: 获取构建信息
         id: build_info
         run: |
           echo "version_code=$(date +%s)" >> $GITHUB_OUTPUT
           echo "build_number=$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-      - name: 注入版本号
-        run: |
-          echo "VERSION_CODE=${{ steps.build_info.outputs.version_code }}" >> android/gradle.properties
-          echo "VERSION_NAME=${{ steps.version.outputs.version }}" >> android/gradle.properties
-
-      - name: 构建 APK
+      # ✅ 合并构建（性能优化）
+      - name: 构建全部产物
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug assembleRelease bundleRelease \
+            -PVERSION_CODE=${{ steps.build_info.outputs.version_code }} \
+            -PVERSION_NAME=${{ steps.version.outputs.version }}
 
-      - name: 复制 APK
+      - name: 整理产物
         run: |
-          mkdir -p android/app/build/outputs/apk/final
-          cp android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/final/
+          mkdir -p output
+          find android -name "*.apk" -exec cp {} output/ \;
+          find android -name "*.aab" -exec cp {} output/ \;
 
-      - uses: actions/upload-artifact@v4
+      - name: 上传 Artifact（唯一命名）
+        uses: actions/upload-artifact@v4
         with:
-          name: PopSmoke-APK
-          path: android/app/build/outputs/apk/final/*.apk
+          name: build-${{ github.run_id }}
+          path: output/*
+          retention-days: 1
 
   create-release:
     needs: build
@@ -97,121 +105,127 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
         with:
-          name: PopSmoke-APK
-          path: ./apk
+          fetch-depth: 0
 
-      # ✅ 设置 channel
-      - name: 设置发布通道
-        id: channel
+      - name: 下载 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ github.run_id }}
+          path: ./artifacts
+
+      # ✅ 精确匹配旧 Release（修复误删）
+      - name: 处理旧 Release
+        id: old_release
         run: |
-          echo "channel=${{ inputs.channel }}" >> $GITHUB_OUTPUT
-          if [ "${{ inputs.channel }}" = "beta" ]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
+          VERSION="${{ needs.build.outputs.version }}"
+          CHANNEL="${{ inputs.channel }}"
+
+          OLD_TAG=$(gh release list --limit 100 --json tagName \
+            --jq ".[] | select(.tagName | startswith(\"v${VERSION}-${CHANNEL}.\")) | .tagName" \
+            | head -1)
+
+          if [ -n "$OLD_TAG" ]; then
+            echo "发现旧 Release: $OLD_TAG"
+
+            BODY=$(gh release view $OLD_TAG --json body -q .body)
+
+            echo "old_body<<EOF" >> $GITHUB_OUTPUT
+            echo "$BODY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+
+            gh release delete $OLD_TAG -y
+            git push origin :refs/tags/$OLD_TAG
           else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
+            echo "无旧 Release"
           fi
-
-      # ✅ 当前 tag
-      - name: 生成 tag
-        id: tag
-        run: |
-          TAG="v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}.${{ needs.build.outputs.build_number }}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      # ✅ 找到上一个 release（同 channel）
-      - name: 获取上一个 Release
-        id: last_release
-        run: |
-          LAST=$(gh release list --limit 50 \
-            | grep "v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}" \
-            | head -1 \
-            | awk '{print $1}')
-
-          echo "last=$LAST" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ✅ 获取 commit 变更（核心）
+      # ✅ 获取“同通道”上一个 tag（关键修复）
+      - name: 获取上一个 Tag
+        id: prev_tag
+        run: |
+          CHANNEL="${{ inputs.channel }}"
+          TAG=$(git tag --list "v*-${CHANNEL}.*" --sort=-v:refname | head -1)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # ✅ 生成干净 changelog
       - name: 生成版本更迭变化
         id: changelog
         run: |
-          if [ -z "${{ steps.last_release.outputs.last }}" ]; then
-            LOG=$(git log --pretty=format:"- %s (%h)")
+          if [ -z "${{ steps.prev_tag.outputs.tag }}" ]; then
+            RANGE=""
           else
-            LOG=$(git log ${{ steps.last_release.outputs.last }}..HEAD --pretty=format:"- %s (%h)")
+            RANGE="${{ steps.prev_tag.outputs.tag }}..HEAD"
           fi
+
+          LOG=$(git log $RANGE --pretty=format:"%s" --no-merges)
+
+          FEAT=$(echo "$LOG" | grep "^feat" || true)
+          FIX=$(echo "$LOG" | grep "^fix" || true)
+          OTHER=$(echo "$LOG" | grep -vE "^(feat|fix)" || true)
+
+          [ -z "$FEAT" ] && FEAT="无"
+          [ -z "$FIX" ] && FIX="无"
+          [ -z "$OTHER" ] && OTHER="无"
 
           {
             echo "log<<EOF"
-            echo "$LOG"
+            echo "### ✨ 新功能"
+            echo "$FEAT"
+            echo ""
+            echo "### 🐛 修复"
+            echo "$FIX"
+            echo ""
+            echo "### 🧩 其他"
+            echo "$OTHER"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      # ✅ 获取旧 release body（用于合并）
-      - name: 获取旧版本变更历史
-        id: old_body
-        run: |
-          BODY=""
-          for tag in $(gh release list --limit 50 | grep "v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}" | awk '{print $1}'); do
-            OLD=$(gh release view "$tag" --json body -q .body)
-            BODY="$BODY\n\n$OLD"
-          done
-
-          {
-            echo "body<<EOF"
-            echo "$BODY"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ✅ 删除旧 release（同版本）
-      - name: 删除旧 Release
-        run: |
-          gh release list --limit 50 | while read tag rest; do
-            if [[ "$tag" == v${{ needs.build.outputs.version }}-${{ steps.channel.outputs.channel }}* ]]; then
-              gh release delete "$tag" -y
-            fi
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ✅ 合并最终 body
-      - name: 合并 Release 内容
-        id: final
-        run: |
-          FINAL="## 🚀 版本更迭变化
-
-${{ steps.changelog.outputs.log }}
-
----
-
-${{ steps.old_body.outputs.body }}
-
-## 📦 构建信息
-
-版本: v${{ needs.build.outputs.version }}
-构建号: ${{ needs.build.outputs.build_number }}
-通道: ${{ steps.channel.outputs.channel }}
-"
-
-          {
-            echo "body<<EOF"
-            echo "$FINAL"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      # ✅ 创建 Release
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ env.APP_NAME }} ${{ steps.tag.outputs.tag }}
-          body: ${{ steps.final.outputs.body }}
-          files: ./apk/*.apk
-          prerelease: ${{ steps.channel.outputs.prerelease }}
+          tag_name: v${{ needs.build.outputs.version }}-${{ inputs.channel }}.${{ needs.build.outputs.build_number }}
+          name: ${{ env.APP_NAME }} v${{ needs.build.outputs.version }} (${{ inputs.channel }})
+          prerelease: ${{ inputs.channel == 'beta' }}
+          body: |
+            ## 📦 构建信息
+            - 版本: v${{ needs.build.outputs.version }}
+            - 通道: ${{ inputs.channel }}
+            - 构建号: ${{ needs.build.outputs.build_number }}
+
+            ## 🔄 版本更迭变化
+            ${{ steps.changelog.outputs.log }}
+
+            ## 📜 历史合并
+            ${{ steps.old_release.outputs.old_body }}
+
+          files: ./artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ 只清理当前 run 的 Artifact
+      - name: 清理当前构建 Artifact
+        if: always()
+        run: |
+          echo "清理当前 run 的 artifacts..."
+
+          RUN_ID=${{ github.run_id }}
+
+          IDS=$(gh api repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts \
+            --jq '.artifacts[].id')
+
+          if [ -z "$IDS" ]; then
+            echo "没有需要清理的 artifact"
+            exit 0
+          fi
+
+          for id in $IDS; do
+            echo "删除 artifact: $id"
+            gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$id
+          done
+
+          echo "清理完成"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
