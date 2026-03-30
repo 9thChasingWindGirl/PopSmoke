@@ -133,6 +133,18 @@ const getClient = async (): Promise<SupabaseClient> => {
 
 export const getUserSupabaseConfig = async (): Promise<{ apiUrl: string; anonKey: string } | null> => {
   try {
+    // Web 端优先使用环境变量配置
+    const { isWebPlatform } = await import('./storageAdapter');
+    if (isWebPlatform()) {
+      const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+      const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+      
+      if (envUrl && envKey) {
+        console.log('[getUserSupabaseConfig] Using environment variable config for Web platform');
+        return { apiUrl: envUrl, anonKey: envKey };
+      }
+    }
+    
     const { getSupabaseRuntimeConfig } = await import('./storageAdapter');
     const runtimeConfig = await getSupabaseRuntimeConfig();
     if (runtimeConfig?.apiUrl && runtimeConfig?.anonKey) {
@@ -174,6 +186,22 @@ export const isApiConfigEncrypted = async (source: 'feishu' | 'supabase'): Promi
     const configField = source === 'feishu' ? savedSettings.feishu : savedSettings.supabase;
     if (!configField) {
       return false;
+    }
+
+    // Web 端特殊处理：检查 Supabase 配置是否来自环境变量
+    if (source === 'supabase') {
+      const { isWebPlatform } = await import('./storageAdapter');
+      if (isWebPlatform()) {
+        // Web 端：检查环境变量中是否有 Supabase 配置
+        const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+        const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+        
+        // 如果环境变量中有配置，说明可能是自动保存的配置，不需要密码
+        if (envUrl && envKey) {
+          console.log('[isApiConfigEncrypted] Web platform with env config, treating as unencrypted');
+          return false;
+        }
+      }
     }
 
     try {

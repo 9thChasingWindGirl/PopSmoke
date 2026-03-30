@@ -261,12 +261,15 @@ export const authService = {
     try {
       const client = await getClient();
       
-      // 添加超时处理
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // 使用 Promise.race 实现超时
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 10000);
+      });
       
-      const { data: { user } } = await client.auth.getUser();
-      clearTimeout(timeoutId);
+      const { data: { user } } = await Promise.race([
+        client.auth.getUser(),
+        timeoutPromise
+      ]) as { data: { user: User | null } };
 
       return {
         status: user ? 'authenticated' : 'unauthenticated',
@@ -279,10 +282,7 @@ export const authService = {
         return {
           status: 'error',
           user: null,
-          error: {
-            ...authError,
-            message: '网络连接超时，请检查网络设置或API配置'
-          }
+          error: authError
         };
       }
       return {
@@ -316,84 +316,8 @@ export const authService = {
     authManager.clearSubscriptions();
   },
 
-  // React hook for auth state changes with automatic cleanup
-  useAuthStateChange(callback: (user: User | null) => void) {
-    const { useEffect } = require('react');
-    
-    useEffect(() => {
-      let subscription: { unsubscribe: () => void } | null = null;
-      let isMounted = true;
-
-      const setupSubscription = async () => {
-        try {
-          const client = await getClient();
-          if (!isMounted) return;
-          
-          const { data: { subscription: sub } } = client.auth.onAuthStateChange((event, session) => {
-            if (isMounted) {
-              callback(session?.user as User | null);
-            }
-          });
-          
-          subscription = sub;
-          authManager.addSubscription(sub);
-        } catch (error) {
-          console.error('Failed to set up auth state change subscription:', error);
-        }
-      };
-
-      setupSubscription();
-
-      return () => {
-        isMounted = false;
-        if (subscription) {
-          authManager.removeSubscription(subscription);
-          subscription.unsubscribe();
-        }
-      };
-    }, [callback]);
-  },
-
-  // React hook for auth events with automatic cleanup
-  useAuthEvent(callback: (event: string, session: any) => void) {
-    const { useEffect } = require('react');
-    
-    useEffect(() => {
-      let subscription: { unsubscribe: () => void } | null = null;
-      let isMounted = true;
-
-      const setupSubscription = async () => {
-        try {
-          const client = await getClient();
-          if (!isMounted) return;
-          
-          const { data: { subscription: sub } } = client.auth.onAuthStateChange((event, session) => {
-            if (isMounted) {
-              callback(event, session);
-            }
-          });
-          
-          subscription = sub;
-          authManager.addSubscription(sub);
-        } catch (error) {
-          console.error('Failed to set up auth event subscription:', error);
-        }
-      };
-
-      setupSubscription();
-
-      return () => {
-        isMounted = false;
-        if (subscription) {
-          authManager.removeSubscription(subscription);
-          subscription.unsubscribe();
-        }
-      };
-    }, [callback]);
-  },
-
   // 更新用户密码
-  async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+  async updatePassword(newPassword: string): Promise<AuthState> {
     try {
       const client = await getClient();
       const { error } = await client.auth.updateUser({
@@ -401,19 +325,43 @@ export const authService = {
       });
 
       if (error) {
+        EventHandle.publish({
+          type: EventType.AUTH_PASSWORD_RESET,
+          category: 'auth',
+          data: { success: false, error: error.message },
+          timestamp: Date.now()
+        });
         return {
-          success: false,
-          error: error.message
+          status: 'error',
+          user: null,
+          error: handleAuthError(error)
         };
       }
 
+      EventHandle.publish({
+        type: EventType.AUTH_PASSWORD_RESET,
+        category: 'auth',
+        data: { success: true },
+        timestamp: Date.now()
+      });
+
       return {
-        success: true
+        status: 'authenticated',
+        user: null,
+        error: null
       };
     } catch (error) {
+      const authError = handleAuthError(error);
+      EventHandle.publish({
+        type: EventType.AUTH_PASSWORD_RESET,
+        category: 'auth',
+        data: { success: false, error: authError.message },
+        timestamp: Date.now()
+      });
       return {
-        success: false,
-        error: error instanceof Error ? error.message : '密码更新失败'
+        status: 'error',
+        user: null,
+        error: authError
       };
     }
   },

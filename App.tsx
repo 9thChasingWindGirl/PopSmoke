@@ -1051,7 +1051,7 @@ export default function App() {
     try {
       const result = await authService.updatePassword(newPassword);
       
-      if (result.success) {
+      if (result.status === 'authenticated' && !result.error) {
         setResetStatus({
           success: true,
           message: t.passwordResetSuccess || '密码重置成功'
@@ -1064,7 +1064,7 @@ export default function App() {
       } else {
         setResetStatus({
           success: false,
-          message: result.error || t.passwordResetFailed || '密码重置失败'
+          message: result.error?.message || t.passwordResetFailed || '密码重置失败'
         });
       }
     } catch (error) {

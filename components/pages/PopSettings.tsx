@@ -126,7 +126,8 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       const fileName = `${user?.id}-${Date.now()}-${file.name}`;
       
       // 上传文件到Supabase Storage
-      const { data, error } = await getSupabaseClient().storage
+      const client = await getSupabaseClient();
+      const { data, error } = await client.storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -146,7 +147,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       }
       
       // 获取文件URL
-      const { data: urlData } = getSupabaseClient().storage
+      const { data: urlData } = client.storage
         .from('avatars')
         .getPublicUrl(data.path);
       
@@ -192,7 +193,8 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     }
     
     try {
-      const { error } = await getSupabaseClient().auth.updateUser({
+      const authClient = await getSupabaseClient();
+      const { error } = await authClient.auth.updateUser({
         email
       });
       
@@ -244,7 +246,8 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
     
     try {
       // 直接更新密码（Supabase会自动验证当前会话）
-      const { error: updateError } = await getSupabaseClient().auth.updateUser({
+      const pwdClient = await getSupabaseClient();
+      const { error: updateError } = await pwdClient.auth.updateUser({
         password: newPwd
       });
       
@@ -764,7 +767,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
                      >
                          {t.github}
                      </button>
-                     <p className="text-center text-xs font-bold mt-2 font-display text-gray-500 tracking-widest">ver.0.3.18.beta</p>
+                     <p className="text-center text-xs font-bold mt-2 font-display text-gray-500 tracking-widest">ver.0.3.30.beta</p>
                      <p className="text-center text-[10px] font-bold mt-1 font-body text-gray-400">
                          {t.fontAttribution}
                      </p>
