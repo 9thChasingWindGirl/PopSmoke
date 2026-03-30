@@ -185,8 +185,9 @@ jobs:
 
           NEW_LOG=$(printf "### ✨ 新功能\n%s\n\n### 🐛 修复\n%s\n\n### 🧩 其他\n%s\n" "$FEAT" "$FIX" "$OTHER")
 
-          # 合并旧 release 的版本更迭变化
-          MERGED_LOG="${{ steps.old_release.outputs.old_log }}"$'\n'"$NEW_LOG"
+          # 合并旧 release 的版本更迭变化，移除可能的重复标题
+          OLD_LOG=$(echo "${{ steps.old_release.outputs.old_log }}" | sed '/^## 🔄 版本更迭变化/d')
+          MERGED_LOG="$OLD_LOG"$'\n'"$NEW_LOG"
 
           echo "log<<EOF" >> $GITHUB_OUTPUT
           echo "$MERGED_LOG" >> $GITHUB_OUTPUT
@@ -211,8 +212,8 @@ jobs:
 
                 ## 🔄 版本更迭变化
                 ${{ steps.changelog.outputs.log }}
-            # ✅ 新参数 assets 代替 files
-            assets: ./artifacts/*
+            # 使用 files 参数指定要上传的文件
+            files: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
