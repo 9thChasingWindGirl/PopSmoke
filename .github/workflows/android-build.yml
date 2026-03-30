@@ -121,7 +121,7 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ inputs.create_release == 'true' }}
+    if: ${{ inputs.create_release }}
 
     steps:
       - uses: actions/checkout@v4
@@ -195,24 +195,24 @@ jobs:
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}-${{ inputs.channel }}.${{ needs.build.outputs.build_number }}
-          name: ${{ env.APP_NAME }} v${{ needs.build.outputs.version }} (${{ inputs.channel }})
-          prerelease: ${{ inputs.channel == 'beta' }}
-          body: |
-            ## 📦 构建信息
-            - 应用: ${{ env.APP_NAME }}
-            - 版本: v${{ needs.build.outputs.version }}
-            - 通道: ${{ inputs.channel }}
-            - 构建号: ${{ needs.build.outputs.build_number }}
+            tag_name: v${{ needs.build.outputs.version }}-${{ inputs.channel }}.${{ needs.build.outputs.build_number }}
+            name: ${{ env.APP_NAME }} v${{ needs.build.outputs.version }} (${{ inputs.channel }})
+            prerelease: ${{ inputs.channel == 'beta' }}
+            body: |
+                ## 📦 构建信息
+                - 应用: ${{ env.APP_NAME }}
+                - 版本: v${{ needs.build.outputs.version }}
+                - 通道: ${{ inputs.channel }}
+                - 构建号: ${{ needs.build.outputs.build_number }}
 
-            ## 📱 产物说明
-            - beta：Debug 构建（用于测试，未优化，体积较大）
-            - stable：Release 构建（性能优化版本，适合正式使用）
+                ## 📱 产物说明
+                - beta：Debug 构建（用于测试，未优化，体积较大）
+                - stable：Release 构建（性能优化版本，适合正式使用）
 
-            ## 🔄 版本更迭变化
-            ${{ steps.changelog.outputs.log }}
-          # ✅ 新参数 assets 代替 files
-          assets: ./artifacts/*
+                ## 🔄 版本更迭变化
+                ${{ steps.changelog.outputs.log }}
+            # ✅ 新参数 assets 代替 files
+            assets: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
