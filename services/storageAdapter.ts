@@ -192,38 +192,46 @@ class IndexedDBAdapter implements DataStorageAdapter {
     try {
       const db = await this.openDB();
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction('logs', 'readwrite');
-        const store = transaction.objectStore('logs');
+        // 使用requestAnimationFrame确保操作在浏览器空闲时执行
+        requestAnimationFrame(() => {
+          try {
+            const transaction = db.transaction('logs', 'readwrite');
+            const store = transaction.objectStore('logs');
 
-        let completed = 0;
-        const total = logs.length;
+            let completed = 0;
+            const total = logs.length;
 
-        if (total === 0) {
-          resolve();
-          return;
-        }
-
-        console.log('[IndexedDBAdapter.saveLogs] 开始保存记录:', { totalLogs: total });
-
-        logs.forEach(log => {
-          const request = store.put(log);
-          request.onsuccess = () => {
-            completed++;
-            if (completed === total) {
-              console.log('[IndexedDBAdapter.saveLogs] 所有记录保存成功');
+            if (total === 0) {
               resolve();
+              return;
             }
-          };
-          request.onerror = () => {
-            console.error('[IndexedDBAdapter.saveLogs] 保存记录失败:', log.id);
-            reject(new Error(`Failed to save log: ${log.id}`));
-          };
-        });
 
-        transaction.onerror = () => {
-          console.error('[IndexedDBAdapter.saveLogs] 事务错误');
-          reject(new Error('Transaction failed'));
-        };
+            console.log('[IndexedDBAdapter.saveLogs] 开始保存记录:', { totalLogs: total });
+
+            logs.forEach(log => {
+              const request = store.put(log);
+              request.onsuccess = () => {
+                completed++;
+                if (completed === total) {
+                  console.log('[IndexedDBAdapter.saveLogs] 所有记录保存成功');
+                  resolve();
+                }
+              };
+              request.onerror = () => {
+                console.error('[IndexedDBAdapter.saveLogs] 保存记录失败:', log.id);
+                reject(new Error(`Failed to save log: ${log.id}`));
+              };
+            });
+
+            transaction.onerror = () => {
+              console.error('[IndexedDBAdapter.saveLogs] 事务错误');
+              reject(new Error('Transaction failed'));
+            };
+          } catch (error) {
+            console.error('Failed to save logs to IndexedDB:', error);
+            reject(error);
+          }
+        });
       });
     } catch (error) {
       console.error('Failed to save logs to IndexedDB:', error);
@@ -702,43 +710,54 @@ class SQLiteAdapter implements DataStorageAdapter {
   }
 
   async saveLogs(logs: SmokeLog[]): Promise<void> {
-    return this.withRetry(async () => {
-      await this.ensureConnection();
-      if (!this.db) throw new Error('Database not initialized');
+    // 使用setTimeout确保操作在后台执行，不阻塞UI线程
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          await this.withRetry(async () => {
+            await this.ensureConnection();
+            if (!this.db) throw new Error('Database not initialized');
 
-      // 避免手动 BEGIN/COMMIT 在插件内部事务下触发“no current transaction”异常
-      await this.db.execute("DELETE FROM logs");
+            // 避免手动 BEGIN/COMMIT 在插件内部事务下触发“no current transaction”异常
+            await this.db.execute("DELETE FROM logs");
 
-      if (logs.length > 0) {
-        // 分批插入，每批500条
-        const batchSize = 500;
-        for (let i = 0; i < logs.length; i += batchSize) {
-          const batch = logs.slice(i, i + batchSize);
+            if (logs.length > 0) {
+              // 分批插入，每批500条
+              const batchSize = 500;
+              for (let i = 0; i < logs.length; i += batchSize) {
+                const batch = logs.slice(i, i + batchSize);
 
-          const values = batch.map(log => [
-            log.id,
-            log.user_id,
-            log.table_id ?? null,
-            log.table_name ?? null,
-            log.record_date || null,
-            log.record_time || null,
-            log.record_index || 0,
-            log.timestamp,
-            log.created_at || null
-          ]);
+                const values = batch.map(log => [
+                  log.id,
+                  log.user_id,
+                  log.table_id ?? null,
+                  log.table_name ?? null,
+                  log.record_date || null,
+                  log.record_time || null,
+                  log.record_index || 0,
+                  log.timestamp,
+                  log.created_at || null
+                ]);
 
-          const placeholders = values.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-          const flatValues = values.flat();
+                const placeholders = values.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+                const flatValues = values.flat();
 
-          const insertQuery = `
-            INSERT INTO logs (id, user_id, table_id, table_name, record_date, record_time, record_index, timestamp, created_at)
-            VALUES ${placeholders}
-          `;
+                const insertQuery = `
+                  INSERT INTO logs (id, user_id, table_id, table_name, record_date, record_time, record_index, timestamp, created_at)
+                  VALUES ${placeholders}
+                `;
 
-          await this.db.run(insertQuery, flatValues);
+                await this.db.run(insertQuery, flatValues);
+              }
+            }
+          }, 'saveLogs');
+          resolve();
+        } catch (error) {
+          console.error('Failed to save logs to SQLite:', error);
+          reject(error);
         }
-      }
-    }, 'saveLogs');
+      }, 0);
+    });
   }
 
   async getSettings(): Promise<AppSettings> {
@@ -1321,41 +1340,46 @@ class SyncQueueManager {
 
     this.isProcessing = true;
 
-    const operation = this.syncQueue.shift();
-    if (!operation) {
-      this.isProcessing = false;
-      return;
-    }
+    // 使用setTimeout让UI线程有时间更新
+    setTimeout(async () => {
+      try {
+        const operation = this.syncQueue.shift();
+        if (!operation) {
+          this.isProcessing = false;
+          return;
+        }
 
-    const logs = await this.getLogs();
+        const logs = await this.getLogs();
 
-    try {
-      await this.syncOperation(operation, logs);
+        try {
+          await this.syncOperation(operation, logs);
 
-      if (operation.type !== 'clear' && operation.type !== 'sync') {
-        this.notifyListeners({
-          type: operation.type,
-          status: 'success',
-          message: this.getOperationMessage(operation),
-          timestamp: Date.now()
-        });
+          if (operation.type !== 'clear' && operation.type !== 'sync') {
+            this.notifyListeners({
+              type: operation.type,
+              status: 'success',
+              message: this.getOperationMessage(operation),
+              timestamp: Date.now()
+            });
+          }
+        } catch (error) {
+          if (operation.type !== 'clear' && operation.type !== 'sync') {
+            this.notifyListeners({
+              type: operation.type,
+              status: 'error',
+              message: `同步失败: ${error instanceof Error ? error.message : '未知错误'}`,
+              timestamp: Date.now()
+            });
+          }
+        }
+      } finally {
+        this.isProcessing = false;
+
+        if (this.syncQueue.length > 0) {
+          setTimeout(() => this.processSyncQueue(), 0);
+        }
       }
-    } catch (error) {
-      if (operation.type !== 'clear' && operation.type !== 'sync') {
-        this.notifyListeners({
-          type: operation.type,
-          status: 'error',
-          message: `同步失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          timestamp: Date.now()
-        });
-      }
-    }
-
-    this.isProcessing = false;
-
-    if (this.syncQueue.length > 0) {
-      setTimeout(() => this.processSyncQueue(), 0);
-    }
+    }, 0);
   }
 
   private async syncOperation(operation: OperationLog, logs: SmokeLog[]): Promise<void> {

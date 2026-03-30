@@ -21,7 +21,7 @@ export const PopDropdown = forwardRef<HTMLDivElement, PopDropdownProps>(({
         {trigger}
       </div>
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-1 bg-white border-4 border-black shadow-pop z-50">
+        <div className="absolute right-0 mt-1 bg-white border-4 border-black shadow-pop z-50 min-w-[80px]">
           {children}
         </div>
       )}
@@ -43,19 +43,15 @@ export const PopDropdownTrigger: React.FC<PopDropdownTriggerProps> = ({
   themeColor,
 }) => {
   return (
-    <div className="flex items-center border-2 border-black px-3 py-2 hover:bg-black hover:text-white transition-colors w-full justify-between">
-      <span className="flex items-center">
-        {label}
-        {value && (
-          <div 
-            className="w-6 h-6 border-2 border-black ml-2" 
-            style={themeColor ? { backgroundColor: themeColor } : undefined}
-          >
-            {!themeColor && value}
-          </div>
-        )}
-      </span>
-      <span>▼</span>
+    <div className="flex items-center justify-center w-8 h-8 border-2 border-black hover:bg-black hover:text-white transition-colors cursor-pointer">
+      {value ? (
+        <div 
+          className="w-full h-full" 
+          style={themeColor ? { backgroundColor: themeColor } : undefined}
+        />
+      ) : (
+        <span className="text-xs font-bold">{label}</span>
+      )}
     </div>
   );
 };

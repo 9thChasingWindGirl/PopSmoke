@@ -1032,7 +1032,6 @@ export const apiService = {
   },
 
   async createRecord(userId: string | undefined, existingLogs: SmokeLog[]): Promise<SmokeLog> {
-    const adapter = getStorageAdapter();
     const now = new Date();
     const recordDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const recordTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -1053,7 +1052,6 @@ export const apiService = {
 
     const completedLog = completeLogFields(newLog);
     const updatedLogs = [completedLog, ...existingLogs];
-    await adapter.saveLogs(updatedLogs);
 
     // 立即发布事件，通知UI更新
     EventHandle.publish({
@@ -1063,12 +1061,22 @@ export const apiService = {
       timestamp: Date.now()
     });
 
-    // 在后台异步进行Supabase同步，不阻塞返回
-    if (userId) {
-      this.saveLog(newLog).catch(error => {
-        console.error('Failed to sync log to cloud:', error);
-      });
-    }
+    // 在后台异步执行存储操作，不阻塞返回
+    setTimeout(async () => {
+      try {
+        const adapter = getStorageAdapter();
+        await adapter.saveLogs(updatedLogs);
+
+        // 在后台异步进行Supabase同步，不阻塞返回
+        if (userId) {
+          this.saveLog(newLog).catch(error => {
+            console.error('Failed to sync log to cloud:', error);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to save log locally:', error);
+      }
+    }, 0);
 
     return completedLog;
   },

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ViewState, Language } from '../../types';
 import { PopColorPicker } from './PopColorPicker';
+import { PopDropdown, PopDropdownTrigger, PopDropdownItem } from './PopDropdown';
 import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 import { isLightColor } from '../../utils/colorUtils';
 import { Capacitor } from '@capacitor/core';
@@ -27,6 +28,7 @@ const PopNav: React.FC<PopNavProps> = ({
 }) => {
   const mobileColorPickerRef = useRef<HTMLDivElement>(null);
   const [showMobileColorPicker, setShowMobileColorPicker] = React.useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = React.useState(false);
   const [statusBarHeight, setStatusBarHeight] = useState(0);
 
   const textColor = isLightColor(settings.themeColor) ? '#000000' : '#FFFFFF';
@@ -37,10 +39,15 @@ const PopNav: React.FC<PopNavProps> = ({
     }
   }, [isAndroid]);
 
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (mobileColorPickerRef.current && !mobileColorPickerRef.current.contains(event.target as Node)) {
         setShowMobileColorPicker(false);
+      }
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+        setShowLanguageDropdown(false);
       }
     };
 
@@ -88,17 +95,54 @@ const PopNav: React.FC<PopNavProps> = ({
                 </div>
                 
                 {/* 语言选择 */}
-                <select
-                  value={settings.language}
-                  onChange={(e) => handleUpdateSettings({ ...settings, language: e.target.value as Language })}
-                  className={POP_COMPONENT_STYLES.nav.header.mobileSelect}
-                  style={{ backgroundColor: settings.themeColor, color: textColor }}
+                <PopDropdown
+                  ref={languageDropdownRef}
+                  trigger={
+                    <PopDropdownTrigger
+                      label={settings.language === 'en' ? 'EN' : settings.language === 'zh' ? '中' : settings.language === 'ja' ? '日' : '한'}
+                      themeColor={settings.themeColor}
+                    />
+                  }
+                  isOpen={showLanguageDropdown}
+                  onToggle={() => setShowLanguageDropdown(!showLanguageDropdown)}
                 >
-                  <option value="en">EN</option>
-                  <option value="zh">中</option>
-                  <option value="ja">日</option>
-                  <option value="ko">한</option>
-                </select>
+                  <PopDropdownItem
+                    onClick={() => {
+                      handleUpdateSettings({ ...settings, language: 'en' as Language });
+                      setShowLanguageDropdown(false);
+                    }}
+                    isActive={settings.language === 'en'}
+                  >
+                    EN
+                  </PopDropdownItem>
+                  <PopDropdownItem
+                    onClick={() => {
+                      handleUpdateSettings({ ...settings, language: 'zh' as Language });
+                      setShowLanguageDropdown(false);
+                    }}
+                    isActive={settings.language === 'zh'}
+                  >
+                    中
+                  </PopDropdownItem>
+                  <PopDropdownItem
+                    onClick={() => {
+                      handleUpdateSettings({ ...settings, language: 'ja' as Language });
+                      setShowLanguageDropdown(false);
+                    }}
+                    isActive={settings.language === 'ja'}
+                  >
+                    日
+                  </PopDropdownItem>
+                  <PopDropdownItem
+                    onClick={() => {
+                      handleUpdateSettings({ ...settings, language: 'ko' as Language });
+                      setShowLanguageDropdown(false);
+                    }}
+                    isActive={settings.language === 'ko'}
+                  >
+                    한
+                  </PopDropdownItem>
+                </PopDropdown>
               </div>
               
               {/* 桌面端导航 */}

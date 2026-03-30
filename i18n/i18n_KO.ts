@@ -27,6 +27,7 @@ export const i18n_KO = {
   smokeUnit: '개',
   consecutiveDaysWithinLimit: '연속 달성 일수',
   days: '일',
+  smokes: '개',
   
   // ============ Time Periods ============
   lateNight: '심야',
@@ -97,6 +98,7 @@ export const i18n_KO = {
   save: '저장',
   cancel: '취소',
   confirm: '확인',
+  confirmDelete: '이 기록을 삭제하시겠습니까?',
   editTime: '시간 편집',
   never: '없음',
   view: '보기',

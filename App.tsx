@@ -644,6 +644,7 @@ export default function App() {
           setOperationLogs(prev => [loginLog, ...prev]);
           setShowAuthModal(false);
           setIsLocalMode(false);
+          setAuthState(result);
           
           // 保存API设置到SQLite，确保重启后能恢复登录
           const saveApiSettingsOnAuth = async () => {
@@ -789,14 +790,14 @@ export default function App() {
     const usage = getStorageUsage();
     if (usage.percent > 0.8) {
       systemLogService.warn('storage', '存储使用超过80%，清理旧数据');
-      cleanupOldData(authState.user?.id);
+      // 在后台清理旧数据，不阻塞记录操作
+      setTimeout(() => {
+        cleanupOldData(authState.user?.id);
+      }, 0);
     }
     
     try {
-      // 等待记录创建完成
-      const newLog = await apiService.createRecord(authState.user?.id, logs);
-      
-      // 记录创建完成后触发POW动画
+      // 立即显示POW动画，提供即时反馈
       const newEffectId = effectIdCounter++;
       const randomX = 50 + (Math.random() * 10 - 5); 
       const randomY = 50 + (Math.random() * 10 - 5);
@@ -806,6 +807,9 @@ export default function App() {
       setTimeout(() => {
         setPopEffects(prev => prev.filter(e => e.id !== newEffectId));
       }, 600);
+
+      // 调用createRecord创建记录
+      const newLog = await apiService.createRecord(authState.user?.id, logs);
       
       const t = TRANSLATIONS[settings.language] || TRANSLATIONS.zh;
       const operationLog: OperationLogType = {
@@ -818,7 +822,10 @@ export default function App() {
       };
       setOperationLogs(prev => [operationLog, ...prev]);
       
-      syncStateManager.addOperation(operationLog);
+      // 延迟添加到同步队列，让UI先更新
+      setTimeout(() => {
+        syncStateManager.addOperation(operationLog);
+      }, 100);
     } catch (error) {
       systemLogService.error('ui', '记录失败', error as Error);
       setStorageError(error instanceof Error ? error.message : 'Record error');

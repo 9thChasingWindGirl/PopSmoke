@@ -86,12 +86,12 @@ export const PopTimePicker: React.FC<TimePickerProps> = ({ initialTimestamp, onS
   };
 
   return (
-    <div className="flex flex-col w-full h-full bg-paper absolute inset-0 z-30 p-4">
-        <h3 className="font-display text-xl text-center mb-4 border-b-4 border-black pb-2">{t.editTime}</h3>
+    <div className="flex flex-col w-full bg-white p-4">
+        <h3 className="font-display text-xl text-center mb-6 border-b-4 border-black pb-2">{t.editTime}</h3>
         
-        <div className="flex justify-center items-center relative flex-1 gap-2">
+        <div className="flex justify-center items-center relative mb-8 gap-4">
             {/* Selection Highlight Bar */}
-            <div className="absolute top-1/2 left-4 right-4 h-[40px] -mt-[20px] bg-yellow-100 -z-10 border-y-2 border-black pointer-events-none opacity-50"></div>
+            <div className="absolute top-1/2 left-0 right-0 h-[40px] -mt-[20px] bg-yellow-100 -z-10 border-y-2 border-black pointer-events-none opacity-50"></div>
 
             <ScrollColumn 
                 label={t.hour}
@@ -100,7 +100,7 @@ export const PopTimePicker: React.FC<TimePickerProps> = ({ initialTimestamp, onS
                 onSelect={(val) => setSelectedHour(Number(val))} 
                 widthClass="w-20"
             />
-            <span className="font-display text-2xl pt-6">:</span>
+            <span className="font-display text-3xl font-bold">:</span>
             <ScrollColumn 
                 label={t.minute}
                 items={minutes} 
@@ -110,17 +110,17 @@ export const PopTimePicker: React.FC<TimePickerProps> = ({ initialTimestamp, onS
             />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-2 gap-4">
             <button 
                 onClick={onCancel}
-                className="font-bold border-2 border-black p-3 hover:bg-gray-200 text-sm uppercase"
+                className="font-bold border-2 border-black p-4 hover:bg-gray-200 text-sm uppercase"
             >
                 {t.cancel}
             </button>
             <button 
                 onClick={handleSave}
                 style={{ backgroundColor: themeColor }}
-                className="font-bold border-2 border-black p-3 text-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
+                className="font-bold border-2 border-black p-4 text-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
             >
                 {t.confirm}
             </button>

@@ -27,6 +27,7 @@ export const i18n_JP = {
   smokeUnit: '本',
   consecutiveDaysWithinLimit: '連続達成日数',
   days: '日',
+  smokes: '本',
   
   // ============ Time Periods ============
   lateNight: '深夜',
@@ -97,6 +98,7 @@ export const i18n_JP = {
   save: '保存',
   cancel: 'キャンセル',
   confirm: '確認',
+  confirmDelete: 'この記録を削除してもよろしいですか？',
   editTime: '時間を編集',
   never: 'なし',
   view: '表示',

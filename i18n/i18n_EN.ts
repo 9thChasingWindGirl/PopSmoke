@@ -18,6 +18,7 @@ export const i18n_EN = {
   // ============ Dashboard ============
   lastRecord: 'LAST RECORD',
   smokeButton: 'SMOKE',
+  smokes: 'SMOKES',
   clickToLog: 'Click the button below to log',
   todayLogs: "TODAY'S LOGS",
   noRecords: 'No records yet',
@@ -83,7 +84,7 @@ export const i18n_EN = {
   sat: 'Sat',
   sun: 'Sun',
   
-  // ============ Common Actions ============
+  // ============ Common Actions ============  
   more: 'MORE / EDIT',
   back: 'BACK',
   next: 'NEXT',
@@ -97,6 +98,7 @@ export const i18n_EN = {
   save: 'SAVE',
   cancel: 'CANCEL',
   confirm: 'CONFIRM',
+  confirmDelete: 'Are you sure you want to delete this record?',
   editTime: 'Edit Time',
   never: 'Never',
   view: 'View',

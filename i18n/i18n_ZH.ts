@@ -27,6 +27,7 @@ export const i18n_ZH = {
   smokeUnit: '支',
   consecutiveDaysWithinLimit: '连续达标',
   days: '天',
+  smokes: '根',
   
   // ============ Time Periods ============
   lateNight: '深夜',
@@ -97,6 +98,7 @@ export const i18n_ZH = {
   save: '保存',
   cancel: '取消',
   confirm: '确认',
+  confirmDelete: '确定要删除这条记录吗？',
   editTime: '修改时间',
   never: '从未',
   view: '视图',

@@ -14,6 +14,7 @@ import { TRANSLATIONS } from '../../i18n';
 import { apiService, getFeishuApiSettings, syncFromFeishu, SyncDiffResult } from '../../services/apiService';
 import { getStorageKeys } from '../../utils/logUtils';
 import { getStorageAdapter, isWebPlatform, isAndroidPlatform } from '../../services/storageAdapter';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { POP_COMPONENT_STYLES } from '../../styles';
 
 interface PopAnalysisProps {
@@ -444,7 +445,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
     };
   }, [logs, viewMode, currentMonth]);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     
@@ -470,7 +471,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
     }
     
     const headers = ['Date', ...Array.from({ length: 20 }, (_, i) => i + 1)];
-    let csvContent = `data:text/csv;charset=utf-8,${headers.join(',')}\n`;
+    let csvContent = `${headers.join(',')}\n`;
     
     const sortedDates = Object.keys(logsByDate).sort();
     
@@ -486,37 +487,62 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
     const monthStr = `${year}${String(month + 1).padStart(2, '0')}`;
     const fileName = `smoking_logs_${monthStr}.csv`;
     
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setExportStatus({
-      success: true,
-      message: t.exportSuccess
-    });
-    
-    // 添加操作日志
-    if (onAddOperationLog) {
-      const exportLog: OperationLogType = {
-        id: `export_${Date.now()}`,
-        type: 'sync',
-        data: {
-          id: '',
-          user_id: user?.id || 'local',
-          record_date: new Date().toISOString().split('T')[0],
-          record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-          timestamp: Date.now()
-        } as SmokeLog,
-        syncStatus: 'synced',
-        timestamp: Date.now(),
-        message: `${t.export} CSV: ${fileName}`,
-        apiFetchedCount: Object.keys(logsByDate).length
-      };
-      onAddOperationLog(exportLog);
+    try {
+      if (isAndroidPlatform()) {
+        // Android 平台使用 Filesystem 插件
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: csvContent,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+        
+        // 显示成功消息
+        setExportStatus({
+          success: true,
+          message: `${t.exportSuccess} - 文件已保存到文档目录: ${fileName}`
+        });
+      } else {
+        // Web 平台使用原来的方法
+        const encodedUri = encodeURI(`data:text/csv;charset=utf-8,${csvContent}`);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setExportStatus({
+          success: true,
+          message: t.exportSuccess
+        });
+      }
+      
+      // 添加操作日志
+      if (onAddOperationLog) {
+        const exportLog: OperationLogType = {
+          id: `export_${Date.now()}`,
+          type: 'sync',
+          data: {
+            id: '',
+            user_id: user?.id || 'local',
+            record_date: new Date().toISOString().split('T')[0],
+            record_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+            timestamp: Date.now()
+          } as SmokeLog,
+          syncStatus: 'synced',
+          timestamp: Date.now(),
+          message: `${t.export} CSV: ${fileName}`,
+          apiFetchedCount: Object.keys(logsByDate).length
+        };
+        onAddOperationLog(exportLog);
+      }
+    } catch (error) {
+      console.error('Export CSV error:', error);
+      setExportStatus({
+        success: false,
+        message: error instanceof Error ? error.message : t.exportFailed
+      });
     }
   };
 
