@@ -42,14 +42,14 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'INIT_001',
     message: 'Platform detection failed',
     category: 'init',
-    userMessage: '无法检测运行平台',
+    userMessage: '',
     recoverable: false
   },
   INIT_002: {
     code: 'INIT_002',
     message: 'Storage initialization failed',
     category: 'init',
-    userMessage: '存储初始化失败',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -57,14 +57,14 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'AUTH_001',
     message: 'Invalid credentials',
     category: 'auth',
-    userMessage: '邮箱或密码错误',
+    userMessage: '',
     recoverable: true
   },
   AUTH_002: {
     code: 'AUTH_002',
     message: 'Session expired',
     category: 'auth',
-    userMessage: '登录已过期，请重新登录',
+    userMessage: '',
     recoverable: true,
     action: 'relogin'
   },
@@ -72,7 +72,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'AUTH_003',
     message: 'Network error during authentication',
     category: 'auth',
-    userMessage: '网络错误，请检查网络连接',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -80,7 +80,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'STORAGE_001',
     message: 'Storage quota exceeded',
     category: 'storage',
-    userMessage: '存储空间不足',
+    userMessage: '',
     recoverable: true,
     action: 'cleanup'
   },
@@ -88,7 +88,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'STORAGE_002',
     message: 'Failed to read from storage',
     category: 'storage',
-    userMessage: '读取数据失败',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -96,7 +96,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'STORAGE_003',
     message: 'Failed to write to storage',
     category: 'storage',
-    userMessage: '保存数据失败',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -104,7 +104,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'API_001',
     message: 'API request failed',
     category: 'api',
-    userMessage: 'API请求失败',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -112,7 +112,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'API_002',
     message: 'API configuration missing',
     category: 'api',
-    userMessage: 'API配置缺失',
+    userMessage: '',
     recoverable: true,
     action: 'configure'
   },
@@ -120,7 +120,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'API_003',
     message: 'API rate limit exceeded',
     category: 'api',
-    userMessage: 'API请求频率超限，请稍后再试',
+    userMessage: '',
     recoverable: true,
     action: 'wait'
   },
@@ -128,7 +128,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'SYNC_001',
     message: 'Sync failed',
     category: 'sync',
-    userMessage: '同步失败',
+    userMessage: '',
     recoverable: true,
     action: 'retry'
   },
@@ -136,7 +136,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'SYNC_002',
     message: 'Data conflict during sync',
     category: 'sync',
-    userMessage: '数据同步冲突',
+    userMessage: '',
     recoverable: true,
     action: 'resolve'
   },
@@ -144,7 +144,7 @@ export const ERROR_CODES: Record<string, ErrorInfo> = {
     code: 'UI_001',
     message: 'Component render error',
     category: 'ui',
-    userMessage: '界面渲染错误',
+    userMessage: '',
     recoverable: true,
     action: 'refresh'
   }
@@ -155,7 +155,7 @@ export function getErrorInfo(code: string): ErrorInfo {
     code: 'UNKNOWN',
     message: 'Unknown error',
     category: 'unknown',
-    userMessage: '发生未知错误',
+    userMessage: '',
     recoverable: true
   };
 }

@@ -26,7 +26,7 @@ export const simpleEncrypt = (text: string, password: string): string => {
     const charCode = text.charCodeAt(i) ^ password.charCodeAt(i % password.length);
     result += String.fromCharCode(charCode);
   }
-  return btoa(result);
+  return btoa(unescape(encodeURIComponent(result)));
 };
 
 export const simpleDecrypt = (encodedText: string, password: string): string => {
@@ -37,7 +37,7 @@ export const simpleDecrypt = (encodedText: string, password: string): string => 
       const charCode = text.charCodeAt(i) ^ password.charCodeAt(i % password.length);
       result += String.fromCharCode(charCode);
     }
-    return result;
+    return decodeURIComponent(escape(result));
   } catch (e) {
     return '';
   }

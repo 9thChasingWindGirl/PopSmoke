@@ -344,11 +344,11 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
             </div>
           </div>
           
-          {isAndroid && (
+          {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold">Supabase API</h3>
-                <PopSupabaseGuide themeColor={settings.themeColor} />
+                <PopSupabaseGuide themeColor={settings.themeColor} language={settings.language} />
               </div>
               <div className="space-y-4">
                 <div>
@@ -401,7 +401,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                   </div>
                 </div>
                 
-                {isAndroid && (
+                {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
                   <div>
                     <h3 className="font-bold mb-2">Supabase API</h3>
                     <div className="bg-gray-100 p-3 border-2 border-black rounded">
@@ -441,7 +441,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                       </div>
                     </div>
                     
-                    {isAndroid && (
+                    {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
                       <div>
                         <h3 className="font-bold mb-4">Supabase API</h3>
                         <div className="space-y-4">
@@ -521,7 +521,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                       </div>
                     </div>
                     
-                    {isAndroid && (
+                    {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
                       <div>
                         <h3 className="font-bold mb-2">Supabase API</h3>
                         <div className="bg-gray-100 p-3 border-2 border-black rounded">
