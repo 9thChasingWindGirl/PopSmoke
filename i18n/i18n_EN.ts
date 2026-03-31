@@ -257,8 +257,10 @@ export const i18n_EN = {
   downloadFromCloud: 'Download from Cloud',
   skipDownload: 'Skip',
   loginRequired: 'Login Required',
-  loginRequiredMessage: 'Your Supabase API is configured but you are not logged in. Please login to access your cloud data.',
+  loginRequiredMessage: 'Your Supabase API is configured but you are not logged in. Please log in to access your cloud data.',
   loginNow: 'Login Now',
+  selectDataSource: 'Select Data Source',
+  selectDataSourceMessage: 'Please select which data source to get data from:',
   
   // ============ API Management Page ============
   apiManagement: 'API INF',
@@ -267,6 +269,7 @@ export const i18n_EN = {
   securityPassword: 'Security Password',
   enterPassword: 'Enter Security Password',
   selectSyncSource: 'Select Sync Source',
+  firstLaunchSyncMessage: 'Welcome! We detected you have cloud sync configured, but no local data yet. Please select which data source to retrieve your history from:',
   feishu: 'Feishu',
   supabase: 'Supabase',
   storageMethod: 'Storage Method',
@@ -374,6 +377,11 @@ export const i18n_EN = {
   // ============ External Link Warning ============
   externalLinkWarningTitle: 'External Link',
   externalLinkWarningMessage: 'You are about to visit an external website:',
+  
+  // ============ Sync - Field Update ============
+  fieldsToUpdate: 'Fields to update',
+  localDataNewerThanFeishu: 'Local data is newer than Feishu, please back up local data first',
+  localDataNewerThanCloud: 'Local data is newer than cloud, please upload local data first',
   externalLinkContinue: 'Continue',
   externalLinkCancel: 'Cancel',
   

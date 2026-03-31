@@ -18,11 +18,13 @@ import { PopColorPicker } from './components/ui/PopColorPicker';
 import { PopLoading } from './components/ui/PopLoading';
 import PopNav from './components/ui/PopNav';
 import { PopSystemLog } from './components/ui/PopSystemLog';
+import { PopSelect } from './components/ui/PopSelect';
+import { PopPrompt } from './components/ui/PopPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { THEME_PRESETS } from './constants';
 import { TRANSLATIONS } from './i18n';
 import { getStorageAdapter, getAuthStorageAdapter, getSyncQueueManager, simpleEncrypt, simpleDecrypt, isAndroidPlatform, hasLoggedInBefore, setLoggedInFlag, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, createSupabaseAuthStorage } from './services/storageAdapter';
-import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs } from './services/apiService';
+import { apiService, createSupabaseClient, setSupabaseClient, initializeSupabaseClient, isSupabaseClientInitialized, persistSupabaseRuntimeConfig, fetchAllTables, convertToSmokeLogs, SyncDiffResult } from './services/apiService';
 import EventHandle from './event/EventHandle';
 import { EventType } from './event/EventType';
 import { getStorageKeys } from './utils/logUtils';
@@ -81,6 +83,9 @@ export default function App() {
   const [storageError, setStorageError] = useState<string | null>(null);
   const [showAuthErrorNotification, setShowAuthErrorNotification] = useState(false);
   const [showSystemLog, setShowSystemLog] = useState(false);
+  const [isLoadingUserData, setIsLoadingUserData] = useState(false);
+  const [hasLoggedInSuccess, setHasLoggedInSuccess] = useState(false);
+  const hasCheckedCloudDataRef = useRef(false);
   
   const [popEffects, setPopEffects] = useState<PopEffectItem[]>([]);
   const [operationLogs, setOperationLogs] = useState<OperationLogType[]>([]);
@@ -97,10 +102,10 @@ export default function App() {
   const [hasMoreCloudLogs, setHasMoreCloudLogs] = useState(false);
   
   // 云端数据发现对话框状态
-  const [cloudDataSource, setCloudDataSource] = useState<'supabase' | 'feishu' | 'none'>('none');
+  const [cloudDataSource, setCloudDataSource] = useState<'supabase' | 'feishu' | 'none' | 'both'>('none');
   const [cloudDataCount, setCloudDataCount] = useState(0);
   const [cloudDataRecords, setCloudDataRecords] = useState<SmokeLog[]>([]);
-  const [cloudDialogMode, setCloudDialogMode] = useState<'download' | 'login'>('download');
+  const [cloudDialogMode, setCloudDialogMode] = useState<'download' | 'login' | 'select'>('download');
   
   const isAndroid = isAndroidPlatform();
 
@@ -255,9 +260,24 @@ export default function App() {
           systemLogService.debug('storage', '应用本地日志数据');
         }
         
-        const shouldTryRestore = hasLoggedIn;
+        // 检查API配置，确定本地/云端模式
+        const hasFeishu = !!savedApiSettings?.feishu;
+        const hasSupabase = !!savedApiSettings?.supabase;
+        
+        // 根据API配置设置本地模式
+        if (!hasFeishu && !hasSupabase) {
+          systemLogService.info('init', '未配置任何API，使用本地模式');
+          setIsLocalMode(true);
+        } else if (hasFeishu && !hasSupabase) {
+          systemLogService.info('init', '仅配置飞书API，使用本地模式 + 飞书远端获取数据');
+          setIsLocalMode(true);
+        } else {
+          systemLogService.info('init', '配置了Supabase API，使用云端模式');
+          setIsLocalMode(false);
+        }
 
-        if (shouldTryRestore) {
+        // 检查本地数据后，根据登录状态和API配置决定后续操作
+        if (hasLoggedIn) {
           systemLogService.info('auth', '尝试恢复会话', {
             hasLoggedIn,
             hasRuntimeSupabaseConfig: !!runtimeSupabaseConfig
@@ -274,12 +294,25 @@ export default function App() {
               setShowRestorePasswordDialog(false);
               setIsLocalMode(false);
               setLoggedInFlag(true);
-              loadUserData(currentUser.user);
+              
+              // 检查本地是否有数据
+              if (localLogs?.length === 0) {
+                // 本地没有数据，调用checkCloudDataAndShowDialog函数
+                checkCloudDataAndShowDialog(
+                  localLogs?.length || 0,
+                  savedApiSettings,
+                  true
+                );
+              } else {
+                // 本地有数据，直接加载用户数据
+                loadUserData(currentUser.user);
+              }
             } else {
               systemLogService.info('auth', '无活跃会话，检查保存的API设置');
               if (savedApiSettings && localLogs?.length > 0) {
                 setShowPreviousLoginDialog(true);
               } else {
+                // 检查本地数据后，根据API配置决定是否需要登录
                 checkCloudDataAndShowDialog(
                   localLogs?.length || 0,
                   savedApiSettings,
@@ -291,9 +324,10 @@ export default function App() {
             setIsConnecting(false);
           }
         } else {
-          systemLogService.info('init', '首次启动，检查云端数据');
+          systemLogService.info('init', '检查云端数据');
           setIsConnecting(true);
           try {
+            // 检查本地数据后，根据API配置决定是否需要登录
             checkCloudDataAndShowDialog(
               localLogs?.length || 0,
               savedApiSettings,
@@ -307,6 +341,7 @@ export default function App() {
         systemLogService.error('init', '应用初始化失败', error as Error);
       } finally {
         setIsLoading(false);
+        setIsInitialized(true);
         systemLogService.info('init', '应用初始化完成');
       }
     };
@@ -315,7 +350,7 @@ export default function App() {
 
     const setupAuthSubscription = async () => {
       try {
-        const { data: { subscription }, unsubscribe } = await authService.onAuthStateChange((event, session, user) => {
+        const result = await authService.onAuthStateChange((event, session, user) => {
           systemLogService.info('auth', `认证事件: ${event}`);
           
           if (event === 'PASSWORD_RECOVERY') {
@@ -330,7 +365,11 @@ export default function App() {
           }
           
           if (session?.user && session.user.email_confirmed_at) {
-            systemLogService.info('auth', '用户登录成功', { userId: session.user.id });
+            // 避免重复报告登录成功
+            if (!hasLoggedInSuccess) {
+              systemLogService.info('auth', '用户登录成功', { userId: session.user.id });
+              setHasLoggedInSuccess(true);
+            }
             
             // 更新认证状态
             setAuthState({
@@ -399,7 +438,25 @@ export default function App() {
             };
             
             saveApiSettingsOnLogin();
-            loadUserData(session.user as User);
+            
+            // 检查本地是否有数据
+            const checkLocalData = async () => {
+              const adapter = getStorageAdapter();
+              const localLogs = await adapter.getLogs();
+              if (localLogs?.length === 0) {
+                // 本地没有数据，调用checkCloudDataAndShowDialog函数
+                const savedApiSettings = await adapter.getApiSettings();
+                checkCloudDataAndShowDialog(
+                  localLogs?.length || 0,
+                  savedApiSettings,
+                  true
+                );
+              } else {
+                // 本地有数据，直接加载用户数据
+                loadUserData(session.user as User);
+              }
+            };
+            checkLocalData();
           } else if (event === 'SIGNED_OUT') {
             systemLogService.info('auth', '用户登出');
             
@@ -453,7 +510,7 @@ export default function App() {
           }
         });
         
-        return unsubscribe;
+        return result.unsubscribe;
       } catch (error) {
         console.error('Failed to set up auth subscription:', error);
         return () => {};
@@ -461,8 +518,8 @@ export default function App() {
     };
     
     let unsubscribe: (() => void) = () => {};
-    setupAuthSubscription().then(unsub => {
-      unsubscribe = unsub;
+    setupAuthSubscription().then(result => {
+      unsubscribe = result;
     });
 
     return () => {
@@ -471,7 +528,14 @@ export default function App() {
   }, [isInitialized]);
 
   const loadUserData = async (user: User) => {
+    // 防止重复调用
+    if (isLoadingUserData) {
+      console.log('User data is already loading, skipping');
+      return;
+    }
+
     systemLogService.info('auth', '开始加载用户数据', { userId: user.id });
+    setIsLoadingUserData(true);
     await setLoggedInFlag(true);
 
     try {
@@ -481,17 +545,7 @@ export default function App() {
         setSettingsState(result.settings);
       }
 
-      if (result.needCloudSync && result.cloudLogs && result.localLogs.length === 0 && !showCloudDataDialog) {
-        systemLogService.info('storage', `发现 ${result.cloudLogs.length} 条云端日志，显示同步对话框`);
-        setCloudDataSource('supabase');
-        setCloudDialogMode('download');
-        setCloudDataCount(result.cloudLogs.length);
-        setCloudDataRecords(result.cloudLogs);
-        setShowCloudDataDialog(true);
-        setLogs([]);
-      } else {
-        setLogs(result.localLogs);
-      }
+      setLogs(result.localLogs);
 
       systemLogService.info('auth', '用户数据加载成功');
     } catch (error) {
@@ -500,6 +554,8 @@ export default function App() {
       const adapter = getStorageAdapter();
       const localLogs = await adapter.getLogs();
       setLogs(localLogs || []);
+    } finally {
+      setIsLoadingUserData(false);
     }
   };
 
@@ -528,33 +584,136 @@ export default function App() {
     }
   };
 
+  // 同步状态
+  const [showSyncSourceDialog, setShowSyncSourceDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [pendingSyncSource, setPendingSyncSource] = useState<'feishu' | 'supabase' | null>(null);
+  const [feishuPassword, setFeishuPassword] = useState('');
+  const [syncDiff, setSyncDiff] = useState<SyncDiffResult | null>(null);
+  const [showDiffDialog, setShowDiffDialog] = useState(false);
+  const [syncOptions, setSyncOptions] = useState<{ upload: boolean; download: boolean }>({ upload: true, download: true });
+  const [isCalculatingDiff, setIsCalculatingDiff] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<'loading' | 'syncing'>('loading');
+
+  const handleSyncClick = (savedApiSettings?: any) => {
+    let hasFeishu = false;
+    let hasSupabase = false;
+
+    if (savedApiSettings) {
+      // 使用传入的API设置
+      hasFeishu = !!savedApiSettings.feishu;
+      hasSupabase = !!savedApiSettings.supabase;
+    } else {
+      // 从localStorage获取API设置
+      hasFeishu = !!localStorage.getItem('feishuApiSettings');
+      hasSupabase = !!localStorage.getItem('supabaseApiSettings');
+    }
+
+    const hasAnyApiConfig = hasFeishu || hasSupabase;
+    const needToSelectSource = hasFeishu && hasSupabase;
+
+    if (!hasAnyApiConfig) {
+      systemLogService.info('storage', '未配置任何API，保持本地模式');
+      return;
+    }
+
+    systemLogService.info('storage', `配置了API，使用云端模式: Feishu=${hasFeishu}, Supabase=${hasSupabase}`);
+
+    if (needToSelectSource) {
+      setShowSyncSourceDialog(true);
+    } else if (hasFeishu) {
+      handleSync('feishu');
+    } else if (hasSupabase) {
+      handleSync('supabase');
+    }
+  };
+
+  const handleSync = async (source: 'feishu' | 'supabase' | null, password?: string) => {
+    setShowSyncSourceDialog(false);
+    setIsCalculatingDiff(true);
+    setLoadingStatus('loading');
+    setIsLoading(true);
+
+    try {
+      if (source === 'feishu') {
+        const userId = authState.user?.id || 'local';
+        const diffResult = await apiService.getSyncDiff('feishu', userId, password, settings.language);
+        
+        setSyncDiff(diffResult);
+        setShowDiffDialog(true);
+      } else if (source === 'supabase') {
+        if (!authState.user) {
+          setShowAuthModal(true);
+          setAuthMode('signin');
+          return;
+        }
+
+        const diffResult = await apiService.getSyncDiff('supabase', authState.user.id, undefined, settings.language);
+        setSyncDiff(diffResult);
+        setShowDiffDialog(true);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      const errorMessage = error instanceof Error ? error.message : '同步失败';
+      
+      if (errorMessage.includes('encrypted')) {
+        setPendingSyncSource(source);
+        setShowPasswordDialog(true);
+      }
+    } finally {
+      setIsCalculatingDiff(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!syncDiff) return;
+    
+    setShowDiffDialog(false);
+    setLoadingStatus('syncing');
+    setIsLoading(true);
+
+    try {
+      let result;
+      if (syncDiff.source === 'feishu') {
+        // 飞书只支持下载
+        result = await apiService.executeSync('feishu', syncDiff.diff, { download: true }, settings.language);
+      } else {
+        // Supabase支持上传和下载
+        result = await apiService.executeSync('supabase', syncDiff.diff, syncOptions, settings.language);
+      }
+      
+      if (result.success) {
+        // 刷新本地日志
+        const adapter = getStorageAdapter();
+        const updatedLogs = await adapter.getLogs();
+        setLogs(updatedLogs);
+      }
+    } catch (error) {
+      console.error('Sync execution error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const checkCloudDataAndShowDialog = async (
     localLogsCount: number,
     savedApiSettings: any,
     isLoggedIn: boolean
   ) => {
+    if (hasCheckedCloudDataRef.current) {
+      return;
+    }
+
     if (localLogsCount > 0) {
-      console.log('Local data exists, skip cloud data dialog');
+      systemLogService.info('storage', '本地数据存在，跳过云端数据对话框');
+      hasCheckedCloudDataRef.current = true;
       return;
     }
 
-    if (savedApiSettings?.feishu) {
-      console.log('Feishu API configured (encrypted), showing download dialog...');
-      setCloudDataSource('feishu');
-      setCloudDialogMode('download');
-      setShowCloudDataDialog(true);
-      return;
-    }
-
-    if (savedApiSettings?.supabase) {
-      console.log('Supabase API configured, showing login dialog...');
-      setCloudDataSource('supabase');
-      setCloudDialogMode('login');
-      setShowCloudDataDialog(true);
-      return;
-    }
-
-    console.log('No cloud data source configured, staying in local mode');
+    // 复用分析页的同步流程
+    handleSyncClick(savedApiSettings);
+    hasCheckedCloudDataRef.current = true;
   };
 
   // 切换视图并重置滚动位置
@@ -568,7 +727,7 @@ export default function App() {
   };
 
   const handleDownloadCloudData = async (password?: string) => {
-    if (cloudDataSource === 'none') {
+    if (cloudDataSource === 'none' || cloudDataSource === 'both') {
       return { needPassword: false };
     }
 
@@ -623,6 +782,59 @@ export default function App() {
 
   const handleSkipCloudData = () => {
     console.log('User skipped cloud data download');
+  };
+
+  const handleSelectDataSource = async (dataSource: 'feishu' | 'supabase') => {
+    systemLogService.info('storage', `用户选择数据源: ${dataSource}`);
+    setCloudDataSource(dataSource);
+    setCloudDialogMode('download');
+    
+    // 获取云端数据
+    try {
+      if (dataSource === 'supabase' && authState.user) {
+        const cloudLogs = await apiService.getAllLogs(authState.user.id);
+        systemLogService.info('storage', `发现 ${cloudLogs.length} 条云端日志，显示同步对话框`);
+        setCloudDataCount(cloudLogs.length);
+        setCloudDataRecords(cloudLogs);
+      } else if (dataSource === 'feishu') {
+        // 尝试获取飞书数据
+        systemLogService.info('storage', `尝试从飞书获取数据`);
+        const adapter = getStorageAdapter();
+        const savedApiSettings = await adapter.getApiSettings();
+        
+        if (savedApiSettings?.feishu) {
+          // 尝试不使用密码获取飞书数据（如果未加密）
+          try {
+            const result = await apiService.downloadCloudData('feishu', authState.user?.id);
+            if (result.needPassword) {
+              // 需要密码，显示对话框让用户输入密码
+              systemLogService.info('storage', `飞书API设置已加密，需要密码，显示同步对话框`);
+              setCloudDataCount(0);
+              setCloudDataRecords([]);
+            } else {
+              // 不需要密码，获取到了数据
+              systemLogService.info('storage', `发现 ${result.logs.length} 条飞书云端日志，显示同步对话框`);
+              setCloudDataCount(result.logs.length);
+              setCloudDataRecords(result.logs);
+            }
+          } catch (error) {
+            systemLogService.error('storage', '获取飞书数据失败', error as Error);
+            setCloudDataCount(0);
+            setCloudDataRecords([]);
+          }
+        } else {
+          systemLogService.info('storage', `未配置飞书API，显示同步对话框`);
+          setCloudDataCount(0);
+          setCloudDataRecords([]);
+        }
+      }
+    } catch (error) {
+      systemLogService.error('storage', '获取云端数据失败', error as Error);
+      setCloudDataCount(0);
+      setCloudDataRecords([]);
+    }
+    
+    setShowCloudDataDialog(true);
   };
 
   const handleAuth = async () => {
@@ -772,7 +984,22 @@ export default function App() {
         setShowAuthModal(false);
         setIsLocalMode(false);
         setLoggedInFlag(true);
-        await loadUserData(result.user);
+        
+        // 检查本地是否有数据
+        const adapter = getStorageAdapter();
+        const localLogs = await adapter.getLogs();
+        if (localLogs?.length === 0) {
+          // 本地没有数据，调用checkCloudDataAndShowDialog函数
+          const savedApiSettings = await adapter.getApiSettings();
+          checkCloudDataAndShowDialog(
+            localLogs?.length || 0,
+            savedApiSettings,
+            true
+          );
+        } else {
+          // 本地有数据，直接加载用户数据
+          await loadUserData(result.user);
+        }
       } else {
         setIsLocalMode(true);
       }
@@ -914,9 +1141,9 @@ export default function App() {
 
   const handleDownloadFromCloud = async () => {
     const adapter = getStorageAdapter();
-    setLogs(cloudRecords);
+    setLogs(cloudDataRecords);
     try {
-      await adapter.saveLogs(cloudRecords);
+      await adapter.saveLogs(cloudDataRecords);
     } catch (error) {
       console.error('Failed to save cloud records locally', error);
       setStorageError(error instanceof Error ? error.message : 'Storage error');
@@ -1007,25 +1234,28 @@ export default function App() {
     touchStartX.current = null;
   };
 
-  if (isLoading) {
-        return <PopLoading settings={settings} status="initializing" isInitialize={true} />;
-      }
-      
-      if (isConnecting) {
-        return <PopLoading settings={settings} status="connecting" isInitialize={true} />;
-      }
-      
-      if (isSyncing) {
-        return <PopLoading settings={settings} status="syncing" isInitialize={true} />;
-      }
-      
-      if (isAuthenticating) {
-        return <PopLoading settings={settings} status="authenticating" isInitialize={true} />;
-      }
-      
-      if (isRestoring) {
-        return <PopLoading settings={settings} status="restoring" isInitialize={true} />;
-      }
+  // 应用初始化阶段的加载状态
+  if (!isInitialized) {
+    if (isLoading) {
+      return <PopLoading settings={settings} status="initializing" isInitialize={true} />;
+    }
+    
+    if (isConnecting) {
+      return <PopLoading settings={settings} status="connecting" isInitialize={true} />;
+    }
+    
+    if (isSyncing) {
+      return <PopLoading settings={settings} status="syncing" isInitialize={true} />;
+    }
+    
+    if (isAuthenticating) {
+      return <PopLoading settings={settings} status="authenticating" isInitialize={true} />;
+    }
+    
+    if (isRestoring) {
+      return <PopLoading settings={settings} status="restoring" isInitialize={true} />;
+    }
+  }
 
   const handlePasswordReset = async () => {
     if (!newPassword.trim()) {
@@ -1379,22 +1609,101 @@ export default function App() {
 
       </main>
 
+      {isLoading && (
+        <PopLoading
+          settings={settings}
+          language={settings.language}
+          status={loadingStatus}
+        />
+      )}
+
       <PopCloudDataDialog
         visible={showCloudDataDialog}
         mode={cloudDialogMode}
         recordCount={cloudDataCount}
         onDownload={handleDownloadCloudData}
         onLogin={handleLoginForCloudData}
+        onSelectDataSource={handleSelectDataSource}
         onSkip={handleSkipCloudData}
         onClose={() => setShowCloudDataDialog(false)}
         themeColor={settings.themeColor}
-        title={cloudDialogMode === 'login' ? t.loginRequired : t.cloudDataFound}
-        message={cloudDialogMode === 'login' ? t.loginRequiredMessage : t.cloudDataFoundMessage}
+        title={cloudDialogMode === 'login' ? t.loginRequired : cloudDialogMode === 'select' ? t.selectDataSource : t.cloudDataFound}
+        message={cloudDialogMode === 'login' ? t.loginRequiredMessage : cloudDialogMode === 'select' ? t.selectDataSourceMessage : t.cloudDataFoundMessage}
         downloadText={t.downloadFromCloud}
         loginText={t.loginNow}
         skipText={t.skipDownload}
-        requirePassword={!!cloudDataSource}
+        requirePassword={cloudDialogMode === 'download' && cloudDataSource === 'feishu'}
         passwordPlaceholder={t.enterPassword || 'Enter password'}
+      />
+
+      {/* 同步相关对话框 */}
+      {showSyncSourceDialog && (
+        <PopSelect
+          type="info"
+          title={t.selectSyncSource}
+          message={t.firstLaunchSyncMessage || '检测到您已配置云端同步，但本地暂无数据。请选择从哪个数据源获取您的历史记录。'}
+          options={[
+            { label: t.feishu, value: 'feishu' },
+            { label: t.supabase, value: 'supabase' }
+          ]}
+          onSelect={(value) => handleSync(value as 'feishu' | 'supabase')}
+          onCancel={() => setShowSyncSourceDialog(false)}
+          cancelText={t.cancel}
+          themeColor={settings.themeColor}
+          isFirstLaunch={true}
+        />
+      )}
+      
+      {showPasswordDialog && pendingSyncSource && (
+        <PopPrompt
+          type="info"
+          title={t.enterPassword || 'Enter Password'}
+          message={`请输入您的API密码以解密 ${pendingSyncSource} 设置`}
+          placeholder={t.enterPassword || 'Enter password'}
+          confirmText={t.confirm || 'Confirm'}
+          cancelText={t.cancel || 'Cancel'}
+          confirmThemeColor={settings.themeColor}
+          isPassword={true}
+          onConfirm={(value) => {
+            setShowPasswordDialog(false);
+            handleSync(pendingSyncSource, value);
+            setPendingSyncSource(null);
+          }}
+          onCancel={() => {
+            setShowPasswordDialog(false);
+            setPendingSyncSource(null);
+          }}
+        />
+      )}
+
+      <PopCloudDataDialog
+        visible={showDiffDialog}
+        mode="sync-diff"
+        syncDiff={syncDiff}
+        title={syncDiff?.source === 'feishu' ? t.syncFromFeishu : t.syncFromSupabaseOnly}
+        message=""
+        skipText={t.cancel}
+        onSkip={() => {
+          setShowDiffDialog(false);
+          setSyncDiff(null);
+        }}
+        onClose={() => {
+          setShowDiffDialog(false);
+          setSyncDiff(null);
+        }}
+        onSyncConfirm={handleSyncConfirm}
+        onSyncOptionChange={(option: 'upload' | 'download' | 'fields', value: boolean) => {
+          if (option === 'upload') {
+            setSyncOptions({ ...syncOptions, upload: value });
+          } else if (option === 'download') {
+            setSyncOptions({ ...syncOptions, download: value });
+          } else if (option === 'fields') {
+            // 补齐字段操作也需要上传权限
+            setSyncOptions({ ...syncOptions, upload: value });
+          }
+        }}
+        themeColor={settings.themeColor}
+        language={settings.language}
       />
 
       {/* 系统日志组件 - 仅安卓端 */}

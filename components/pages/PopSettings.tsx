@@ -7,6 +7,7 @@ import { PopNotification } from '../ui/PopNotification';
 import { PopConfirm } from '../ui/PopConfirm';
 import { PopForm } from '../ui/PopForm';
 import { PopExternalLinkWarning } from '../ui/PopExternalLinkWarning';
+import { PopLoading } from '../ui/PopLoading';
 import { THEME_PRESETS } from '../../constants';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, User, SmokeLog, OperationLog as OperationLogType } from '../../types';
@@ -48,6 +49,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
   const [avatarUrl, setAvatarUrl] = useState<string>(settings.avatarUrl || '');
   const [displayAvatarUrl, setDisplayAvatarUrl] = useState<string>(settings.avatarUrl || '');
   const [isUploading, setIsUploading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   // 加载缓存的头像
   useEffect(() => {
@@ -244,6 +246,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
       return;
     }
     
+    setIsResetting(true);
     try {
       // 直接更新密码（Supabase会自动验证当前会话）
       const pwdClient = await getSupabaseClient();
@@ -272,6 +275,8 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
         success: false,
         message: errorMessage
       });
+    } finally {
+      setIsResetting(false);
     }
   };
   
@@ -335,6 +340,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
 
   // 处理数据清理
   const handleClearData = async () => {
+    setIsResetting(true);
     try {
       const adapter = getStorageAdapter();
       await adapter.clearLogsOnly();
@@ -372,8 +378,14 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
         success: false,
         message: error instanceof Error ? error.message : 'Failed to clear data'
       });
+    } finally {
+      setIsResetting(false);
     }
   };
+
+  if (isResetting) {
+    return <PopLoading settings={settings} status="resetting" isInitialize={false} />;
+  }
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6 pt-8 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-8">

@@ -267,6 +267,7 @@ export const i18n_KO = {
   securityPassword: '보안 비밀번호',
   enterPassword: '보안 비밀번호 입력',
   selectSyncSource: '동기화 소스 선택',
+  firstLaunchSyncMessage: '환영합니다! 클라우드 동기화가 설정되어 있지만 로컬 데이터가 없습니다. 기록을 가져올 데이터 소스를 선택하세요:',
   feishu: 'Feishu',
   supabase: 'Supabase',
   storageMethod: '스토리지 방식',
@@ -376,6 +377,11 @@ export const i18n_KO = {
   externalLinkWarningMessage: '외부 웹사이트를 방문하려고 합니다:',
   externalLinkContinue: '계속',
   externalLinkCancel: '취소',
+  
+  // ============ Sync - Field Update ============
+  fieldsToUpdate: '필드 업데이트',
+  localDataNewerThanFeishu: '로컬 데이터가 Feishu보다 최신입니다. 먼저 로컬 데이터를 백업하세요',
+  localDataNewerThanCloud: '로컬 데이터가 클라우드보다 최신입니다. 먼저 로컬 데이터를 업로드하세요',
   
   // ============ Error Boundary ============
   somethingWentWrong: '오류가 발생했습니다',

@@ -9,6 +9,9 @@ export interface SmokeLog {
   timestamp: number;
   created_at?: string;
   date?: string;
+  source?: 'local' | 'feishu' | 'supabase';
+  canonical_id?: string;
+  sync_status?: 'pending' | 'synced' | 'failed';
   [key: string]: unknown;
 }
 

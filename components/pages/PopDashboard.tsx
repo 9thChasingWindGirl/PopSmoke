@@ -439,7 +439,7 @@ export const PopDashboard: React.FC<PopDashboardProps> = ({ logs, settings, onRe
                       <p className="font-display text-xl">{t.noRecords || 'No records yet'}</p>
                     </div>
                   ) : (
-                    todayLogs.slice(0, 8).map(log => (
+                    todayLogs.map(log => (
                       <LogItem
                         key={log.id}
                         log={log}

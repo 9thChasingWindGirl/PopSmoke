@@ -23,13 +23,15 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
   
   const isAndroid = isAndroidPlatform();
   
+  const shouldShowSupabaseGuide = () => isAndroid || (isWebPlatform() && import.meta.env.DEV);
+  
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
     feishu: {
       apiUrl: ''
     },
     supabase: {
-      apiUrl: isWebPlatform() ? (import.meta.env.VITE_SUPABASE_URL || '') : '',
-      anonKey: isWebPlatform() ? (import.meta.env.VITE_SUPABASE_ANON_KEY || '') : ''
+      apiUrl: '',
+      anonKey: ''
     }
   });
   
@@ -39,8 +41,8 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
       apiUrl: ''
     },
     supabase: {
-      apiUrl: isWebPlatform() ? (import.meta.env.VITE_SUPABASE_URL || '') : '',
-      anonKey: isWebPlatform() ? (import.meta.env.VITE_SUPABASE_ANON_KEY || '') : ''
+      apiUrl: '',
+      anonKey: ''
     }
   });
   
@@ -344,7 +346,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
             </div>
           </div>
           
-          {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
+          {shouldShowSupabaseGuide() && (
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold">Supabase API</h3>
@@ -401,7 +403,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                   </div>
                 </div>
                 
-                {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
+                {shouldShowSupabaseGuide() && (
                   <div>
                     <h3 className="font-bold mb-2">Supabase API</h3>
                     <div className="bg-gray-100 p-3 border-2 border-black rounded">
@@ -441,7 +443,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                       </div>
                     </div>
                     
-                    {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
+                    {shouldShowSupabaseGuide() && (
                       <div>
                         <h3 className="font-bold mb-4">Supabase API</h3>
                         <div className="space-y-4">
@@ -500,8 +502,8 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                               apiUrl: ''
                             },
                             supabase: {
-                              apiUrl: import.meta.env.VITE_SUPABASE_URL || '',
-                              anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+                              apiUrl: '',
+                              anonKey: ''
                             }
                           });
                         }}
@@ -521,7 +523,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                       </div>
                     </div>
                     
-                    {(isAndroid || (isWebPlatform() && import.meta.env.DEV)) && (
+                    {shouldShowSupabaseGuide() && (
                       <div>
                         <h3 className="font-bold mb-2">Supabase API</h3>
                         <div className="bg-gray-100 p-3 border-2 border-black rounded">
@@ -567,8 +569,8 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                         apiUrl: ''
                       },
                       supabase: {
-                        apiUrl: import.meta.env.VITE_SUPABASE_URL || '',
-                        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+                        apiUrl: '',
+                        anonKey: ''
                       }
                     });
                   }}

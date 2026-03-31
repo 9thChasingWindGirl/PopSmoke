@@ -5,7 +5,7 @@ import { POP_DESIGN_SYSTEM, POP_COMPONENT_STYLES } from '../../styles';
 import { SyncDiffResult } from '../../services/apiService';
 import { TRANSLATIONS } from '../../i18n';
 
-type DialogMode = 'download' | 'login' | 'sync-diff';
+type DialogMode = 'download' | 'login' | 'sync-diff' | 'select';
 
 interface PopCloudDataDialogProps {
   visible: boolean;
@@ -15,7 +15,8 @@ interface PopCloudDataDialogProps {
   onDownload?: (password?: string) => void;
   onLogin?: () => void;
   onSyncConfirm?: () => void;
-  onSyncOptionChange?: (option: 'upload' | 'download', value: boolean) => void;
+  onSyncOptionChange?: (option: 'upload' | 'download' | 'fields', value: boolean) => void;
+  onSelectDataSource?: (dataSource: 'feishu' | 'supabase') => void;
   onSkip: () => void;
   onClose: () => void;
   themeColor?: string;
@@ -38,6 +39,7 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   onLogin,
   onSyncConfirm,
   onSyncOptionChange,
+  onSelectDataSource,
   onSkip,
   onClose,
   themeColor = POP_DESIGN_SYSTEM.colors.theme.gold,
@@ -53,7 +55,7 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [password, setPassword] = useState('');
-  const [syncOption, setSyncOption] = useState<'upload' | 'download'>('upload');
+  const [syncOption, setSyncOption] = useState<'upload' | 'download' | 'fields'>('upload');
   
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
 
@@ -97,10 +99,20 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
     }, 300);
   };
 
-  const handleSyncOptionChange = (option: 'upload' | 'download') => {
+  const handleSyncOptionChange = (option: 'upload' | 'download' | 'fields') => {
     setSyncOption(option);
     onSyncOptionChange?.(option, true);
-    onSyncOptionChange?.(option === 'upload' ? 'download' : 'upload', false);
+    // 取消其他选项
+    if (option === 'upload') {
+      onSyncOptionChange?.('download', false);
+      onSyncOptionChange?.('fields', false);
+    } else if (option === 'download') {
+      onSyncOptionChange?.('upload', false);
+      onSyncOptionChange?.('fields', false);
+    } else if (option === 'fields') {
+      onSyncOptionChange?.('upload', false);
+      onSyncOptionChange?.('download', false);
+    }
   };
 
   const handleSyncConfirm = () => {
@@ -169,6 +181,15 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
               {syncDiff.diff.conflicting.length > 0 && (
                 <p className="text-red-600">{t.conflicts}: {syncDiff.diff.conflicting.length}</p>
               )}
+              {syncDiff.diff.fieldsToUpdate && syncDiff.diff.fieldsToUpdate.length > 0 && (
+                <p className="text-yellow-600">{t.fieldsToUpdate}: {syncDiff.diff.fieldsToUpdate.length}</p>
+              )}
+              {/* 本地数据比云端更新的提醒 */}
+              {syncDiff.diff.localOnly.length > 0 && syncDiff.diff.cloudOnly.length === 0 && syncDiff.diff.conflicting.length === 0 && (
+                <p className="text-orange-600 font-bold">
+                  {syncDiff.source === 'feishu' ? t.localDataNewerThanFeishu : t.localDataNewerThanCloud}
+                </p>
+              )}
             </div>
             
             {syncDiff.diff.cloudOnly.length > 0 && (
@@ -226,6 +247,43 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
               </PopButton>
             </>
           )}
+          {mode === 'select' && (
+            <div className="flex flex-col gap-3 w-full">
+              {/* 数据源选择选项 */}
+              <div className="space-y-2">
+                <label 
+                  className={`flex items-center gap-3 p-3 border-4 border-black cursor-pointer transition-all`}
+                  onClick={() => onSelectDataSource?.('feishu')}
+                >
+                  <div className="w-5 h-5 border-2 border-black flex items-center justify-center bg-white">
+                  </div>
+                  <span className="font-display text-sm md:text-base">
+                    从飞书获取数据
+                  </span>
+                </label>
+                
+                <label 
+                  className={`flex items-center gap-3 p-3 border-4 border-black cursor-pointer transition-all`}
+                  onClick={() => onSelectDataSource?.('supabase')}
+                >
+                  <div className="w-5 h-5 border-2 border-black flex items-center justify-center bg-white">
+                  </div>
+                  <span className="font-display text-sm md:text-base">
+                    从Supabase获取数据
+                  </span>
+                </label>
+              </div>
+              
+              {/* 跳过按钮 */}
+              <PopButton
+                variant="secondary"
+                onClick={handleSkip}
+                className={POP_COMPONENT_STYLES.cloudDataDialog.button}
+              >
+                {skipText}
+              </PopButton>
+            </div>
+          )}
           {mode === 'sync-diff' && syncDiff?.source === 'supabase' && (
             <div className="flex flex-col gap-3 w-full">
               {/* 单选框选项 */}
@@ -243,7 +301,7 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
                     {syncOption === 'upload' && <span className="text-white text-xs">✓</span>}
                   </div>
                   <span className="font-display text-sm md:text-base">
-                    {t.uploadOnly} ({syncDiff.diff.localOnly.length})
+                    上传数据 ({syncDiff.diff.localOnly.length})
                   </span>
                 </label>
                 
@@ -260,9 +318,28 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
                     {syncOption === 'download' && <span className="text-white text-xs">✓</span>}
                   </div>
                   <span className="font-display text-sm md:text-base">
-                    {t.downloadOnly} ({syncDiff.diff.cloudOnly.length})
+                    下载数据 ({syncDiff.diff.cloudOnly.length})
                   </span>
                 </label>
+                
+                {syncDiff.diff.fieldsToUpdate && syncDiff.diff.fieldsToUpdate.length > 0 && (
+                  <label 
+                    className={`flex items-center gap-3 p-3 border-4 border-black cursor-pointer transition-all ${
+                      syncOption === 'fields' ? 'bg-opacity-20' : 'bg-white'
+                    }`}
+                    style={{ backgroundColor: syncOption === 'fields' ? themeColor : undefined }}
+                    onClick={() => handleSyncOptionChange('fields')}
+                  >
+                    <div className={`w-5 h-5 border-2 border-black flex items-center justify-center ${
+                      syncOption === 'fields' ? 'bg-black' : 'bg-white'
+                    }`}>
+                      {syncOption === 'fields' && <span className="text-white text-xs">✓</span>}
+                    </div>
+                    <span className="font-display text-sm md:text-base">
+                      补齐缺失字段 ({syncDiff.diff.fieldsToUpdate.length})
+                    </span>
+                  </label>
+                )}
               </div>
               
               {/* 确认同步按钮 */}

@@ -259,6 +259,8 @@ export const i18n_ZH = {
   loginRequired: '需要登录',
   loginRequiredMessage: '您的 Supabase API 已配置但尚未登录。请登录以访问您的云端数据。',
   loginNow: '立即登录',
+  selectDataSource: '选择数据源',
+  selectDataSourceMessage: '请选择要从哪个数据源获取数据：',
   
   // ============ API Management Page ============
   apiManagement: 'API管理',
@@ -267,6 +269,7 @@ export const i18n_ZH = {
   securityPassword: '安全密码',
   enterPassword: '请输入安全密码',
   selectSyncSource: '选择同步源',
+  firstLaunchSyncMessage: '欢迎使用！检测到您已配置云端同步，但本地暂无数据。请选择从哪个数据源获取您的历史记录：',
   feishu: '飞书',
   supabase: 'Supabase',
   storageMethod: '存储方式',
@@ -374,6 +377,11 @@ export const i18n_ZH = {
   // ============ External Link Warning ============
   externalLinkWarningTitle: '外部链接',
   externalLinkWarningMessage: '您即将访问外部网站：',
+  
+  // ============ Sync - Field Update ============
+  fieldsToUpdate: '需要补齐字段',
+  localDataNewerThanFeishu: '本地数据比飞书更新，建议先备份本地数据',
+  localDataNewerThanCloud: '本地数据比云端更新，建议先上传本地数据',
   externalLinkContinue: '继续',
   externalLinkCancel: '取消',
   

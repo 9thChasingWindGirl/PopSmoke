@@ -5,6 +5,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import EventHandle from '../event/EventHandle';
 import { EventType } from '../event/EventType';
 import { TRANSLATIONS } from '../i18n';
+import { normalizeTime } from '../utils/logUtils';
 
 const DEFAULT_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const DEFAULT_SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -32,6 +33,7 @@ export interface DataDiff {
   localOnly: SmokeLog[];     // 仅本地有（需要上传）
   cloudOnly: SmokeLog[];     // 仅云端有（需要下载）
   conflicting: SmokeLog[];    // 冲突记录
+  fieldsToUpdate: SmokeLog[]; // 需要补齐字段的记录
   totalLocal: number;
   totalCloud: number;
 }
@@ -278,7 +280,29 @@ const generateLogId = (userId: string, recordDate: string, recordTime: string, i
   return crypto.randomUUID();
 };
 
-const getUniqueKey = (log: SmokeLog): string => `${log.user_id}_${log.record_date}_${log.record_time}`;
+const generateCanonicalId = (log: SmokeLog): string => {
+  const normalizedTime = normalizeTime(log.record_time || '');
+  const content = `${log.record_date}|${normalizedTime}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  return btoa(String.fromCharCode(...data)).substring(0, 16);
+};
+
+const getUniqueKey = (log: SmokeLog): string => {
+  const normalizedTime = normalizeTime(log.record_time || '');
+  const canonicalId = log.canonical_id || generateCanonicalId(log);
+  return `${log.record_date}#${normalizedTime}#${canonicalId}`;
+};
+
+const normalizeLog = (log: SmokeLog, source: 'local' | 'feishu' | 'supabase'): SmokeLog => {
+  const canonicalId = generateCanonicalId(log);
+  return {
+    ...log,
+    source,
+    canonical_id: canonicalId,
+    sync_status: 'pending'
+  };
+};
 
 const compareData = (localLogs: SmokeLog[], cloudLogs: SmokeLog[]): DataDiff => {
   const localKeys = new Map<string, SmokeLog>();
@@ -295,6 +319,7 @@ const compareData = (localLogs: SmokeLog[], cloudLogs: SmokeLog[]): DataDiff => 
   const localOnly: SmokeLog[] = [];
   const cloudOnly: SmokeLog[] = [];
   const conflicting: SmokeLog[] = [];
+  const fieldsToUpdate: SmokeLog[] = [];
   
   // 检查仅本地有的记录
   localKeys.forEach((log, key) => {
@@ -312,15 +337,19 @@ const compareData = (localLogs: SmokeLog[], cloudLogs: SmokeLog[]): DataDiff => 
       const localLog = localKeys.get(key);
       if (localLog) {
         // 比较关键属性，忽略可能不同的属性（如id、sync_status等）
+        // 使用标准化后的时间进行比较，避免格式差异导致的虚假冲突
+        // 只比较核心字段：日期和时间
         const isConflicting = localLog.record_date !== log.record_date ||
-                            localLog.record_time !== log.record_time ||
-                            localLog.category !== log.category ||
-                            localLog.operation !== log.operation ||
-                            localLog.duration !== log.duration ||
-                            localLog.content !== log.content;
+                            normalizeTime(localLog.record_time || '') !== normalizeTime(log.record_time || '');
         
         if (isConflicting) {
           conflicting.push(log);
+        } else {
+          // 检查是否需要补齐字段
+          // 本地记录有 table_name 和 table_id，而云端记录没有
+          if (localLog.table_name && localLog.table_id && (!log.table_name || !log.table_id)) {
+            fieldsToUpdate.push(localLog);
+          }
         }
       }
     }
@@ -330,6 +359,7 @@ const compareData = (localLogs: SmokeLog[], cloudLogs: SmokeLog[]): DataDiff => 
     localOnly,
     cloudOnly,
     conflicting,
+    fieldsToUpdate,
     totalLocal: localLogs.length,
     totalCloud: cloudLogs.length
   };
@@ -431,12 +461,14 @@ export const syncFromFeishu = async (options: SyncOptions, userId?: string, pass
 
     for (const table of tables) {
       const logs = convertToSmokeLogs(table, userId || 'local');
-      allNewLogs.push(...logs);
+      const normalizedLogs = logs.map(log => normalizeLog(log, 'feishu'));
+      allNewLogs.push(...normalizedLogs);
     }
 
     const storageService = getStorageAdapter();
     const existingLogs = await storageService.getLogs();
-    const existingKeys = new Set(existingLogs.map(getUniqueKey));
+    const existingNormalizedLogs = existingLogs.map(log => normalizeLog(log, log.source || 'local'));
+    const existingKeys = new Set(existingNormalizedLogs.map(getUniqueKey));
     const uniqueNewLogs = allNewLogs.filter((log) => !existingKeys.has(getUniqueKey(log)));
     const duplicateCount = allNewLogs.length - uniqueNewLogs.length;
 
@@ -665,7 +697,8 @@ export const apiService = {
       while (hasMore) {
         const logs = await this.getLogs(userId, page, pageSize);
         if (logs.length > 0) {
-          allLogs.push(...logs);
+          const normalizedLogs = logs.map(log => normalizeLog(log, 'supabase'));
+          allLogs.push(...normalizedLogs);
           hasMore = logs.length === pageSize;
           page++;
         } else {
@@ -723,29 +756,34 @@ export const apiService = {
       .in('user_id', userIds)
       .in('record_date', dates);
     
+    // 生成一致的键格式
+    // 区分新记录和需要更新的记录
     const existingKeys = new Set((existing || []).map(r => `${r.user_id}_${r.record_date}_${r.record_time}`));
-    const newLogs = deduplicatedLogs.filter(log => !existingKeys.has(getUniqueKey(log)));
+    
+    // 所有记录都使用 upsert，这样既可以插入新记录，也可以更新现有记录
+    // 不需要区分新记录和更新记录，upsert 会自动处理
+    const logsToProcess = deduplicatedLogs;
 
-    if (newLogs.length === 0) {
+    if (logsToProcess.length === 0) {
       return { success: true, count: 0 };
     }
 
     const BATCH_SIZE = 500;
     const batches: SmokeLog[][] = [];
-    for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
-      batches.push(newLogs.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < logsToProcess.length; i += BATCH_SIZE) {
+      batches.push(logsToProcess.slice(i, i + BATCH_SIZE));
     }
 
     let successCount = 0;
     let lastError: string | undefined;
 
     for (const batch of batches) {
-      const { error } = await client.from('smoke_logs').insert(batch);
+      const { error } = await client.from('smoke_logs').upsert(batch, { onConflict: 'user_id, record_date, record_time' });
       if (error) lastError = error.message;
       else successCount += batch.length;
     }
 
-    return { success: successCount === newLogs.length, count: successCount, error: lastError };
+    return { success: successCount === logsToProcess.length, count: successCount, error: lastError };
   },
 
   async updateLog(updatedLog: SmokeLog, existingLogs: SmokeLog[]): Promise<SmokeLog> {
@@ -859,8 +897,23 @@ export const apiService = {
       let message = '';
       if (source === 'feishu') {
         message = t.foundNewRecords.replace('{count}', String(diff.cloudOnly.length)) + '，' + t.foundConflictingRecords.replace('{count}', String(diff.conflicting.length));
+        
+        // 添加本地数据比飞书更新的提醒
+        if (diff.localOnly.length > 0 && diff.cloudOnly.length === 0 && diff.conflicting.length === 0) {
+          message += '，' + t.localDataNewerThanFeishu;
+        }
       } else {
         message = t.needUploadRecords.replace('{count}', String(diff.localOnly.length)) + '，' + t.needDownloadRecords.replace('{count}', String(diff.cloudOnly.length)) + '，' + t.foundConflictingRecords.replace('{count}', String(diff.conflicting.length));
+        
+        // 添加需要补齐字段的记录数
+        if (diff.fieldsToUpdate.length > 0) {
+          message += '，' + t.fieldsToUpdate + ' ' + String(diff.fieldsToUpdate.length) + ' 条';
+        }
+        
+        // 添加本地数据比云端更新的提醒
+        if (diff.localOnly.length > 0 && diff.cloudOnly.length === 0 && diff.conflicting.length === 0) {
+          message += '，' + t.localDataNewerThanCloud;
+        }
       }
 
       return {
@@ -897,6 +950,20 @@ export const apiService = {
           type: EventType.CLOUD_UPLOAD,
           category: 'sync',
           data: { count: uploadedCount },
+          timestamp: Date.now()
+        });
+      }
+
+      // 执行字段补齐（仅supabase）
+      if (source === 'supabase' && options.upload && diff.fieldsToUpdate.length > 0) {
+        // 执行字段补齐更新
+        const updateResult = await this.saveLogs(diff.fieldsToUpdate);
+        uploadedCount += updateResult.count;
+        
+        EventHandle.publish({
+          type: EventType.CLOUD_UPLOAD,
+          category: 'sync',
+          data: { count: updateResult.count, type: 'field_update' },
           timestamp: Date.now()
         });
       }
@@ -1143,8 +1210,6 @@ export const apiService = {
   async loadUserData(userId: string): Promise<{
     settings: AppSettings | null;
     localLogs: SmokeLog[];
-    cloudLogs?: SmokeLog[];
-    needCloudSync?: boolean;
   }> {
     const adapter = getStorageAdapter();
 
@@ -1153,22 +1218,6 @@ export const apiService = {
       await adapter.saveSettings(userSettings);
 
       const localLogs = await adapter.getLogs();
-
-      if (!localLogs || localLogs.length === 0) {
-        try {
-          const cloudLogs = await this.getAllLogs(userId);
-          if (cloudLogs.length > 0) {
-            return {
-              settings: userSettings,
-              localLogs: [],
-              cloudLogs,
-              needCloudSync: true
-            };
-          }
-        } catch (cloudError) {
-          console.warn('Check cloud data failed:', cloudError);
-        }
-      }
 
       return {
         settings: userSettings,

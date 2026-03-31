@@ -267,6 +267,7 @@ export const i18n_JP = {
   securityPassword: 'セキュリティパスワード',
   enterPassword: 'セキュリティパスワードを入力',
   selectSyncSource: '同期ソースを選択',
+  firstLaunchSyncMessage: 'ようこそ！クラウド同期が設定されていますが、ローカルデータがありません。履歴を取得するデータソースを選択してください：',
   feishu: 'Feishu',
   supabase: 'Supabase',
   storageMethod: 'ストレージ方式',
@@ -376,6 +377,11 @@ export const i18n_JP = {
   externalLinkWarningMessage: '外部ウェブサイトにアクセスしようとしています：',
   externalLinkContinue: '続ける',
   externalLinkCancel: 'キャンセル',
+  
+  // ============ Sync - Field Update ============
+  fieldsToUpdate: 'フィールドの更新',
+  localDataNewerThanFeishu: 'ローカルデータがFeishuより新しいです。まずローカルデータをバックアップしてください',
+  localDataNewerThanCloud: 'ローカルデータがクラウドより新しいです。まずローカルデータをアップロードしてください',
   
   // ============ Error Boundary ============
   somethingWentWrong: 'エラーが発生しました',

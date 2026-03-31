@@ -784,11 +784,14 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
           setSyncDiff(null);
         }}
         onSyncConfirm={handleSyncConfirm}
-        onSyncOptionChange={(option: 'upload' | 'download', value: boolean) => {
+        onSyncOptionChange={(option: 'upload' | 'download' | 'fields', value: boolean) => {
           if (option === 'upload') {
             setSyncOptions({ ...syncOptions, upload: value });
           } else if (option === 'download') {
             setSyncOptions({ ...syncOptions, download: value });
+          } else if (option === 'fields') {
+            // 补齐字段操作也需要上传权限
+            setSyncOptions({ ...syncOptions, upload: value });
           }
         }}
         themeColor={settings.themeColor}
