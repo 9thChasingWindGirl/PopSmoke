@@ -277,6 +277,7 @@ export const i18n_EN = {
   storageUsage: 'Storage Usage',
   clearOldData: 'Clear Local Data',
   systemLog: 'System Logs',
+  viewSystemLogs: 'View System Logs',
   apiUrlDisplay: 'Saved API Settings',
   apiConfigRequired: 'API Configuration Required',
 
@@ -354,6 +355,13 @@ export const i18n_EN = {
   emailBindFailed: 'Email binding failed',
   passwordSameAsCurrent: 'New password cannot be the same as current password',
   passwordRequirements: 'Password requirements: at least 6 characters',
+  passwordRequirement: 'Password requirements',
+  passwordTooShort: 'Password must be at least 6 characters',
+  resetSuccess: 'Password reset successfully',
+  resetFailed: 'Failed to reset password',
+  confirmPasswordPlaceholder: 'Confirm password',
+  accountSettings: 'Account Settings',
+  continue: 'Continue',
   signOutFailed: 'Sign out failed',
   
   // ============ Settings - Storage Info ============
@@ -373,6 +381,13 @@ export const i18n_EN = {
   createRecord: 'Create record',
   updateRecord: 'Update record',
   deleteRecord: 'Delete record',
+  
+  // ============ Dashboard - Additional ============
+  noRecordsToday: 'No records today. Tap the button above to add one!',
+  confirmDeleteMessage: 'Are you sure you want to delete this record?',
+  editRecord: 'Edit Record',
+  editingRecord: 'Editing record',
+  left: 'left',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: 'External Link',
@@ -432,7 +447,55 @@ export const i18n_EN = {
   supabaseCloudSync: 'Use cloud sync to download/upload data',
   supabasePrev: 'Previous',
   supabaseNext: 'Next',
-  supabaseComplete: 'Complete'
+  supabaseComplete: 'Complete',
+
+  // ============ Version Update ============
+  newVersionAvailable: 'New Version Available',
+  releaseNotes: "What's New",
+  updateNow: 'Update Now',
+  later: 'Later',
+  noReleaseNotes: 'No release notes available',
+  updateHint: 'Updating to the latest version ensures you have the newest features and bug fixes.',
+  
+  // ============ Anti-Duplicate Submit ============
+  recording: 'Recording...',
+  operationFrequent: 'Too frequent, please try again later',
+  
+  // ============ Settings Page - General ============
+  generalSettings: 'General Settings',
+  
+  // ============ Settings Page - Storage ============
+  storageInfo: 'Storage Information',
+  checkStorage: 'Check Storage',
+  
+  // ============ Settings Page - Account ============
+  changeAvatar: 'Change Avatar',
+  bindEmail: 'Bind Email',
+  confirmSignOut: 'Confirm Sign Out',
+  signOutWarning: 'Are you sure you want to sign out? Your data will be saved locally.',
+  externalLinkWarning: 'You are leaving this app to visit an external website. Continue?',
+  
+  // ============ Analysis Page - Statistics ============
+  statistics: 'Statistics',
+  thisMonth: 'This Month',
+  maxDayRecord: 'Max Day Record',
+  
+  // ============ Analysis Page - Chart ============
+  chart: 'Chart',
+  weekView: 'Week View',
+  monthView: 'Month View',
+  noData: 'No data available',
+  
+  // ============ Analysis Page - Sync ============
+  sync: 'Synchronization',
+  syncDescription: 'Sync your data with cloud services for backup and multi-device access.',
+  noApiConfig: 'No API configured. Please set up API in Settings first.',
+  
+  // ============ Analysis Page - Operation Logs ============
+  operationLogs: 'Operation Logs',
+  clearLogs: 'Clear Logs',
+  conflicting: 'Conflicting',
+  syncResult: 'Sync Result'
 };
 
 export type I18nTranslations = typeof i18n_EN;

@@ -275,6 +275,7 @@ export const i18n_KO = {
   storageUsage: '스토리지 사용량',
   clearOldData: '로컬 데이터 지우기',
   systemLog: '시스템 로그',
+  viewSystemLogs: '시스템 로그 보기',
   apiUrlDisplay: '저장된 API 설정',
   apiConfigRequired: 'API 설정 필요',
   syncFromFeishuOnly: 'Feishu에서 동기화',
@@ -352,6 +353,13 @@ export const i18n_KO = {
   emailBindFailed: '이메일 바인딩 실패',
   passwordSameAsCurrent: '새 비밀번호는 현재 비밀번호와 같을 수 없습니다',
   passwordRequirements: '비밀번호 요구사항: 6자 이상',
+  passwordRequirement: '비밀번호 요구사항',
+  passwordTooShort: '비밀번호는 6자 이상이어야 합니다',
+  resetSuccess: '비밀번호 재설정 성공',
+  resetFailed: '비밀번호 재설정 실패',
+  confirmPasswordPlaceholder: '비밀번호 확인',
+  accountSettings: '계정 설정',
+  continue: '계속',
   signOutFailed: '로그아웃 실패',
   
   // ============ Settings - Storage Info ============
@@ -371,6 +379,13 @@ export const i18n_KO = {
   createRecord: '기록 생성',
   updateRecord: '기록 수정',
   deleteRecord: '기록 삭제',
+  
+  // ============ Dashboard - Additional ============
+  noRecordsToday: '오늘 기록이 없습니다. 위 버튼을 눌러 추가하세요!',
+  confirmDeleteMessage: '이 기록을 삭제하시겠습니까?',
+  editRecord: '기록 편집',
+  editingRecord: '기록 편집 중',
+  left: '남음',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: '외부 링크',
@@ -430,7 +445,57 @@ export const i18n_KO = {
   supabaseCloudSync: '클라우드 동기화를 사용하여 데이터 다운로드/업로드',
   supabasePrev: '이전',
   supabaseNext: '다음',
-  supabaseComplete: '완료'
+  supabaseComplete: '완료',
+  selectDataSource: '데이터 소스 선택',
+  selectDataSourceMessage: '데이터를 가져올 데이터 소스를 선택하세요:',
+
+  // ============ Version Update ============
+  newVersionAvailable: '새 버전 사용 가능',
+  releaseNotes: '업데이트 내용',
+  updateNow: '지금 업데이트',
+  later: '나중에 알림',
+  noReleaseNotes: '릴리스 노트가 없습니다',
+  updateHint: '최신 버전으로 업데이트하면 최신 기능과 버그 수정을 이용할 수 있습니다.',
+  
+  // ============ Anti-Duplicate Submit ============
+  recording: '기록 중...',
+  operationFrequent: '작업이 너무 빠릅니다. 잠시 후 다시 시도해 주세요',
+  
+  // ============ 설정 페이지 - 일반 ============
+  generalSettings: '일반 설정',
+  
+  // ============ 설정 페이지 - 저장소 ============
+  storageInfo: '저장소 정보',
+  checkStorage: '저장소 확인',
+  
+  // ============ 설정 페이지 - 계정 ============
+  changeAvatar: '아바타 변경',
+  bindEmail: '이메일 연결',
+  confirmSignOut: '로그아웃 확인',
+  signOutWarning: '로그아웃하시겠습니까? 데이터는 로컬에 저장됩니다.',
+  externalLinkWarning: '외부 웹사이트로 이동합니다. 계속하시겠습니까?',
+  
+  // ============ 분석 페이지 - 통계 ============
+  statistics: '통계 정보',
+  thisMonth: '이번 달',
+  maxDayRecord: '최대 일일 기록',
+  
+  // ============ 분석 페이지 - 차트 ============
+  chart: '차트',
+  weekView: '주간 보기',
+  monthView: '월간 보기',
+  noData: '데이터 없음',
+  
+  // ============ 분석 페이지 - 동기화 ============
+  sync: '데이터 동기화',
+  syncDescription: '클라우드 서비스와 데이터를 동기화하여 백업 및 멀티 디바이스 액세스를 구현합니다.',
+  noApiConfig: 'API가 구성되지 않았습니다. 먼저 설정에서 API를 구성하세요.',
+  
+  // ============ 분석 페이지 - 작업 로그 ============
+  operationLogs: '작업 로그',
+  clearLogs: '로그 삭제',
+  conflicting: '충돌',
+  syncResult: '동기화 결과'
 };
 
 export type I18nKO = typeof i18n_KO;

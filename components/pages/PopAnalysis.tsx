@@ -9,6 +9,7 @@ import { PopPrompt } from '../ui/PopPrompt';
 import { PopCloudDataDialog } from '../ui/PopCloudDataDialog';
 import { PopLoading } from '../ui/PopLoading';
 import { PopOperationLog } from '../ui/PopOperationLog';
+import { PageContainer } from '../ui/PageContainer';
 import { SmokeLog, AppSettings, User, OperationLog as OperationLogType } from '../../types';
 import { TRANSLATIONS } from '../../i18n';
 import { apiService, getFeishuApiSettings, syncFromFeishu, SyncDiffResult } from '../../services/apiService';
@@ -551,7 +552,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-0">
+    <PageContainer maxWidth="2xl" className="space-y-6">
        <PopCard className="relative pt-20 mb-8">
          <div className="absolute top-0 left-0 w-full flex flex-col border-b-4 border-black bg-gray-100 z-10">
             <div className="flex justify-between items-center px-4 py-2">
@@ -603,7 +604,7 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
 
          <div className="min-h-[200px] sm:min-h-[300px] md:min-h-[350px] lg:min-h-[400px] w-full mt-12 sm:mt-10 md:mt-8" style={{ height: '300px', minHeight: '250px' }}>
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }} barCategoryGap="20%" barSize={40}>
                     <XAxis 
                         dataKey="date" 
                         tick={{fontSize: 8, fontFamily: 'Public Sans', fontWeight: 'bold'}} 
@@ -798,6 +799,6 @@ export const PopAnalysis: React.FC<PopAnalysisProps> = ({ logs, settings, user, 
         language={settings.language}
       />
 
-    </div>
+    </PageContainer>
   );
 };

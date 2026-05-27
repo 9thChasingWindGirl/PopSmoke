@@ -1,6 +1,8 @@
+import type { SmokeLog } from './storage';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export type LogCategory = 'init' | 'auth' | 'storage' | 'api' | 'sync' | 'ui' | 'error' | 'settings';
+export type LogCategory = 'init' | 'auth' | 'storage' | 'api' | 'sync' | 'ui' | 'error' | 'settings' | 'cloud' | 'data' | 'feishu' | 'log';
 
 export interface LogEntry {
   id: string;
@@ -31,6 +33,20 @@ export interface DiagnosticConfig {
   enableConsole: boolean;
   enableStorage: boolean;
   logLevel: LogLevel;
+}
+
+export interface DailyStats {
+  total: number;
+  today: number;
+  remaining: number;
+  todayLogs: SmokeLog[];
+}
+
+export interface WeeklyTrend {
+  date: string;
+  count: number;
+  isToday?: boolean;
+  label?: string;
 }
 
 export interface LogDisplayOptions {

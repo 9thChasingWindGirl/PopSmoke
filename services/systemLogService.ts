@@ -250,7 +250,7 @@ class SystemLogService {
     const stats: LogStats = {
       total: this.logs.length,
       byLevel: { debug: 0, info: 0, warn: 0, error: 0 },
-      byCategory: { init: 0, auth: 0, storage: 0, api: 0, sync: 0, ui: 0, error: 0, settings: 0 }
+      byCategory: { init: 0, auth: 0, storage: 0, api: 0, sync: 0, ui: 0, error: 0, settings: 0, feishu: 0, cloud: 0, data: 0, log: 0 }
     };
 
     this.logs.forEach(log => {

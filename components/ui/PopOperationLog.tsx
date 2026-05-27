@@ -103,7 +103,7 @@ export const PopOperationLog: React.FC<PopOperationLogProps> = ({
     }
   }, [logs, isPaused]);
 
-  const getOperationPrefix = (type: 'create' | 'update' | 'delete' | 'clear' | 'sync') => {
+  const getOperationPrefix = (type: OperationLogType['type']): { prefix: string; color: string } => {
     switch (type) {
       case 'create':
         return { prefix: '[+]', color: 'text-green-400' };
@@ -115,6 +115,10 @@ export const PopOperationLog: React.FC<PopOperationLogProps> = ({
         return { prefix: '[🗑]', color: 'text-orange-400' };
       case 'sync':
         return { prefix: '[⬇]', color: 'text-purple-400' };
+      case 'system':
+        return { prefix: '[⚙]', color: 'text-gray-400' };
+      default:
+        return { prefix: '[?]', color: 'text-gray-400' };
     }
   };
 
@@ -188,8 +192,8 @@ export const PopOperationLog: React.FC<PopOperationLogProps> = ({
         {logs.map((log, index) => {
           const opStyle = getOperationPrefix(log.type);
           const syncStyle = getSyncStatusPrefix(log.syncStatus);
-          const date = log.data.record_date || log.data.date || new Date(log.data.timestamp).toLocaleDateString();
-          const time = log.data.record_time || new Date(log.data.timestamp).toTimeString().split(' ')[0].substring(0, 5);
+          const date = log.data?.record_date || log.data?.date || new Date(log.data?.timestamp || Date.now()).toLocaleDateString();
+          const time = log.data?.record_time || new Date(log.data?.timestamp || Date.now()).toTimeString().split(' ')[0].substring(0, 5);
           
           return (
             <div
@@ -197,11 +201,11 @@ export const PopOperationLog: React.FC<PopOperationLogProps> = ({
               className="flex items-start gap-2 py-1 border-b border-gray-200 last:border-b-0"
             >
               <span className="text-gray-500 shrink-0">{formatTimestamp(log.timestamp)}</span>
-              <span className={`${opStyle.color} shrink-0`}>{opStyle.prefix}</span>
+              <span className={`${opStyle?.color || ''} shrink-0`}>{opStyle?.prefix || ''}</span>
               <span className="text-gray-800 flex-1 min-w-0 truncate">
                 {log.message ? log.message : `${t[log.type] || log.type.toUpperCase()} ${date} ${time}`}
               </span>
-              <span className={`${syncStyle.color} shrink-0`}>{syncStyle.prefix}</span>
+              <span className={`${syncStyle?.color || ''} shrink-0`}>{syncStyle?.prefix || ''}</span>
             </div>
           );
         })}

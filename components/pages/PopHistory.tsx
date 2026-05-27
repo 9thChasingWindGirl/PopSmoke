@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PopCard } from '../ui/PopCard';
 import { PopButton } from '../ui/PopButton';
 import { PopDatePicker } from '../ui/PopDatePicker';
+import { PageContainer } from '../ui/PageContainer';
 import { SmokeLog, AppSettings, HistoryFilters, HistorySort, HistoryPagination } from '../../types';
 import { HISTORY_PAGE_SIZE } from '../../constants';
 import { TRANSLATIONS } from '../../i18n';
@@ -225,7 +226,7 @@ export const PopHistory: React.FC<PopHistoryProps> = ({ logs, settings, onLoadMo
   };
   
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 pt-8 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-8">
+    <PageContainer maxWidth="3xl" className="space-y-6 md:pb-8" id="history-page">
       <div className="text-center">
         <h1 className="font-display text-4xl md:text-5xl mb-2">
           {t.history}
@@ -490,6 +491,6 @@ export const PopHistory: React.FC<PopHistoryProps> = ({ logs, settings, onLoadMo
           </div>
         </div>
       </PopCard>
-    </div>
+    </PageContainer>
   );
 };

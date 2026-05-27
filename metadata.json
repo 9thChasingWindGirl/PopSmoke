@@ -1,5 +1,1 @@
-{
-  "name": "PopSmoke Tracker",
-  "description": "A Pop Art styled smoking tracker with visual analytics and threshold alerts.",
-  "requestFramePermissions": []
-}
+{"name": "PopSmoke Tracker", "description": "A Pop Art styled smoking tracker with visual analytics and threshold alerts.", "version": "0.4.30-beta", "requestFramePermissions": []}

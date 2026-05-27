@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { PopCard } from '../ui/PopCard';
 import { PopTimePicker } from '../ui/PopTimePicker';
 import { PopConfirm } from '../ui/PopConfirm';
+import { PageContainer } from '../ui/PageContainer';
 import { SmokeLog, AppSettings, Language } from '../../types';
 import { TRANSLATIONS } from '../../i18n';
 import { 
@@ -310,7 +311,7 @@ export const PopDashboard: React.FC<PopDashboardProps> = ({ logs, settings, onRe
         />
       )}
       
-      <div className="w-full max-w-4xl mx-auto flex flex-col p-2 md:p-4 min-h-[500px] sm:min-h-[600px] md:min-h-[700px] h-full pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-0">
+      <PageContainer maxWidth="4xl" className="flex items-center justify-center p-2 md:p-4">
         {/* 翻转卡片容器 */}
         <div className="relative flex justify-center items-center flex-1" style={{ perspective: '1000px' }}>
           <div 
@@ -470,7 +471,7 @@ export const PopDashboard: React.FC<PopDashboardProps> = ({ logs, settings, onRe
             </div>
           )}
         </div>
-      </div>
+      </PageContainer>
     </>
   );
 };

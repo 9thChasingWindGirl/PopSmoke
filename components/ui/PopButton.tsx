@@ -4,6 +4,7 @@ import { getButtonStyle } from '../../styles/componentStyles';
 interface PopButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger';
   themeColor?: string;
+  size?: 'small' | 'medium' | 'large';
 }
 
 export const PopButton: React.FC<PopButtonProps> = memo(({ 

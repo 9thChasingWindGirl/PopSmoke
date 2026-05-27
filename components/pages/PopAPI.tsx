@@ -5,6 +5,7 @@ import { PopConfirm } from '../ui/PopConfirm';
 import { PopPrompt } from '../ui/PopPrompt';
 import { PopForm } from '../ui/PopForm';
 import { PopSupabaseGuide } from '../ui/PopSupabaseGuide';
+import { PageContainer } from '../ui/PageContainer';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, ApiSettings, User, EncryptedApiSettings } from '../../types';
 import { apiService, saveFeishuApiSettings, createSupabaseClient, getSupabaseClient, setSupabaseClient, persistSupabaseRuntimeConfig, clearPersistedSupabaseRuntimeConfig, decryptSupabaseConfig } from '../../services/apiService';
@@ -13,12 +14,19 @@ import { POP_COMPONENT_STYLES, getApiManagementPadding, getApiManagementWrapper 
 
 interface PopAPIProps {
   settings: AppSettings;
-  onSave: (newSettings: AppSettings) => void;
-  refreshLogs: () => void;
-  user: User | null;
+  onSave?: (newSettings: AppSettings) => void;
+  refreshLogs?: () => void;
+  user?: User | null;
+  onSync?: () => void;
+  isSyncing?: boolean;
 }
 
-export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
+export const PopAPI: React.FC<PopAPIProps> = ({ 
+  settings,
+  onSave,
+  refreshLogs,
+  user = null
+}) => {
   const t = TRANSLATIONS[settings.language];
   
   const isAndroid = isAndroidPlatform();
@@ -105,6 +113,13 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
     }
     
     return `${protocol}://${maskedDomain}/${maskedPath}`;
+  };
+
+  const maskAnonKey = (key: string): string => {
+    if (!key) return '';
+    if (key.length <= 12) return '••••••••••••';
+    // 显示前6位和后4位，中间用...代替
+    return key.substring(0, 6) + '...' + key.substring(key.length - 4);
   };
   
   const handleApiSettingsChange = (service: 'feishu' | 'supabase', key: keyof any, value: any) => {
@@ -327,8 +342,8 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
   };
 
   return (
-    <div className={POP_COMPONENT_STYLES.apiManagement.mainContainer} style={getApiManagementPadding()}>
-      <div className={POP_COMPONENT_STYLES.apiManagement.contentWrapper} style={getApiManagementWrapper()}>
+    <PageContainer maxWidth="xl" className="flex items-start justify-center" id="api-management">
+      <div className="w-[600px] gap-[30px] flex flex-col">
       <PopCard title={t.apiManagement}>
         <div className="space-y-6 mt-2">
           <div>
@@ -528,7 +543,7 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
                         <h3 className="font-bold mb-2">Supabase API</h3>
                         <div className="bg-gray-100 p-3 border-2 border-black rounded">
                           <p className="mb-2"><span className="font-bold">{t.apiUrl}:</span> {decryptedApiSettings?.supabase?.apiUrl || t.apiConfigRequired}</p>
-                          <p><span className="font-bold">{t.anonKey}:</span> {decryptedApiSettings?.supabase?.anonKey || t.apiConfigRequired}</p>
+                          <p><span className="font-bold">{t.anonKey}:</span> {maskAnonKey(decryptedApiSettings?.supabase?.anonKey || '')}</p>
                         </div>
                       </div>
                     )}
@@ -680,6 +695,6 @@ export const PopAPI: React.FC<PopAPIProps> = ({ settings }) => {
         />
       )}
       </div>
-    </div>
+    </PageContainer>
   );
 };

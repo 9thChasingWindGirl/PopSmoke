@@ -1,23 +1,24 @@
 import React from 'react';
-import { ViewState } from '../../types';
+import { TRANSLATIONS } from '../../i18n';
+import { Language } from '../../types';
 
 interface PopStorageErrorDialogProps {
   isOpen: boolean;
-  errorMessage: string;
-  onDismiss: () => void;
-  onGoToSettings: () => void;
-  themeColor: string;
-  t: Record<string, string>;
+  onClose: () => void;
+  errorMessage?: string;
+  themeColor?: string;
+  language?: string;
 }
 
 export const PopStorageErrorDialog: React.FC<PopStorageErrorDialogProps> = ({
   isOpen,
-  errorMessage,
-  onDismiss,
-  onGoToSettings,
-  themeColor,
-  t
+  onClose,
+  errorMessage = 'Storage is running low. Please clear some data.',
+  themeColor = '#F59E0B',
+  language = 'en'
 }) => {
+  const t = TRANSLATIONS[language as Language];
+
   if (!isOpen) return null;
 
   return (
@@ -39,20 +40,12 @@ export const PopStorageErrorDialog: React.FC<PopStorageErrorDialogProps> = ({
           {t.storageErrorHint || 'Please go to Settings and clear some old data to free up space.'}
         </p>
         
-        <div className="flex space-x-3">
-          <button
-            onClick={onGoToSettings}
-            className="flex-1 bg-black text-white font-bold py-3 border-4 border-black hover:bg-white hover:text-black transition-colors"
-          >
-            {t.goToSettings || 'Go to Settings'}
-          </button>
-          <button
-            onClick={onDismiss}
-            className="flex-1 bg-gray-200 text-black font-bold py-3 border-4 border-black hover:bg-gray-300 transition-colors"
-          >
-            {t.dismiss || 'Dismiss'}
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="w-full bg-black text-white font-bold py-3 border-4 border-black hover:bg-white hover:text-black transition-colors"
+        >
+          {t.dismiss || 'Dismiss'}
+        </button>
       </div>
     </div>
   );

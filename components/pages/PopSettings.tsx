@@ -8,6 +8,7 @@ import { PopConfirm } from '../ui/PopConfirm';
 import { PopForm } from '../ui/PopForm';
 import { PopExternalLinkWarning } from '../ui/PopExternalLinkWarning';
 import { PopLoading } from '../ui/PopLoading';
+import { PageContainer } from '../ui/PageContainer';
 import { THEME_PRESETS } from '../../constants';
 import { TRANSLATIONS } from '../../i18n';
 import { AppSettings, User, SmokeLog, OperationLog as OperationLogType } from '../../types';
@@ -388,7 +389,7 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
   }
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6 pt-8 pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-8">
+    <PageContainer maxWidth="md" className="space-y-6 md:pb-8">
         {/* 页面导航 */}
         {activePage === 'main' ? (
             <PopCard title={t.settings} className="mb-8">
@@ -802,6 +803,6 @@ export const PopSettings: React.FC<PopSettingsProps> = ({ settings, onSave, user
                 onCancel={() => setExternalLinkUrl(null)}
             />
         )}
-    </div>
+    </PageContainer>
   );
 };

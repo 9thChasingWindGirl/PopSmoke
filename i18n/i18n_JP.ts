@@ -275,6 +275,7 @@ export const i18n_JP = {
   storageUsage: 'ストレージ使用量',
   clearOldData: 'ローカルデータをクリア',
   systemLog: 'システムログ',
+  viewSystemLogs: 'システムログを表示',
   apiUrlDisplay: '保存されたAPI設定',
   apiConfigRequired: 'API設定が必要',
   syncFromFeishuOnly: 'Feishuから同期',
@@ -352,6 +353,13 @@ export const i18n_JP = {
   emailBindFailed: 'メールのバインドに失敗しました',
   passwordSameAsCurrent: '新しいパスワードは現在のパスワードと同じにできません',
   passwordRequirements: 'パスワード要件：6文字以上',
+  passwordRequirement: 'パスワード要件',
+  passwordTooShort: 'パスワードは6文字以上必要です',
+  resetSuccess: 'パスワードリセット成功',
+  resetFailed: 'パスワードリセット失敗',
+  confirmPasswordPlaceholder: 'パスワード確認',
+  accountSettings: 'アカウント設定',
+  continue: '続ける',
   signOutFailed: 'サインアウトに失敗しました',
   
   // ============ Settings - Storage Info ============
@@ -371,6 +379,13 @@ export const i18n_JP = {
   createRecord: '記録を作成',
   updateRecord: '記録を更新',
   deleteRecord: '記録を削除',
+  
+  // ============ Dashboard - Additional ============
+  noRecordsToday: '本日の記録はありません。上のボタンをタップして追加してください！',
+  confirmDeleteMessage: 'この記録を削除してもよろしいですか？',
+  editRecord: '記録の編集',
+  editingRecord: '記録を編集中',
+  left: '残り',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: '外部リンク',
@@ -430,7 +445,57 @@ export const i18n_JP = {
   supabaseCloudSync: 'クラウド同期でデータのダウンロード/アップロード',
   supabasePrev: '前へ',
   supabaseNext: '次へ',
-  supabaseComplete: '完了'
+  supabaseComplete: '完了',
+  selectDataSource: 'データソースを選択',
+  selectDataSourceMessage: 'データを取得するデータソースを選択してください：',
+
+  // ============ Version Update ============
+  newVersionAvailable: '新しいバージョンが利用可能です',
+  releaseNotes: '更新内容',
+  updateNow: '今すぐ更新',
+  later: '後で通知',
+  noReleaseNotes: 'リリースノートはありません',
+  updateHint: '最新バージョンに更新すると、最新の機能とバグ修正が利用できます。',
+  
+  // ============ Anti-Duplicate Submit ============
+  recording: '記録中...',
+  operationFrequent: '操作が頻繁です。しばらくお待ちください',
+  
+  // ============ 設定ページ - 一般 ============
+  generalSettings: '一般設定',
+  
+  // ============ 設定ページ - ストレージ ============
+  storageInfo: 'ストレージ情報',
+  checkStorage: 'ストレージ確認',
+  
+  // ============ 設定ページ - アカウント ============
+  changeAvatar: 'アバター変更',
+  bindEmail: 'メール紐付け',
+  confirmSignOut: 'ログアウト確認',
+  signOutWarning: 'ログアウトしてもよろしいですか？データはローカルに保存されます。',
+  externalLinkWarning: '外部ウェブサイトに移動します。続行しますか？',
+  
+  // ============ 分析ページ - 統計 ============
+  statistics: '統計情報',
+  thisMonth: '今月',
+  maxDayRecord: '最大日別記録',
+  
+  // ============ 分析ページ - チャート ============
+  chart: 'チャート',
+  weekView: '週ビュー',
+  monthView: '月ビュー',
+  noData: 'データなし',
+  
+  // ============ 分析ページ - 同期 ============
+  sync: 'データ同期',
+  syncDescription: 'クラウドサービスとデータを同期して、バックアップとマルチデバイスアクセスを実現します。',
+  noApiConfig: 'APIが設定されていません。先に設定でAPIを構成してください。',
+  
+  // ============ 分析ページ - 操作ログ ============
+  operationLogs: '操作ログ',
+  clearLogs: 'ログ消去',
+  conflicting: '競合',
+  syncResult: '同期結果'
 };
 
 export type I18nJP = typeof i18n_JP;

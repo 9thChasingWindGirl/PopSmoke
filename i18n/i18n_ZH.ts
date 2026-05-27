@@ -277,6 +277,7 @@ export const i18n_ZH = {
   storageUsage: '存储占用',
   clearOldData: '清理本地数据',
   systemLog: '系统日志',
+  viewSystemLogs: '查看系统日志',
   apiUrlDisplay: '已保存的API设置',
   apiConfigRequired: '需要API配置',
   syncFromFeishuOnly: '从飞书同步',
@@ -354,6 +355,13 @@ export const i18n_ZH = {
   emailBindFailed: '邮箱绑定失败',
   passwordSameAsCurrent: '新密码不能与当前密码相同',
   passwordRequirements: '密码要求：至少6位字符',
+  passwordRequirement: '密码要求',
+  passwordTooShort: '密码至少需要6位字符',
+  resetSuccess: '密码重置成功',
+  resetFailed: '密码重置失败',
+  confirmPasswordPlaceholder: '确认密码',
+  accountSettings: '账户设置',
+  continue: '继续',
   signOutFailed: '登出失败',
   
   // ============ Settings - Storage Info ============
@@ -373,6 +381,13 @@ export const i18n_ZH = {
   createRecord: '新增记录',
   updateRecord: '编辑记录',
   deleteRecord: '删除记录',
+  
+  // ============ Dashboard - Additional ============
+  noRecordsToday: '今天还没有记录，点击上方按钮添加！',
+  confirmDeleteMessage: '确定要删除这条记录吗？',
+  editRecord: '编辑记录',
+  editingRecord: '正在编辑记录',
+  left: '剩余',
   
   // ============ External Link Warning ============
   externalLinkWarningTitle: '外部链接',
@@ -432,7 +447,55 @@ export const i18n_ZH = {
   supabaseCloudSync: '使用云同步功能下载/上传数据',
   supabasePrev: '上一步',
   supabaseNext: '下一步',
-  supabaseComplete: '完成'
+  supabaseComplete: '完成',
+
+  // ============ Version Update ============
+  newVersionAvailable: '发现新版本',
+  releaseNotes: '更新内容',
+  updateNow: '立即更新',
+  later: '稍后提醒',
+  noReleaseNotes: '暂无更新说明',
+  updateHint: '更新到最新版本以获得最新功能和错误修复。',
+  
+  // ============ Anti-Duplicate Submit ============
+  recording: '记录中...',
+  operationFrequent: '操作过于频繁，请稍后再试',
+  
+  // ============ 设置页面 - 通用 ============
+  generalSettings: '通用设置',
+  
+  // ============ 设置页面 - 存储 ============
+  storageInfo: '存储信息',
+  checkStorage: '检查存储',
+  
+  // ============ 设置页面 - 账户 ============
+  changeAvatar: '更换头像',
+  bindEmail: '绑定邮箱',
+  confirmSignOut: '确认退出',
+  signOutWarning: '确定要退出登录吗？您的数据将保存在本地。',
+  externalLinkWarning: '您即将离开本应用访问外部网站。是否继续？',
+  
+  // ============ 分析页面 - 统计 ============
+  statistics: '统计信息',
+  thisMonth: '本月',
+  maxDayRecord: '最大日记录',
+  
+  // ============ 分析页面 - 图表 ============
+  chart: '图表',
+  weekView: '周视图',
+  monthView: '月视图',
+  noData: '暂无数据',
+  
+  // ============ 分析页面 - 同步 ============
+  sync: '数据同步',
+  syncDescription: '与云服务同步数据，实现备份和多设备访问。',
+  noApiConfig: '未配置API。请先在设置中配置API。',
+  
+  // ============ 分析页面 - 操作日志 ============
+  operationLogs: '操作日志',
+  clearLogs: '清除日志',
+  conflicting: '冲突',
+  syncResult: '同步结果'
 };
 
 export type I18nZH = typeof i18n_ZH;

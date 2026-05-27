@@ -718,11 +718,9 @@ class SQLiteAdapter implements DataStorageAdapter {
             await this.ensureConnection();
             if (!this.db) throw new Error('Database not initialized');
 
-            // 避免手动 BEGIN/COMMIT 在插件内部事务下触发“no current transaction”异常
-            await this.db.execute("DELETE FROM logs");
-
             if (logs.length > 0) {
-              // 分批插入，每批500条
+              // 使用 INSERT OR REPLACE 进行增量更新，不删除现有数据
+              // 分批处理，每批500条
               const batchSize = 500;
               for (let i = 0; i < logs.length; i += batchSize) {
                 const batch = logs.slice(i, i + batchSize);
@@ -743,7 +741,7 @@ class SQLiteAdapter implements DataStorageAdapter {
                 const flatValues = values.flat();
 
                 const insertQuery = `
-                  INSERT INTO logs (id, user_id, table_id, table_name, record_date, record_time, record_index, timestamp, created_at)
+                  INSERT OR REPLACE INTO logs (id, user_id, table_id, table_name, record_date, record_time, record_index, timestamp, created_at)
                   VALUES ${placeholders}
                 `;
 
@@ -1309,9 +1307,14 @@ class SyncQueueManager {
   private static instance: SyncQueueManager;
   private syncQueue: OperationLog[] = [];
   private listeners: ((status: SyncStatus) => void)[] = [];
+  private queueListeners: ((queue: OperationLog[]) => void)[] = [];
   private isProcessing: boolean = false;
+  private autoSyncEnabled: boolean = false; // 默认关闭自动同步
+  private readonly QUEUE_STORAGE_KEY = 'popsmoke_sync_queue';
 
-  private constructor() {}
+  private constructor() {
+    this.loadQueueFromStorage();
+  }
 
   public static getInstance(): SyncQueueManager {
     if (!SyncQueueManager.instance) {
@@ -1320,8 +1323,52 @@ class SyncQueueManager {
     return SyncQueueManager.instance;
   }
 
+  private async loadQueueFromStorage(): Promise<void> {
+    try {
+      const adapter = getStorageAdapter();
+      if (adapter instanceof SQLiteAdapter) {
+        const stored = await adapter.getRuntimeConfig(this.QUEUE_STORAGE_KEY);
+        if (stored) {
+          this.syncQueue = JSON.parse(stored);
+          this.notifyQueueListeners();
+        }
+      } else if (isWebPlatform()) {
+        const stored = localStorage.getItem(this.QUEUE_STORAGE_KEY);
+        if (stored) {
+          this.syncQueue = JSON.parse(stored);
+          this.notifyQueueListeners();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load sync queue from storage:', error);
+    }
+  }
+
+  private async saveQueueToStorage(): Promise<void> {
+    try {
+      const adapter = getStorageAdapter();
+      const data = JSON.stringify(this.syncQueue);
+      
+      if (adapter instanceof SQLiteAdapter) {
+        await adapter.saveRuntimeConfig(this.QUEUE_STORAGE_KEY, data);
+      } else if (isWebPlatform()) {
+        localStorage.setItem(this.QUEUE_STORAGE_KEY, data);
+      }
+    } catch (error) {
+      console.error('Failed to save sync queue to storage:', error);
+    }
+  }
+
   public addOperation(operation: OperationLog): void {
-    this.syncQueue.push(operation);
+    // 确保操作有 syncStatus
+    const opWithStatus: OperationLog = {
+      ...operation,
+      syncStatus: 'pending'
+    };
+    
+    this.syncQueue.push(opWithStatus);
+    this.saveQueueToStorage();
+    this.notifyQueueListeners();
 
     if (operation.type !== 'clear' && operation.type !== 'sync') {
       this.notifyListeners({
@@ -1332,27 +1379,46 @@ class SyncQueueManager {
       });
     }
 
-    this.processSyncQueue();
+    // 只有在启用自动同步时才自动处理
+    if (this.autoSyncEnabled) {
+      this.processSyncQueue();
+    }
   }
 
-  private async processSyncQueue(): Promise<void> {
+  public setAutoSyncEnabled(enabled: boolean): void {
+    this.autoSyncEnabled = enabled;
+    if (enabled && this.syncQueue.length > 0) {
+      this.processSyncQueue();
+    }
+  }
+
+  public getAutoSyncEnabled(): boolean {
+    return this.autoSyncEnabled;
+  }
+
+  public getQueue(): OperationLog[] {
+    return [...this.syncQueue];
+  }
+
+  public async processSyncQueue(): Promise<void> {
     if (this.isProcessing || this.syncQueue.length === 0) return;
 
     this.isProcessing = true;
 
-    // 使用setTimeout让UI线程有时间更新
-    setTimeout(async () => {
-      try {
-        const operation = this.syncQueue.shift();
-        if (!operation) {
-          this.isProcessing = false;
-          return;
-        }
+    try {
+      while (this.syncQueue.length > 0) {
+        const operation = this.syncQueue[0];
+        if (!operation) break;
 
         const logs = await this.getLogs();
 
         try {
           await this.syncOperation(operation, logs);
+          
+          // 同步成功，从队列中移除
+          this.syncQueue.shift();
+          await this.saveQueueToStorage();
+          this.notifyQueueListeners();
 
           if (operation.type !== 'clear' && operation.type !== 'sync') {
             this.notifyListeners({
@@ -1363,7 +1429,12 @@ class SyncQueueManager {
             });
           }
         } catch (error) {
+          // 同步失败，标记状态并停止处理
           if (operation.type !== 'clear' && operation.type !== 'sync') {
+            operation.syncStatus = 'failed';
+            await this.saveQueueToStorage();
+            this.notifyQueueListeners();
+            
             this.notifyListeners({
               type: operation.type,
               status: 'error',
@@ -1371,32 +1442,71 @@ class SyncQueueManager {
               timestamp: Date.now()
             });
           }
-        }
-      } finally {
-        this.isProcessing = false;
-
-        if (this.syncQueue.length > 0) {
-          setTimeout(() => this.processSyncQueue(), 0);
+          break;
         }
       }
-    }, 0);
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  public async processSingleOperation(operationId: string): Promise<boolean> {
+    const index = this.syncQueue.findIndex(op => op.id === operationId);
+    if (index === -1) return false;
+
+    const operation = this.syncQueue[index];
+    const logs = await this.getLogs();
+
+    try {
+      await this.syncOperation(operation, logs);
+      
+      // 同步成功，从队列中移除
+      this.syncQueue.splice(index, 1);
+      await this.saveQueueToStorage();
+      this.notifyQueueListeners();
+
+      return true;
+    } catch (error) {
+      // 同步失败，标记状态
+      operation.syncStatus = 'failed';
+      await this.saveQueueToStorage();
+      this.notifyQueueListeners();
+      
+      return false;
+    }
+  }
+
+  public async removeOperation(operationId: string): Promise<boolean> {
+    const index = this.syncQueue.findIndex(op => op.id === operationId);
+    if (index === -1) return false;
+
+    this.syncQueue.splice(index, 1);
+    await this.saveQueueToStorage();
+    this.notifyQueueListeners();
+    return true;
+  }
+
+  public async clearQueue(): Promise<void> {
+    this.syncQueue = [];
+    await this.saveQueueToStorage();
+    this.notifyQueueListeners();
   }
 
   private async syncOperation(operation: OperationLog, logs: SmokeLog[]): Promise<void> {
-    if (operation.data.user_id === 'local') {
+    if (!operation.data || operation.data.user_id === 'local') {
       console.log('Local mode, skipping sync to Supabase');
       return;
     }
 
     switch (operation.type) {
       case 'create':
-        await apiService.saveLog(operation.data);
+        await apiService.saveLog(operation.data as SmokeLog);
         break;
       case 'update':
-        await apiService.updateLog(operation.data, logs);
+        await apiService.updateLog(operation.data as SmokeLog, logs);
         break;
       case 'delete':
-        await apiService.deleteLog(operation.data.id, operation.data.user_id, logs);
+        await apiService.deleteLog(operation.data.id!, operation.data.user_id!, logs);
         break;
     }
   }
@@ -1408,12 +1518,29 @@ class SyncQueueManager {
     };
   }
 
+  public onQueueChange(callback: (queue: OperationLog[]) => void): () => void {
+    this.queueListeners.push(callback);
+    return () => {
+      this.queueListeners = this.queueListeners.filter(cb => cb !== callback);
+    };
+  }
+
   private notifyListeners(status: SyncStatus): void {
     this.listeners.forEach(callback => {
       try {
         callback(status);
       } catch (error) {
         console.error('Sync status listener error:', error);
+      }
+    });
+  }
+
+  private notifyQueueListeners(): void {
+    this.queueListeners.forEach(callback => {
+      try {
+        callback([...this.syncQueue]);
+      } catch (error) {
+        console.error('Queue listener error:', error);
       }
     });
   }
@@ -1439,8 +1566,8 @@ class SyncQueueManager {
     return this.syncQueue.length;
   }
 
-  public clearQueue(): void {
-    this.syncQueue = [];
+  public getIsProcessing(): boolean {
+    return this.isProcessing;
   }
 
   public async getLogs(): Promise<SmokeLog[]> {

@@ -6,11 +6,18 @@ type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
 interface PopNotificationProps {
   type?: NotificationType;
-  title: string;
+  title?: string;
   message: string;
   onClose?: () => void;
   duration?: number;
 }
+
+const DEFAULT_TITLES: Record<NotificationType, string> = {
+  success: 'Success',
+  error: 'Error',
+  info: 'Info',
+  warning: 'Warning'
+};
 
 export const PopNotification: React.FC<PopNotificationProps> = memo(({ 
   type = 'info',
@@ -37,7 +44,7 @@ export const PopNotification: React.FC<PopNotificationProps> = memo(({
       warning: 'text-yellow-600'
     };
     return {
-      title: title,
+      title: title || DEFAULT_TITLES[type] || DEFAULT_TITLES.info,
       titleColor: colors[type] || colors.info
     };
   };

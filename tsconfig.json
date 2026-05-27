@@ -54,6 +54,7 @@
     "node_modules",
     "android",
     "dist",
-    "backup"
+    "backup",
+    "__tests__"
   ]
 }

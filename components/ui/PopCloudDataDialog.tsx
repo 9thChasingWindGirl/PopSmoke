@@ -8,7 +8,8 @@ import { TRANSLATIONS } from '../../i18n';
 type DialogMode = 'download' | 'login' | 'sync-diff' | 'select';
 
 interface PopCloudDataDialogProps {
-  visible: boolean;
+  visible?: boolean;
+  isOpen?: boolean;
   mode?: DialogMode;
   recordCount?: number;
   syncDiff?: SyncDiffResult | null;
@@ -17,14 +18,14 @@ interface PopCloudDataDialogProps {
   onSyncConfirm?: () => void;
   onSyncOptionChange?: (option: 'upload' | 'download' | 'fields', value: boolean) => void;
   onSelectDataSource?: (dataSource: 'feishu' | 'supabase') => void;
-  onSkip: () => void;
+  onSkip?: () => void;
   onClose: () => void;
   themeColor?: string;
-  title: string;
-  message: string;
+  title?: string;
+  message?: string;
   downloadText?: string;
   loginText?: string;
-  skipText: string;
+  skipText?: string;
   requirePassword?: boolean;
   passwordPlaceholder?: string;
   language?: string;
@@ -32,6 +33,7 @@ interface PopCloudDataDialogProps {
 
 export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   visible,
+  isOpen,
   mode = 'download',
   recordCount = 0,
   syncDiff,
@@ -40,14 +42,14 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   onSyncConfirm,
   onSyncOptionChange,
   onSelectDataSource,
-  onSkip,
+  onSkip = () => {},
   onClose,
   themeColor = POP_DESIGN_SYSTEM.colors.theme.gold,
-  title,
-  message,
+  title = 'Cloud Data',
+  message = 'Found {count} records in cloud',
   downloadText,
   loginText,
-  skipText,
+  skipText = 'Skip',
   requirePassword = false,
   passwordPlaceholder = 'Enter password',
   language = 'en'
@@ -58,14 +60,15 @@ export const PopCloudDataDialog: React.FC<PopCloudDataDialogProps> = ({
   const [syncOption, setSyncOption] = useState<'upload' | 'download' | 'fields'>('upload');
   
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS];
+  const shouldShow = visible || isOpen;
 
   useEffect(() => {
-    if (visible) {
+    if (shouldShow) {
       setIsVisible(true);
       setIsClosing(false);
       setPassword('');
     }
-  }, [visible]);
+  }, [shouldShow]);
 
   const handleClose = () => {
     setIsClosing(true);

@@ -1,6 +1,15 @@
 export * from './auth';
 export * from './storage';
 export * from './logs';
+export * from './common';
+
+// 显式重新导出常用类型，解决循环引用问题
+export type { SmokeLog, AppSettings, EncryptedApiSettings, Language } from './storage';
+export type { User } from './auth';
+
+// 导入 SmokeLog 用于接口定义（避免循环引用）
+import type { SmokeLog, AppSettings, EncryptedApiSettings } from './storage';
+import type { User } from './auth';
 
 export type Platform = 'web' | 'android';
 
@@ -12,10 +21,65 @@ export enum ViewState {
   SETTINGS = 'SETTINGS',
 }
 
+// ============ 同步相关类型 (使用 storage.ts 中的基础类型) ============
+
+/** 同步差异结果 */
+export interface SyncDiffResult {
+  diff: DataDiff;
+  source: 'feishu' | 'supabase';
+  timestamp: number;
+  message: string;
+}
+
+/** 数据差异详情 */
+export interface DataDiff {
+  localOnly: SmokeLog[];
+  cloudOnly: SmokeLog[];
+  conflicting: SmokeLog[];
+  fieldsToUpdate: SmokeLog[];
+  totalLocal: number;
+  totalCloud: number;
+}
+
+/** 云端记录（通用） */
+export interface CloudRecord {
+  id: string;
+  [key: string]: unknown;
+}
+
+// ============ API 设置扩展类型 ============
+
+/** 飞书 API 配置 */
+export interface FeishuApiConfig {
+  apiUrl: string;
+  writeAccessKey?: string;
+  [key: string]: unknown;
+}
+
+/** Supabase 运行时配置 */
+export interface SupabaseRuntimeConfig {
+  apiUrl: string;
+  anonKey: string;
+  [key: string]: unknown;
+}
+
+// ============ 初始化回调类型 ============
+
+/** 应用初始化回调 */
+export interface InitializationCallbacks {
+  onSettingsLoaded?: (settings: AppSettings) => void;
+  onLogsLoaded?: (logs: SmokeLog[]) => void;
+  onAuthStateChange?: (user: User | null, status: import('./auth').AuthStatus, error?: Error) => void;
+  onInitComplete?: () => void;
+  onCheckCloudData?: (localLogsCount: number, savedApiSettings: EncryptedApiSettings | null, hasLoggedIn: boolean) => Promise<void>;
+}
+
+// ============ 操作日志类型 ============
+
 export interface DaySummary {
   date: string;
   count: number;
-  logs: import('./storage').SmokeLog[];
+  logs: SmokeLog[];
 }
 
 export interface FeishuTableInfo {
@@ -59,28 +123,30 @@ export interface HistoryPagination {
 
 export interface OperationLog {
   id: string;
-  type: 'create' | 'update' | 'delete' | 'clear' | 'sync';
-  data: import('./storage').SmokeLog;
+  type: 'create' | 'update' | 'delete' | 'clear' | 'sync' | 'system';
+  action?: string;
+  data?: Partial<SmokeLog>;
   syncStatus?: 'pending' | 'synced' | 'failed';
   timestamp: number;
   message?: string;
+  details?: string;
   apiFetchedCount?: number;
 }
 
 export interface SyncStatus {
-  type: 'upload' | 'download' | 'sync' | 'create' | 'update' | 'delete';
+  type: 'upload' | 'download' | 'sync' | 'create' | 'update' | 'delete' | 'system';
   status: 'pending' | 'success' | 'error';
   message: string;
   timestamp: number;
 }
 
 export interface DataStorageAdapter {
-  getLogs: () => Promise<import('./storage').SmokeLog[]>;
-  saveLogs: (logs: import('./storage').SmokeLog[]) => Promise<void>;
-  getSettings: () => Promise<import('./storage').AppSettings>;
-  saveSettings: (settings: import('./storage').AppSettings) => Promise<void>;
-  getApiSettings: () => Promise<import('./storage').EncryptedApiSettings | null>;
-  saveApiSettings: (settings: import('./storage').EncryptedApiSettings) => Promise<void>;
+  getLogs: () => Promise<SmokeLog[]>;
+  saveLogs: (logs: SmokeLog[]) => Promise<void>;
+  getSettings: () => Promise<AppSettings>;
+  saveSettings: (settings: AppSettings) => Promise<void>;
+  getApiSettings: () => Promise<EncryptedApiSettings | null>;
+  saveApiSettings: (settings: EncryptedApiSettings) => Promise<void>;
   deleteApiSettings: () => Promise<void>;
   clearAll: () => Promise<void>;
   clearLogsOnly: () => Promise<void>;

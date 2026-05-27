@@ -14,7 +14,8 @@ interface LogEntry {
 }
 
 interface PopSystemLogProps {
-  visible: boolean;
+  visible?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   themeColor?: string;
   language?: string;
@@ -22,10 +23,12 @@ interface PopSystemLogProps {
 
 export const PopSystemLog: React.FC<PopSystemLogProps> = ({
   visible,
+  isOpen,
   onClose,
   themeColor = POP_DESIGN_SYSTEM.colors.theme.gold,
   language = 'en'
 }) => {
+  const shouldShow = visible || isOpen;
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -100,11 +103,11 @@ export const PopSystemLog: React.FC<PopSystemLogProps> = ({
   }, []);
 
   useEffect(() => {
-    if (visible) {
+    if (shouldShow) {
       setIsVisible(true);
       setIsClosing(false);
     }
-  }, [visible]);
+  }, [shouldShow]);
 
   const handleClose = () => {
     setIsClosing(true);

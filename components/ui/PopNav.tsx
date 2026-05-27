@@ -1,37 +1,55 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ViewState, Language } from '../../types';
+import { ViewState, Language, AppSettings } from '../../types';
 import { PopColorPicker } from './PopColorPicker';
 import { PopDropdown, PopDropdownTrigger, PopDropdownItem } from './PopDropdown';
 import { POP_COMPONENT_STYLES } from '../../styles/componentStyles';
 import { isLightColor } from '../../utils/colorUtils';
 import { Capacitor } from '@capacitor/core';
+import { TRANSLATIONS } from '../../i18n';
 
 interface PopNavProps {
-  view: ViewState;
-  setView: (view: ViewState) => void;
-  settings: {
-    language: Language;
-    themeColor: string;
-  };
-  handleUpdateSettings: (settings: any) => void;
-  t: any;
-  isAndroid: boolean;
+  currentView?: ViewState;
+  view?: ViewState;
+  onViewChange?: (view: ViewState) => void;
+  setView?: (view: ViewState) => void;
+  settings?: AppSettings;
+  onUpdateSettings?: (settings: AppSettings) => void;
+  handleUpdateSettings?: (settings: any) => void;
+  t?: any;
+  isAndroid?: boolean;
 }
 
 const PopNav: React.FC<PopNavProps> = ({
-  view,
+  currentView,
+  view: viewProp,
+  onViewChange,
   setView,
-  settings,
+  settings: settingsProp,
+  onUpdateSettings,
   handleUpdateSettings,
-  t,
-  isAndroid
+  t: tProp,
+  isAndroid: isAndroidProp
 }) => {
+  const view = currentView || viewProp || ViewState.DASHBOARD;
+  const handleViewChange = onViewChange || setView || (() => {});
+  
+  const defaultSettings: AppSettings = {
+    language: 'en',
+    themeColor: '#F59E0B',
+    dailyLimit: 10,
+    warningLimit: 5,
+    user_id: ''
+  };
+  const settings = settingsProp || defaultSettings;
+  const t = tProp || TRANSLATIONS[settings.language];
+  const isAndroid = isAndroidProp !== undefined ? isAndroidProp : false;
   const mobileColorPickerRef = useRef<HTMLDivElement>(null);
   const [showMobileColorPicker, setShowMobileColorPicker] = React.useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = React.useState(false);
   const [statusBarHeight, setStatusBarHeight] = useState(0);
 
   const textColor = isLightColor(settings.themeColor) ? '#000000' : '#FFFFFF';
+  const handleSettingsUpdate = onUpdateSettings || handleUpdateSettings || (() => {});
 
   useEffect(() => {
     if (isAndroid && Capacitor.isNativePlatform()) {
@@ -68,7 +86,7 @@ const PopNav: React.FC<PopNavProps> = ({
       {/* 顶部导航栏 */}
       <nav className={`w-full fixed top-0 left-0 right-0 z-50 bg-white max-w-4xl mx-auto ${POP_COMPONENT_STYLES.nav.header.container}`} style={navStyle}>
           <div className="flex items-center justify-between w-full">
-            <div className={POP_COMPONENT_STYLES.nav.header.title} onClick={() => setView(ViewState.DASHBOARD)}>
+            <div className={POP_COMPONENT_STYLES.nav.header.title} onClick={() => handleViewChange(ViewState.DASHBOARD)}>
               POP<span style={{ color: settings.themeColor }}>SMOKE</span>
             </div>
             
@@ -86,7 +104,7 @@ const PopNav: React.FC<PopNavProps> = ({
                     <div className="absolute right-0 top-10 bg-white border-4 border-black shadow-pop-lg p-3 z-50 w-[280px]">
                       <PopColorPicker
                         value={settings.themeColor}
-                        onChange={(color) => handleUpdateSettings({ ...settings, themeColor: color })}
+                        onChange={(color) => handleSettingsUpdate({ ...settings, themeColor: color })}
                         themeColor={settings.themeColor}
                         onClose={() => setShowMobileColorPicker(false)}
                       />
@@ -108,7 +126,7 @@ const PopNav: React.FC<PopNavProps> = ({
                 >
                   <PopDropdownItem
                     onClick={() => {
-                      handleUpdateSettings({ ...settings, language: 'en' as Language });
+                      handleSettingsUpdate({ ...settings, language: 'en' as Language });
                       setShowLanguageDropdown(false);
                     }}
                     isActive={settings.language === 'en'}
@@ -117,7 +135,7 @@ const PopNav: React.FC<PopNavProps> = ({
                   </PopDropdownItem>
                   <PopDropdownItem
                     onClick={() => {
-                      handleUpdateSettings({ ...settings, language: 'zh' as Language });
+                      handleSettingsUpdate({ ...settings, language: 'zh' as Language });
                       setShowLanguageDropdown(false);
                     }}
                     isActive={settings.language === 'zh'}
@@ -126,7 +144,7 @@ const PopNav: React.FC<PopNavProps> = ({
                   </PopDropdownItem>
                   <PopDropdownItem
                     onClick={() => {
-                      handleUpdateSettings({ ...settings, language: 'ja' as Language });
+                      handleSettingsUpdate({ ...settings, language: 'ja' as Language });
                       setShowLanguageDropdown(false);
                     }}
                     isActive={settings.language === 'ja'}
@@ -135,7 +153,7 @@ const PopNav: React.FC<PopNavProps> = ({
                   </PopDropdownItem>
                   <PopDropdownItem
                     onClick={() => {
-                      handleUpdateSettings({ ...settings, language: 'ko' as Language });
+                      handleSettingsUpdate({ ...settings, language: 'ko' as Language });
                       setShowLanguageDropdown(false);
                     }}
                     isActive={settings.language === 'ko'}
@@ -147,11 +165,11 @@ const PopNav: React.FC<PopNavProps> = ({
               
               {/* 桌面端导航 */}
               <div className={POP_COMPONENT_STYLES.nav.header.desktopNav.container}>
-                <button onClick={() => setView(ViewState.DASHBOARD)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.DASHBOARD ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.tracker}</button>
-                <button onClick={() => setView(ViewState.ANALYSIS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.ANALYSIS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.analysis}</button>
-                <button onClick={() => setView(ViewState.HISTORY)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.HISTORY ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.history}</button>
-                <button onClick={() => setView(ViewState.API)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.API ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.apiManagement}</button>
-                <button onClick={() => setView(ViewState.SETTINGS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.SETTINGS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.settings}</button>
+                <button onClick={() => handleViewChange(ViewState.DASHBOARD)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.DASHBOARD ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.tracker}</button>
+                <button onClick={() => handleViewChange(ViewState.ANALYSIS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.ANALYSIS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.analysis}</button>
+                <button onClick={() => handleViewChange(ViewState.HISTORY)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.HISTORY ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.history}</button>
+                <button onClick={() => handleViewChange(ViewState.API)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.API ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.apiManagement}</button>
+                <button onClick={() => handleViewChange(ViewState.SETTINGS)} className={`${POP_COMPONENT_STYLES.nav.header.desktopNav.item} ${view === ViewState.SETTINGS ? POP_COMPONENT_STYLES.nav.header.desktopNav.active : ''}`}>{t.settings}</button>
               </div>
             </div>
           </div>
@@ -162,31 +180,31 @@ const PopNav: React.FC<PopNavProps> = ({
         <div className="flex items-center justify-center w-full h-full px-2">
           <div className="flex items-center justify-center w-full gap-2 sm:gap-3">
             <button 
-                onClick={() => setView(ViewState.DASHBOARD)}
+                onClick={() => handleViewChange(ViewState.DASHBOARD)}
                 className={`flex flex-col items-center flex-1 min-w-0 ${view === ViewState.DASHBOARD ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
             >
                 <span className="font-display text-sm sm:text-base tracking-wide whitespace-nowrap">{t.tracker}</span>
             </button>
             <button 
-                onClick={() => setView(ViewState.ANALYSIS)}
+                onClick={() => handleViewChange(ViewState.ANALYSIS)}
                 className={`flex flex-col items-center flex-1 min-w-0 ${view === ViewState.ANALYSIS ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
             >
                 <span className="font-display text-sm sm:text-base tracking-wide whitespace-nowrap">{t.analysis}</span>
             </button>
             <button 
-                onClick={() => setView(ViewState.HISTORY)}
+                onClick={() => handleViewChange(ViewState.HISTORY)}
                 className={`flex flex-col items-center flex-1 min-w-0 ${view === ViewState.HISTORY ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
             >
                 <span className="font-display text-sm sm:text-base tracking-wide whitespace-nowrap">{t.history}</span>
             </button>
             <button 
-                onClick={() => setView(ViewState.API)}
+                onClick={() => handleViewChange(ViewState.API)}
                 className={`flex flex-col items-center flex-1 min-w-0 ${view === ViewState.API ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
             >
                 <span className="font-display text-sm sm:text-base tracking-wide whitespace-nowrap">{t.api}</span>
             </button>
             <button 
-                onClick={() => setView(ViewState.SETTINGS)}
+                onClick={() => handleViewChange(ViewState.SETTINGS)}
                 className={`flex flex-col items-center flex-1 min-w-0 ${view === ViewState.SETTINGS ? 'text-black opacity-100' : 'text-gray-400 opacity-60'}`}
             >
                 <span className="font-display text-sm sm:text-base tracking-wide whitespace-nowrap">{t.settings}</span>

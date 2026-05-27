@@ -43,3 +43,6 @@ stitch/
 
 # Figma prototypes
 figma-prototypes/
+
+# Test files (generated during development)
+__tests__/

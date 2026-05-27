@@ -1,5 +1,5 @@
 import { SmokeLog, AppSettings, FeishuApiSettings, SyncOptions, SubmitOptions } from '../types';
-import { getStorageAdapter, simpleEncrypt, simpleDecrypt } from './storageAdapter';
+import { getStorageAdapter, simpleEncrypt, simpleDecrypt, isWebPlatform, getSupabaseRuntimeConfig, setSupabaseRuntimeConfig, clearSupabaseRuntimeConfig, getSyncQueueManager } from './storageAdapter';
 import { Capacitor } from '@capacitor/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import EventHandle from '../event/EventHandle';
@@ -136,7 +136,6 @@ const getClient = async (): Promise<SupabaseClient> => {
 export const getUserSupabaseConfig = async (): Promise<{ apiUrl: string; anonKey: string } | null> => {
   try {
     // Web 端优先使用环境变量配置
-    const { isWebPlatform } = await import('./storageAdapter');
     if (isWebPlatform()) {
       const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
       const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -147,7 +146,6 @@ export const getUserSupabaseConfig = async (): Promise<{ apiUrl: string; anonKey
       }
     }
     
-    const { getSupabaseRuntimeConfig } = await import('./storageAdapter');
     const runtimeConfig = await getSupabaseRuntimeConfig();
     if (runtimeConfig?.apiUrl && runtimeConfig?.anonKey) {
       return runtimeConfig;
@@ -192,7 +190,6 @@ export const isApiConfigEncrypted = async (source: 'feishu' | 'supabase'): Promi
 
     // Web 端特殊处理：检查 Supabase 配置是否来自环境变量
     if (source === 'supabase') {
-      const { isWebPlatform } = await import('./storageAdapter');
       if (isWebPlatform()) {
         // Web 端：检查环境变量中是否有 Supabase 配置
         const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
@@ -259,12 +256,10 @@ export const isSupabaseClientInitialized = (): boolean => {
 };
 
 export const persistSupabaseRuntimeConfig = async (apiUrl: string, anonKey: string): Promise<void> => {
-  const { setSupabaseRuntimeConfig } = await import('./storageAdapter');
   await setSupabaseRuntimeConfig({ apiUrl, anonKey });
 };
 
 export const clearPersistedSupabaseRuntimeConfig = async (): Promise<void> => {
-  const { clearSupabaseRuntimeConfig } = await import('./storageAdapter');
   await clearSupabaseRuntimeConfig();
 };
 
@@ -791,30 +786,17 @@ export const apiService = {
     const updatedLogs = existingLogs.map(l => l.id === updatedLog.id ? updatedLog : l);
     await adapter.saveLogs(updatedLogs);
 
+    // 添加到同步队列，不自动同步
     if (updatedLog.user_id && updatedLog.user_id !== 'local') {
-      const completedLog = completeLogFields(updatedLog);
-      try {
-        const client = await getClient();
-        const { data, error } = await client.from('smoke_logs').update(completedLog).eq('id', updatedLog.id).select().single();
-        if (error) {
-          EventHandle.publish({
-            type: EventType.LOG_UPDATE,
-            category: 'data',
-            data: { success: false, error: error.message },
-            timestamp: Date.now()
-          });
-          throw error;
-        }
-        EventHandle.publish({
-          type: EventType.LOG_UPDATE,
-          category: 'data',
-          data: { success: true, log: data, logs: updatedLogs },
-          timestamp: Date.now()
-        });
-        return data;
-      } catch (error) {
-        console.error('Failed to update in cloud, local update succeeded:', error);
-      }
+      const queueManager = getSyncQueueManager();
+      queueManager.addOperation({
+        id: crypto.randomUUID(),
+        type: 'update',
+        data: updatedLog,
+        syncStatus: 'pending',
+        timestamp: Date.now(),
+        message: `更新记录: ${updatedLog.record_date} ${updatedLog.record_time}`
+      });
     }
 
     EventHandle.publish({
@@ -829,25 +811,21 @@ export const apiService = {
 
   async deleteLog(id: string, userId: string, existingLogs: SmokeLog[]): Promise<string> {
     const adapter = getStorageAdapter();
+    const logToDelete = existingLogs.find(l => l.id === id);
     const updatedLogs = existingLogs.filter(l => l.id !== id);
     await adapter.saveLogs(updatedLogs);
 
-    if (userId && userId !== 'local') {
-      try {
-        const client = await getClient();
-        const { error } = await client.from('smoke_logs').delete().eq('id', id);
-        if (error) {
-          EventHandle.publish({
-            type: EventType.LOG_DELETE,
-            category: 'data',
-            data: { success: false, error: error.message },
-            timestamp: Date.now()
-          });
-          throw error;
-        }
-      } catch (error) {
-        console.error('Failed to delete from cloud, local deletion succeeded:', error);
-      }
+    // 添加到同步队列，不自动同步
+    if (userId && userId !== 'local' && logToDelete) {
+      const queueManager = getSyncQueueManager();
+      queueManager.addOperation({
+        id: crypto.randomUUID(),
+        type: 'delete',
+        data: logToDelete,
+        syncStatus: 'pending',
+        timestamp: Date.now(),
+        message: `删除记录: ${logToDelete.record_date} ${logToDelete.record_time}`
+      });
     }
 
     EventHandle.publish({
@@ -1134,10 +1112,16 @@ export const apiService = {
         const adapter = getStorageAdapter();
         await adapter.saveLogs(updatedLogs);
 
-        // 在后台异步进行Supabase同步，不阻塞返回
+        // 添加到同步队列，不自动同步
         if (userId) {
-          this.saveLog(newLog).catch(error => {
-            console.error('Failed to sync log to cloud:', error);
+          const queueManager = getSyncQueueManager();
+          queueManager.addOperation({
+            id: crypto.randomUUID(),
+            type: 'create',
+            data: completedLog,
+            syncStatus: 'pending',
+            timestamp: Date.now(),
+            message: `创建记录: ${recordDate} ${recordTime}`
           });
         }
       } catch (error) {
@@ -1238,5 +1222,20 @@ export const apiService = {
         localLogs: localLogs || []
       };
     }
+  },
+
+  async getCloudLogs(userId: string, page: number = 0, pageSize: number = 20): Promise<{ success: boolean; logs: SmokeLog[] }> {
+    try {
+      const logs = await this.getLogs(userId, page, pageSize);
+      return { success: true, logs };
+    } catch (error) {
+      console.error('Failed to get cloud logs:', error);
+      return { success: false, logs: [] };
+    }
+  },
+
+  async syncFromFeishu(options: SyncOptions = {}, userId?: string, password?: string): Promise<SyncResult> {
+    const { syncFromFeishu: syncFn } = await import('./api/services/SyncService').then(m => m.apiService);
+    return syncFn(options, userId, password);
   }
 };
