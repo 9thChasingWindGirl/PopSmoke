@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +49,10 @@ import com.popsmoke.tracker.ui.atoms.PopDialog
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopTopBar
+import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
+import com.popsmoke.tracker.ui.foundation.rememberBackdrop
 
 /** 所有会改数据的动作集中在一个数据类里，页面只声明"我能做什么"，不持有 ViewModel。 */
 data class PopActions(
@@ -129,13 +133,26 @@ fun PopApp(
     // 玻璃面板是半透明的，背后必须有东西可透，否则整套"通透"就塌成浅灰圆角。
     val current = LocalSkin.current
     val glass = current.glass
-    Box(Modifier.fillMaxSize().background(current.palette.canvas)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(current.palette.canvas)) {
         if (current.glass) {
             PopAurora(Modifier.matchParentSize(), accent = ui.dashboard.accent)
         } else {
             PopDotGrid(Modifier.matchParentSize())
         }
 
+        // 背景快照：玻璃面板靠它做折射。背景是静态的，所以这张位图只在
+        // 尺寸或主题色变化时重算一次，之后一直复用。波普主题不需要，给 null。
+        val backdrop = if (glass) {
+            rememberBackdrop(
+                accent = ui.dashboard.accent,
+                widthPx = constraints.maxWidth,
+                heightPx = constraints.maxHeight,
+            )
+        } else {
+            null
+        }
+
+        CompositionLocalProvider(LocalPopBackdrop provides backdrop) {
         Column(Modifier.fillMaxSize()) {
             PopTopBar(
                 accentColor = ui.dashboard.accent,
@@ -257,6 +274,7 @@ fun PopApp(
                 bottomInset = bottomInset,
                 onSelect = { tabIndex = it },
             )
+        }
         }
 
         PopDialog(

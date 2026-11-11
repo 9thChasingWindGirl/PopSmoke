@@ -8,7 +8,10 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +31,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.hypot
@@ -76,9 +81,35 @@ fun Modifier.skinSurface(
     tint: Color = Color.Transparent,
 ): Modifier {
     val stroke = if (current.glass) 1.dp else PopStroke.Default
-    return this
-        .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx()) }
-        .padding(stroke)
+    if (!current.glass) {
+        return this
+            .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx()) }
+            .padding(stroke)
+    }
+    // 玻璃面板要在自己区域里重画一遍"被弯折过的背景"，为此必须知道自己在根坐标系
+    // 里的位置 —— fragCoord 是卡片局部坐标，采样全屏位图得先平移回去。这个值猜不出来，
+    // 只能靠 onGloballyPositioned 拿。
+    return composed {
+        val backdrop = LocalPopBackdrop.current
+        val origin = remember { mutableStateOf(Offset.Zero) }
+        this
+            .onGloballyPositioned { coords -> origin.value = coords.positionInRoot() }
+            .drawBehind {
+                if (backdrop != null) {
+                    drawRefractedBackdrop(
+                        backdrop = backdrop,
+                        origin = origin.value,
+                        shape = shape,
+                        radiusPx = RefractionDefaults.radius(this),
+                        band = RefractionDefaults.band(this),
+                        refraction = RefractionDefaults.amount(this),
+                        dispersion = RefractionDefaults.Dispersion,
+                    )
+                }
+                drawPanel(current, shape, fill, lift, tint, stroke.toPx())
+            }
+            .padding(stroke)
+    }
 }
 
 /**

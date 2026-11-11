@@ -11,6 +11,7 @@ import app.cash.paparazzi.Paparazzi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,7 +58,9 @@ import com.popsmoke.tracker.ui.atoms.PopSyncQueue
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopTopBar
+import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
+import com.popsmoke.tracker.ui.foundation.rememberBackdrop
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
 import org.junit.Rule
 import org.junit.Test
@@ -165,13 +168,20 @@ class DashboardScreenshotTest {
     @Composable
     private fun Backdrop(accent: Color, content: @Composable BoxScope.() -> Unit) {
         val skin = LocalSkin.current
-        Box(Modifier.fillMaxSize().background(skin.palette.canvas)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(skin.palette.canvas)) {
             if (skin.glass) {
-                PopAurora(Modifier.matchParentSize(), accent = accent, animate = false)
+                PopAurora(Modifier.matchParentSize(), accent = accent)
             } else {
                 PopDotGrid(Modifier.matchParentSize())
             }
-            content()
+            val backdrop = if (skin.glass) {
+                rememberBackdrop(accent, constraints.maxWidth, constraints.maxHeight)
+            } else {
+                null
+            }
+            CompositionLocalProvider(LocalPopBackdrop provides backdrop) {
+                Box(Modifier.fillMaxSize()) { content() }
+            }
         }
     }
 
