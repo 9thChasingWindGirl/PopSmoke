@@ -46,6 +46,8 @@ import com.popsmoke.tracker.ui.foundation.GlassTone
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
+import com.popsmoke.tracker.ui.foundation.drawBackdropSlice
+import com.popsmoke.tracker.ui.foundation.drawInnerGlow
 import com.popsmoke.tracker.ui.foundation.popBorder
 import com.popsmoke.tracker.ui.foundation.popShadow
 
@@ -88,14 +90,24 @@ fun PopGroup(
 }
 
 /**
- * 分组底：白，但浓度跟着背后的照片走。
+ * 分组底：玻璃的最小实现 —— 模糊切片 + 恒定中性填充 + 内辉光。
  *
- * 固定的"白 18%"只在一个明度区间里成立：压在夜景照片上，18% 的白只到 70 的灰，
- * 深色正文压上去等于没有；压在雪山上，18% 和背景几乎同色，整块消失。
+ * ## 填充恒定，明暗长在边缘
  *
- * 所以这里读一次背后的明度，把浓度乘上去（夜景 ×3、雪景 ×1.6）。
- * **只调浓度、不改色相** —— 分组里是固定的深色字，底板一旦压暗就等于删掉内容。
- * 需要"变深色 + 浅字"的只有浮层（见 [GlassTone.adaptFill]）。
+ * 上一版把背后明度喂进填充浓度（夜景 ×2、雪景 ×1.6），结果是 div 的颜色
+ * 跟着壁纸滚动不断变化 —— 用户的第一反馈就是"改变了 div 的色相，很难看"。
+ * 现在填充永远是 [PopGlass.GroupAlpha] 的白，对背后明暗的全部回应是
+ * 一圈内辉光（见 [GlassTone.glowColor]）：背景暗则边缘亮、背景明则边缘暗，
+ * 中央平板区纹丝不动。
+ *
+ * ## 适度模糊是材质的一半
+ *
+ * 只有白块没有模糊，壁纸的高频（叶脉、文字、栅栏）会全部透过 34% 的白，
+ * 卡片读作"白纱蒙在锐利照片上"。切片用 soft 档模糊（约 8px）：
+ * 高频没了，山脊和色带还在 —— "隔了一层玻璃"的感觉由此而来。
+ * 折射与菲涅尔线仍然只属于浮动层，分组不参与材质表演。
+ *
+ * 需要"文字换浅色"的只有浮层（顶栏、底栏），分组里是固定的深色字。
  */
 @Composable
 private fun Modifier.groupSurface(current: PopSkin, shape: Shape): Modifier =
@@ -117,11 +129,18 @@ private fun Modifier.groupSurface(current: PopSkin, shape: Shape): Modifier =
                             origin.value.y + size.height,
                         ),
                     ) ?: GlassTone.Light
-                    val alpha = (PopGlass.GroupAlpha * tone.contentAlphaScale()).coerceAtMost(0.90f)
-                    val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
+                    val outline = shape.createOutline(size, layoutDirection, this@drawBehind)
+                    val path = Path().apply { addOutline(outline) }
                     clipPath(path) {
-                        drawRect(Color.White.copy(alpha = alpha))
+                        // 1. 适度模糊的背景切片（辉光要压在它上面，顺序不能反）
+                        if (backdrop != null) {
+                            drawBackdropSlice(backdrop, origin.value)
+                        }
+                        // 2. 恒定中性填充
+                        drawRect(Color.White.copy(alpha = PopGlass.GroupAlpha))
                     }
+                    // 3. 内辉光（贴轮廓，独立画，避免和填充叠成两层白）
+                    drawInnerGlow(outline, tone)
                 }
         }
     }

@@ -261,7 +261,8 @@ object PopGlass {
     const val JellyReleaseStiffness = 420f
     const val WeaveInkAlpha = 0.075f
     const val SolidSheenAlpha = 0.16f
-    const val InnerShadeAlpha = 0.15f
+    val GlowBand = 12.dp
+    const val GlowMaxAlpha = 0.45f
     const val GroupAlpha = 0.34f
     const val DividerAlpha = 0.07f
     const val ChromeVeilAlpha = 0.06f

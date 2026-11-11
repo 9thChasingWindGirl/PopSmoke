@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
@@ -75,24 +74,13 @@ fun Modifier.skinSurface(
     fill: Color,
     lift: Dp = if (current.glass) PopGlass.ShadowLift else PopShadow.PopLg,
     tint: Color = Color.Transparent,
-    /**
-     * 是否按背后明暗**改变颜色方向**（压白 / 压暗）。
-     *
-     * 只有真正的浮层开这个：顶栏、底栏。它们的文字可以跟着一起换色，
-     * 所以玻璃本身也敢变成深色。
-     *
-     * 内容区的分组**不能**开：里面的字是固定的深色，底板一旦压暗就没法读。
-     * 那里只做 alpha 补偿（见 [GlassTone.contentAlphaScale]）—— 同样是白，
-     * 在夜景上更实，在雪山上更实，但永远是白的。
-     */
-    adaptive: Boolean = false,
     /** 用哪一档背景模糊。浮层用 true（更糊），内容区用 false。 */
     strongBlur: Boolean = false,
 ): Modifier {
     val stroke = if (current.glass) PopGlass.EdgeStroke else PopStroke.Default
     if (!current.glass) {
         return this
-            .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx(), null, Offset.Zero, false, false) }
+            .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx(), null, Offset.Zero, false) }
             .padding(stroke)
     }
     // 玻璃面板要在自己区域里重画一遍"被弯折过的背景"，为此必须知道自己在根坐标系
@@ -106,7 +94,7 @@ fun Modifier.skinSurface(
             .drawBehind {
                 drawPanel(
                     current, shape, fill, lift, tint, stroke.toPx(),
-                    backdrop, origin.value, adaptive, strongBlur,
+                    backdrop, origin.value, strongBlur,
                 )
             }
             .padding(stroke)
@@ -195,14 +183,13 @@ private fun DrawScope.drawPanel(
     strokeWidth: Float,
     backdrop: PopBackdrop?,
     origin: Offset,
-    adaptive: Boolean,
     strongBlur: Boolean,
 ) {
     val outline = shape.createOutline(size, layoutDirection, this)
     if (current.glass) {
         drawGlassPanel(
             outline, shape, fill, tint, lift, strokeWidth,
-            backdrop, origin, adaptive, strongBlur,
+            backdrop, origin, strongBlur,
         )
     } else {
         drawInkPanel(outline, fill, current.palette.ink, lift, strokeWidth)
@@ -261,7 +248,6 @@ private fun DrawScope.drawGlassPanel(
     strokeWidth: Float,
     backdrop: PopBackdrop?,
     origin: Offset,
-    adaptive: Boolean,
     strongBlur: Boolean,
 ) {
     val bounds = outline.bounds
@@ -305,23 +291,18 @@ private fun DrawScope.drawGlassPanel(
             bezel = RefractionDefaults.bezel(this),
             depth = RefractionDefaults.depth(this),
             dispersion = RefractionDefaults.dispersion(this),
-            tone = tone,
             strong = strongBlur,
         )
     }
 
     // ---- 2. body ----
-    // 对角渐变，左上亮右下暗。为什么不是"中心最透"的径向：
-    // 径向会在边缘形成一圈比中心更实的边 —— 那又是一道环，只是分辨率低一点。
+    // 恒定中性填充，浓度不跟背后明度走。
     //
-    // 幅度要小。真机的观感里，"脏"几乎全部来自这层：背景被模糊之后再压一层白、
-    // 白本身还有明暗坡度，读起来就是一块擦不干净的玻璃。体积交给折射去表达 ——
-    // 边缘被压弯的地方自然会有明暗，不需要在整个面上再刷一道渐变。
-    //
-    // 颜色方向上，这里分两种元件（见 [GlassTone]）：
-    // - 浮层（adaptive）：壁纸暗就换深色，文字一起换浅色 —— iOS 深色 tab bar 的做法；
-    // - 内容（非 adaptive）：永远是白，只调浓度。里面是深色字，压暗就等于删掉内容。
-    val body = if (adaptive) tone.adaptFill(fill) else fill.scaledForContent(tone)
+    // 上一版按背后明度放大 alpha（夜景 ×2、浮层换深色），每一步单独看都有理由，
+    // 合起来就是 div 的颜色跟着壁纸滚动变化 —— 用户的第一反馈："改变了色相，很难看"。
+    // 现在的分工：填充管"玻璃里有多少料"，恒定；明暗补偿管"边缘怎么回应背景"，
+    // 交给内辉光（见下）。中央平板区从页顶滚到页底颜色不变。
+    val body = fill
     if (body.alpha > 0f) {
         val a = body.alpha
         val softness = (1f - a).coerceIn(0f, 1f)
@@ -363,7 +344,13 @@ private fun DrawScope.drawGlassPanel(
         )
     }
 
-    // ---- 4. edge ----
+    // ---- 4. 内辉光 ----
+    // 玻璃对背后明暗的唯一回应：背景暗→白辉光（把光收进边缘），
+    // 背景亮→深墨辉光（强光下的暗边界）。中央平板区不动。
+    // 详见 [drawInnerGlow] 与 [GlassTone.glowColor]。
+    drawInnerGlow(outline, tone)
+
+    // ---- 5. edge ----
     // 整块面板上唯一允许被叫作"边框"的东西：一根 1dp 的线，一半在形状内、一半在外。
     // 亮度由菲涅尔项决定 —— 掠射（轮廓上）最强，再叠"光从左上来"，所以左上最亮。
     //
@@ -398,23 +385,6 @@ private fun DrawScope.drawGlassPanel(
     if (strokeWidth > 0f) {
         drawOutlineShape(outline, edge, Stroke(strokeWidth))
     }
-}
-
-/**
- * 内容区填充：只调浓度，不改颜色。
- *
- * 白 18% 压在夜景照片上大概是 70 的灰，深字压上去等于没有；×3 到 0.54 之后
- * 读作"一块半透明的白卡"，壁纸的轮廓还在，字也读得清。
- *
- * 只对**浅色**填充生效：次要按钮是一层 ink 5%（深色），比例放大只会把它涂成
- * 一块黑斑；危险键的淡红同理 —— 它们是"内容的一部分"，不是压住背景的板。
- *
- * 实心元件跳过：它们的 alpha 就是它们的设计意图。
- */
-private fun Color.scaledForContent(tone: GlassTone): Color {
-    if (alpha <= 0.001f || alpha >= 0.9f) return this
-    if (luminance() < 0.7f) return this
-    return copy(alpha = (alpha * tone.contentAlphaScale()).coerceAtMost(0.96f))
 }
 
 /**

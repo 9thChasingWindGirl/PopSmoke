@@ -248,7 +248,6 @@ fun PopTopBar(
                                         shape = CircleShape,
                                         fill = current.palette.surfaceStrong.copy(alpha = 0.46f),
                                         lift = 0.dp,
-                                        adaptive = true,
                                         strongBlur = true,
                                     )
                                 } else {
@@ -365,12 +364,12 @@ fun PopBottomBar(
                         current = current,
                         shape = shape,
                         // 浮岛必须明显比内容区的分组更透，背后的东西要能继续在岛里存在。
-                        // 材质感交给边缘折射与那根菲涅尔线 —— 靠不透明度堆出来的"白"，
-                        // 在浅底上只会读成一条塑料条。暗壁纸上则由 adaptive 换成深色。
+                        // 材质感交给边缘折射与那圈内辉光 —— 靠不透明度堆出来的"白"，
+                        // 在浅底上只会读成一条塑料条。填充不跟壁纸变色，
+                        // 明暗回应长在边缘的内辉光上（见 GlassTone.glowColor）。
                         fill = current.palette.surfaceStrong.copy(alpha = PopGlass.NavAlpha),
                         lift = 10.dp,
                         tint = accentColor,
-                        adaptive = true,
                         strongBlur = true,
                     )
                     // 观察按压位置，不消费事件 —— 子项的 clickable 照常工作。

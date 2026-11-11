@@ -1,6 +1,7 @@
 package com.popsmoke.tracker.ui.foundation
 
 import android.graphics.BitmapShader
+import android.graphics.BlurMaskFilter
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
@@ -21,12 +22,14 @@ import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -84,6 +87,9 @@ class PopBackdrop internal constructor(
 
     internal val paint = Paint()
 
+    /** 给 BitmapShader 切片绘制用的画笔（必须开位图过滤，半分辨率图放大才不会出马赛克）。 */
+    internal val slicePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
     /** 给 Compose 外部（PopChrome 的切片绘制）直接用的位图。 */
     val heavyBitmap: android.graphics.Bitmap get() = heavy.asAndroidBitmap()
     val softBitmap: android.graphics.Bitmap get() = soft.asAndroidBitmap()
@@ -116,20 +122,26 @@ class PopBackdrop internal constructor(
 }
 
 /**
- * 玻璃背后的明暗状况 —— 决定这块玻璃该"压白"还是"压暗"。
+ * 玻璃背后的明暗状况 —— 决定内辉光是"亮"还是"暗"。
  *
- * 这是整套材质里唯一一个会改变**颜色方向**的输入。其余参数（折射、边缘、
- * 菲涅尔线）都只是强度，明暗反了则不是强弱问题，是"读不读得出来"的问题：
- * 白玻璃压在夜景上，边缘的白线就是屏幕上最亮的噪点；深玻璃压在雪山上，
- * 整块读作一个洞。
+ * ## 历史教训：明度不能喂给填充
+ *
+ * 上一版把背后明度喂进了填充浓度（暗背景白底 ×2、浮层换深色）。
+ * 每一步单独看都有理由，合起来的效果是**div 的颜色跟着壁纸走**：
+ * 同一张设置页，滚过亮区和暗区，卡片明暗跟着变 —— 界面读起来像在闪，
+ * 用户的第一反馈就是"改变了 div 的色相，很难看"。
+ *
+ * 现在的规矩是：**填充永远恒定中性，玻璃对明暗的全部回应都长在边缘上**
+ * —— 一圈宽的内辉光（见 [glowColor]）。中央平板区纹丝不动，
+ * 背后是什么颜色就是什么颜色。
  */
 @Immutable
 data class GlassTone(val luma: Float) {
 
-    /** 暗背景：玻璃压暗、文字转浅。 */
+    /** 暗背景：浮层文字转浅。 */
     val dark: Boolean get() = luma < 0.42f
 
-    /** 过亮背景：白玻璃没有边界，需要提高填充浓度。 */
+    /** 过亮背景：白玻璃没有边界。 */
     val bright: Boolean get() = luma > 0.78f
 
     /** 面板上的主文字色。 */
@@ -141,42 +153,31 @@ data class GlassTone(val luma: Float) {
         get() = if (dark) Color(0xCCF4F4F6) else Color(0xFF6B6B72)
 
     /**
-     * 中性填充（白/灰）的替换色。
+     * 内辉光颜色：**背景暗则明，背景明则暗**。
      *
-     * 只对**中性色**生效：主题色、危险红这些是"内容色"，玻璃不该改写它们 ——
-     * 一块橙色按钮在夜景里不需要变成深橙，它本来就有足够的明度差。
+     * - 暗背景 → 白辉光：玻璃的边缘把背后的光收进来，一圈亮环勾出轮廓，
+     *   同时把边缘附近的字底垫亮 —— 这是"玻璃在夜里发光"的读法。
+     * - 亮背景 → 深墨辉光：白玻璃压在雪山/晴空上没有边界，
+     *   强光下的玻璃边界本来就是一圈折射造成的暗环，不是高光。
      *
-     * 暗背景上 alpha 也要抬：0.62 的白在 0.2 明度的照片上只剩 0.12 的实感，
-     * 底栏会变成一条能看见滚动文字的灰带。
+     * 分界取 0.52 而不是 0.5：草地、木桌这类中间调（0.55~0.6）里，
+     * 暗辉光比白辉光更不容易把面板读成"脏了一圈"。
      */
-    fun adaptFill(fill: Color): Color {
-        if (fill.alpha <= 0.001f) return fill
-        // 实心元件（主按钮、选中态）不参与：它的颜色就是它自己。
-        if (fill.alpha >= 0.9f) return fill
-        return when {
-            dark -> Color(0xFF0E0E13).copy(alpha = (fill.alpha * 1.55f).coerceAtMost(0.94f))
-            bright -> fill.copy(alpha = (fill.alpha * 1.55f).coerceAtMost(0.96f))
-            else -> fill
-        }
-    }
+    val glowColor: Color
+        get() = if (luma >= 0.52f) Color(0xFF101014) else Color(0xFFFFFFFF)
 
     /**
-     * 内容区（分组、卡片）的填充倍数。
+     * 内辉光强度（0..1）：中间调最低，越极端越强。
      *
-     * 内容区和浮层不同：它里面是深色文字，不能靠"压暗"解决对比，
-     * 只能把底板做实。白 42% 压在夜景照片上大约是 110 的灰，深字勉强；
-     * ×1.5 之后到 0.62，读作"一块半透明的白卡"，壁纸的轮廓还在，字也读得清。
-     *
-     * 亮背景不要加太多：白 42% 压在雪山上已经接近一块卡纸，
-     * 再加就看不见背后的照片了 —— 而"看得见背后"才是这套材质存在的理由。
+     * 即使中间调也保留 0.35 的底强度 —— 那圈辉光是这块材质的**身份特征**
+     * （参考实现的"白内辉 40px"），完全消失玻璃就退化成一块半透明矩形。
+     * 极端明暗时再加码：夜景到 0.9，雪山到 0.85。
      */
-    fun contentAlphaScale(): Float = when {
-        dark -> 2.0f
-        // 亮背景要**减**一点：0.34 的白叠在浅色照片上已经是一块卡纸，
-        // 再加就会把背后的东西全盖住 —— 而"看得见背后"才是这套材质存在的理由。
-        bright -> 0.85f
-        else -> 1f
-    }
+    val glowStrength: Float
+        get() = when {
+            luma >= 0.52f -> (0.35f + (luma - 0.52f) / 0.48f * 0.50f).coerceIn(0f, 1f)
+            else -> (0.35f + (0.52f - luma) / 0.52f * 0.55f).coerceIn(0f, 1f)
+        }
 
     /** 菲涅尔线的强度倍数：暗底上白线更显眼，亮底上要收一点。 */
     fun edgeScale(): Float = if (dark) 1.25f else if (bright) 0.85f else 1f
@@ -220,10 +221,8 @@ internal fun DrawScope.drawRefracted(
     bezel: Float,
     depth: Float,
     dispersion: Float,
-    tone: GlassTone,
     strong: Boolean,
-) {
-    val s = backdrop.shader ?: return
+) {    val s = backdrop.shader ?: return
     val bs = (if (strong) backdrop.heavyShader else backdrop.softShader) ?: return
 
     val outline = shape.createOutline(size, layoutDirection, this)
@@ -258,9 +257,6 @@ internal fun DrawScope.drawRefracted(
     s.setFloatUniform("iBezel", b)
     s.setFloatUniform("iDepth", depth.coerceAtMost(min(b * 1.9f, shortSide * 0.15f)))
     s.setFloatUniform("iDisperse", dispersion)
-    // 暗背景上不能再压暗内沿：那会让边缘更黑，厚度感反而消失。
-    // 厚度交给那根亮线，内阴影只属于浅背景。
-    s.setFloatUniform("iInner", if (tone.dark) 0f else PopGlass.InnerShadeAlpha)
 
     val path = Path().apply { addOutline(outline) }
     backdrop.paint.shader = s
@@ -268,6 +264,84 @@ internal fun DrawScope.drawRefracted(
         drawIntoCanvas { canvas ->
             canvas.nativeCanvas.drawRect(0f, 0f, size.width, size.height, backdrop.paint)
         }
+    }
+}
+
+/**
+ * 适度模糊的背景切片：给"安静的底"（分组卡片）用的轻量玻璃输入。
+ *
+ * 分组不走折射着色器（那是浮动层的表演），但也不该把锐利的壁纸直接压在白块底下 ——
+ * 那正是"材质不理想"的另一半：卡片后面 34% 的白盖不住叶脉和文字，
+ * 背景的高频全部透进来。切片用 soft 档（约 8px 模糊），高频没了，
+ * 山脊和色带还在，玻璃"隔了一层"的感觉由此而来。
+ *
+ * 坐标：切片要采样自己在根坐标系里的那一块背景。画布平移 -[origin] 后，
+ * 画布内坐标恰好等于根坐标，BitmapShader 的 localMatrix 负责把半分辨率
+ * 位图对回屏幕 —— 和折射着色器里的 iOrigin 是同一套思路。
+ */
+internal fun DrawScope.drawBackdropSlice(backdrop: PopBackdrop, origin: Offset) {
+    val shader = backdrop.softShader ?: return
+    drawIntoCanvas { canvas ->
+        val nc = canvas.nativeCanvas
+        val save = nc.save()
+        nc.translate(-origin.x, -origin.y)
+        backdrop.slicePaint.shader = shader
+        nc.drawRect(0f, 0f, size.width, size.height, backdrop.slicePaint)
+        nc.restoreToCount(save)
+    }
+}
+
+/**
+ * 内辉光：玻璃对背后明暗的**唯一**回应方式。
+ *
+ * ## 为什么是辉光，不是改填充
+ *
+ * 上一版让填充浓度跟着背后明度走（暗背景白底 ×2、浮层换深色），
+ * 结果是 div 的颜色跟着壁纸滚动不断变化 —— 用户的第一反馈就是
+ * "改变了 div 的色相，很难看"。现在填充恒定，明暗补偿全部长在边缘：
+ *
+ * - 背景暗 → 白辉光：玻璃把背后的光收进边缘，一圈亮环勾出轮廓；
+ * - 背景亮 → 深墨辉光：强光下玻璃的边界是一圈折射造成的暗环。
+ *
+ * 中央平板区不动。辉光带宽度跟短边走（[PopGlass.GlowBand]，封顶短边 22%），
+ * 模糊用 BlurMaskFilter 在描边上做 —— 描边居中，外半圈被 clip 裁掉，
+ * 剩下的就是一圈从轮廓向内衰减的光带。BlurMaskFilter 在硬件画布与
+ * layoutlib 快照里都受支持（不受支持的是非文本的 setShadowLayer）。
+ *
+ * [outline] 必须和面板真实形状同源 —— 辉光贴着轮廓走，形状错一圈就露馅。
+ */
+internal fun DrawScope.drawInnerGlow(outline: Outline, tone: GlassTone) {
+    val strength = tone.glowStrength
+    if (strength <= 0.01f) return
+    val path = Path().apply { addOutline(outline) }
+    val shortSide = min(size.width, size.height)
+    // 12dp 在卡片上是身份特征，在 28dp 的圆片上就是半块饼 —— 带宽跟元件走
+    val band = with(density) { PopGlass.GlowBand.toPx() }.coerceAtMost(shortSide * 0.22f)
+    val blur = band * 0.55f
+    val glow = glowPaint.apply {
+        style = android.graphics.Paint.Style.STROKE
+        // 描边居中：外半圈会被裁掉，内侧留 band；blur 再吃掉一点边缘，补上余量
+        strokeWidth = band * 2f + blur
+        color = tone.glowColor
+            .copy(alpha = (PopGlass.GlowMaxAlpha * strength).coerceIn(0f, 1f))
+            .toArgb()
+        maskFilter = glowMaskFilter(blur)
+    }
+    clipPath(path) {
+        drawIntoCanvas { it.nativeCanvas.drawPath(path.asAndroidPath(), glow) }
+    }
+}
+
+/** 辉光描边共用一支画笔；BlurMaskFilter 按半径分桶缓存，避免每帧分配。 */
+private val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+private val glowFilters = HashMap<Int, BlurMaskFilter>()
+
+private fun glowMaskFilter(radiusPx: Float): BlurMaskFilter {
+    // 0.5px 精度分桶：辉光对模糊半径 ±1px 不敏感，但每帧 new 一个 filter 会抖内存
+    val key = (radiusPx * 2f).toInt().coerceAtLeast(1)
+    return glowFilters.getOrPut(key) {
+        BlurMaskFilter(key / 2f, BlurMaskFilter.Blur.NORMAL)
     }
 }
 
@@ -549,7 +623,6 @@ private fun compileRefractionShader(): RuntimeShader? = try {
         uniform float iBezel;
         uniform float iDepth;
         uniform float iDisperse;
-        uniform float iInner;
 
         float sdRoundRect(float2 p, float2 hs, float r) {
             float2 q = abs(p) - hs + r;
@@ -593,10 +666,9 @@ private fun compileRefractionShader(): RuntimeShader? = try {
             base.rgb = mix(half3(luma), base.rgb, 1.16) * 0.995;
             base.rgb = min(base.rgb, half3(1.0));
 
-            // 壁厚暗面：贴轮廓最暗，向内散尽。浅背景上它是"厚度"，
-            // 暗背景上 iInner 被置 0（再压暗只会让边缘更黑）。
-            float inner = exp(-t * 4.0) * iInner;
-            base.rgb = base.rgb * (1.0 - inner);
+            // 明暗回应不在这里做：着色器只负责光学（折射 + 提纯 + 色散），
+            // 玻璃对背后明暗的全部回应统一走 Compose 层的内辉光（见 drawInnerGlow）。
+            // 以前这里有一项"贴轮廓压暗内沿"，和辉光叠画会出现两套边界。
 
             if (iDisperse <= 0.0) {
                 return base;
