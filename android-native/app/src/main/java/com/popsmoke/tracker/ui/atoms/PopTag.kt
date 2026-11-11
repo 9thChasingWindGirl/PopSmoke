@@ -48,7 +48,7 @@ fun PopTag(
             .then(
                 if (current.glass) {
                     Modifier
-                        .skinSurface(current, pill, bg.copy(alpha = 0.82f), lift = 10.dp, tint = bg)
+                        .skinSurface(current, pill, bg.copy(alpha = 0.62f), lift = 10.dp, tint = bg)
                         .padding(horizontal = PopSpace.S5, vertical = PopSpace.S2)
                 } else {
                     Modifier

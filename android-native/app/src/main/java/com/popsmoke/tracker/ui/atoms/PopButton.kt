@@ -75,10 +75,13 @@ fun PopButton(
 
     if (current.glass) {
         val fill = when (variant) {
-            // 彩色玻璃而不是实心色块：主按钮要能透出背后的光，否则一块不透明的色斑会打断整个界面的通透感
-            PopButtonVariant.Primary -> themeAccent.copy(alpha = 0.88f)
+            // 彩色玻璃而不是实心色块：主按钮要能透出背后的光，否则一块不透明的色斑
+            // 会打断整个界面的通透感。
+            // 0.88 是初版的值 —— 那基本就是不透明，按钮读作"塑料橙"。
+            // 0.66 刚好还能认出是主色，同时背后的白卡与光带会透上来。
+            PopButtonVariant.Primary -> themeAccent.copy(alpha = 0.58f)
             PopButtonVariant.Secondary -> current.palette.surface
-            PopButtonVariant.Danger -> PopColor.Status.Danger.copy(alpha = 0.88f)
+            PopButtonVariant.Danger -> PopColor.Status.Danger.copy(alpha = 0.62f)
         }
         val foreground = when (variant) {
             PopButtonVariant.Primary -> themeOnAccent

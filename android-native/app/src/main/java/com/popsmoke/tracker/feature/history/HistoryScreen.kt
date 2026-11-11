@@ -316,7 +316,7 @@ private fun SortButton(text: String, active: Boolean, arrow: String, onClick: ()
                     Modifier.skinSurface(
                         current = current,
                         shape = shape,
-                        fill = if (active) accent.copy(alpha = 0.85f) else popSurface,
+                        fill = if (active) accent.copy(alpha = 0.62f) else popSurface,
                         lift = 8.dp,
                         tint = if (active) accent else Color.Transparent,
                     )
@@ -396,10 +396,16 @@ private fun MonthCard(
                     .graphicsLayer { rotationZ = if (current.glass) 0f else -2f }
                     .then(
                         if (current.glass) {
+                            // 这里原来是不透明 accent + 1dp 白边，是整页里最"塑料"的一块。
+                            // 改成彩色玻璃后，徽标能透出下面月份卡的颜色，和卡片成为一体。
                             Modifier
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(accent)
-                                .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(percent = 50))
+                                .skinSurface(
+                                    current = current,
+                                    shape = RoundedCornerShape(percent = 50),
+                                    fill = accent.copy(alpha = 0.58f),
+                                    lift = 6.dp,
+                                    tint = accent,
+                                )
                         } else {
                             Modifier.background(accent).popBorder(PopStroke.Thin, popInk)
                         },

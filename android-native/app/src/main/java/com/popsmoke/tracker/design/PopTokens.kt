@@ -221,13 +221,24 @@ object PopLayout {
 
 /** 液态玻璃主题参数。后缀即单位：Alpha 为透明度，Px 为 dp，Ms 为毫秒，其余为倍数。 */
 object PopGlass {
-    const val SurfaceAlpha = 0.5f
-    const val SurfaceStrongAlpha = 0.68f
-    const val SurfaceDeepAlpha = 0.28f
-    const val StrokeTopAlpha = 0.72f
-    const val StrokeBottomAlpha = 0.3f
-    const val SheenAlpha = 0.24f
-    const val RefractionAlpha = 0.2f
+    const val SurfaceAlpha = 0.38f
+    const val SurfaceStrongAlpha = 0.54f
+    const val SurfaceDeepAlpha = 0.14f
+    const val StrokeTopAlpha = 0.86f
+    const val StrokeBottomAlpha = 0.24f
+    const val SheenAlpha = 0.3f
+    const val RefractionAlpha = 0.22f
+    val RimBand = 9.dp
+    const val RimAlpha = 0.55f
+    const val RimPeakAlpha = 0.92f
+    val Bevel = 3.dp
+    const val BevelAlpha = 0.075f
+    val Dispersion = 1.dp
+    const val DispersionAlpha = 0.2f
+    const val SpecularAlpha = 0.26f
+    const val InnerGlowAlpha = 0.26f
+    const val FieldBandAlpha = 0.22f
+    const val FieldArcAlpha = 0.06f
     const val ShadowAlpha = 0.085f
     val ShadowLift = 10.dp
     val ShadowSpread = 26.dp

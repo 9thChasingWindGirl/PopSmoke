@@ -585,10 +585,17 @@ private fun LimitRow(
                 .graphicsRotation(if (current.glass) 0f else rotate)
                 .then(
                     if (current.glass) {
+                        // 0.9 的实心色块在这个界面里是唯一的"不透明色斑"，
+                        // 一眼就把玻璃语言打断。改成彩色玻璃：0.55 让底色透上来，
+                        // 边缘交给 skinSurface 的 rim/bevel 去建立厚度。
                         Modifier
-                            .clip(chip)
-                            .background(badgeBg.copy(alpha = 0.9f))
-                            .border(1.dp, Color.White.copy(alpha = 0.6f), chip)
+                            .skinSurface(
+                                current = current,
+                                shape = chip,
+                                fill = badgeBg.copy(alpha = 0.55f),
+                                lift = 6.dp,
+                                tint = badgeBg,
+                            )
                             .padding(horizontal = PopSpace.S3, vertical = PopSpace.S1)
                     } else {
                         Modifier
