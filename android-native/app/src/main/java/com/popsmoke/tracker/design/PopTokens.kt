@@ -221,35 +221,33 @@ object PopLayout {
 
 /** 液态玻璃主题参数。后缀即单位：Alpha 为透明度，Px 为 dp，Ms 为毫秒，其余为倍数。 */
 object PopGlass {
-    const val SurfaceAlpha = 0.12f
-    const val SurfaceStrongAlpha = 0.34f
-    const val SurfaceDeepAlpha = 0.14f
-    const val StrokeTopAlpha = 0.86f
-    const val StrokeBottomAlpha = 0.24f
-    const val SheenAlpha = 0.3f
-    const val RefractionAlpha = 0.22f
-    val RimBand = 9.dp
-    const val RimAlpha = 0.55f
-    const val RimPeakAlpha = 0.92f
-    val Bevel = 3.dp
-    const val BevelAlpha = 0.075f
-    val Dispersion = 1.dp
-    const val DispersionAlpha = 0.2f
-    const val SpecularAlpha = 0.26f
-    const val InnerGlowAlpha = 0.26f
-    const val FieldBandAlpha = 0.22f
+    const val SurfaceAlpha = 0.055f
+    const val SurfaceStrongAlpha = 0.18f
+    const val SurfaceDeepAlpha = 0.12f
+    val EdgeStroke = 1.dp
+    const val EdgePeakAlpha = 0.68f
+    const val EdgeMinAlpha = 0.04f
+    val RefractBezel = 34.dp
+    val RefractDepth = 30.dp
+    const val RefractPeak = 0.45f
+    const val DispersionAmount = 0.26f
+    const val SpecularAlpha = 0.16f
+    const val SpecularRadius = 0.13f
+    const val TintAlpha = 0.1f
+    const val FieldBandAlpha = 0.17f
     const val FieldArcAlpha = 0.06f
-    const val WeaveAlpha = 0.2f
-    val WeaveSpacing = 38.dp
+    const val WeaveAlpha = 0.3f
+    val WeaveSpacing = 40.dp
     val WeaveStroke = 1.dp
-    const val ShadowAlpha = 0.085f
-    val ShadowLift = 10.dp
-    val ShadowSpread = 26.dp
-    val RadiusCard = 28.dp
-    val RadiusPanel = 24.dp
-    val RadiusField = 18.dp
-    val RadiusChip = 14.dp
-    val RadiusButton = 22.dp
+    const val ShadowAlpha = 0.055f
+    val ShadowBlur = 34.dp
+    val ShadowLift = 7.dp
+    val ShadowSpread = 0.dp
+    val RadiusCard = 34.dp
+    val RadiusPanel = 28.dp
+    val RadiusField = 20.dp
+    val RadiusChip = 16.dp
+    val RadiusButton = 26.dp
     val AuroraBlob = 560.dp
     val AuroraSecondary = 420.dp
     const val AuroraAlpha = 0.78f
@@ -261,6 +259,9 @@ object PopGlass {
     const val JellyPressStiffness = 780f
     const val JellyReleaseDamping = 0.3f
     const val JellyReleaseStiffness = 420f
+    const val WeaveInkAlpha = 0.085f
+    const val SolidSheenAlpha = 0.2f
+    const val InnerShadeAlpha = 0.11f
 }
 
 object PopMotion {

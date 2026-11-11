@@ -19,24 +19,19 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.DrawStyle
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.hypot
-import kotlin.math.min
 import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.PopShadow
 import com.popsmoke.tracker.design.PopSkin
@@ -69,7 +64,7 @@ fun toneColor(tone: PopPanelTone): Color {
  *
  * 为什么合成一个 draw 层：三连写法要创建三层绘制节点，而且顺序写反就会阴影盖住卡片
  * （这个坑之前真的踩过，靠截图像素采样才发现）。合成后顺序在函数内部固定：
- * 投影 → 填充 → 高光 → 折射 → 描边，外部不可能写错。
+ * 投影 → 折射 → 体 → 高光 → 边缘线，外部不可能写错。
  *
  * 描边宽度会同时让出尺寸（对应 CSS 的 border-box），内容不会压到描边上。
  */
@@ -80,10 +75,10 @@ fun Modifier.skinSurface(
     lift: Dp = if (current.glass) PopGlass.ShadowLift else PopShadow.PopLg,
     tint: Color = Color.Transparent,
 ): Modifier {
-    val stroke = if (current.glass) 1.dp else PopStroke.Default
+    val stroke = if (current.glass) PopGlass.EdgeStroke else PopStroke.Default
     if (!current.glass) {
         return this
-            .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx()) }
+            .drawBehind { drawPanel(current, shape, fill, lift, tint, stroke.toPx(), null, Offset.Zero) }
             .padding(stroke)
     }
     // 玻璃面板要在自己区域里重画一遍"被弯折过的背景"，为此必须知道自己在根坐标系
@@ -95,18 +90,7 @@ fun Modifier.skinSurface(
         this
             .onGloballyPositioned { coords -> origin.value = coords.positionInRoot() }
             .drawBehind {
-                if (backdrop != null) {
-                    drawRefractedBackdrop(
-                        backdrop = backdrop,
-                        origin = origin.value,
-                        shape = shape,
-                        radiusPx = RefractionDefaults.radius(this),
-                        band = RefractionDefaults.band(this),
-                        refraction = RefractionDefaults.amount(this),
-                        dispersion = RefractionDefaults.Dispersion,
-                    )
-                }
-                drawPanel(current, shape, fill, lift, tint, stroke.toPx())
+                drawPanel(current, shape, fill, lift, tint, stroke.toPx(), backdrop, origin.value)
             }
             .padding(stroke)
     }
@@ -192,10 +176,12 @@ private fun DrawScope.drawPanel(
     lift: Dp,
     tint: Color,
     strokeWidth: Float,
+    backdrop: PopBackdrop?,
+    origin: Offset,
 ) {
     val outline = shape.createOutline(size, layoutDirection, this)
     if (current.glass) {
-        drawGlassPanel(outline, fill, tint, lift, strokeWidth)
+        drawGlassPanel(outline, shape, fill, tint, lift, strokeWidth, backdrop, origin)
     } else {
         drawInkPanel(outline, fill, current.palette.ink, lift, strokeWidth)
     }
@@ -220,199 +206,164 @@ private fun DrawScope.drawInkPanel(
 /**
  * 液态玻璃面板。
  *
- * 这个函数改过一次口径，值得记下来。第一版是"半透明填充 + 顶部渐变高光 + 上亮下暗描边"，
- * 也就是**磨砂玻璃（glassmorphism）**。它的定义性缺陷是：只**散射**光，不**弯折**光。
- * Apple 在 WWDC25 里把这个区别当成整套材质的分水岭 —— 旧材质散射，新材质
- * 实时弯曲、塑形、聚拢光线（Lensing）。所以那版无论怎么调参，看上去都是一块
- * 磨砂白卡片，而不是玻璃。
+ * ## 这一版把边缘拆掉了
  *
- * 现在按真实玻璃的成像顺序分成四层，每层各自负责一件事：
+ * 上一版按"真实玻璃的成像顺序"分了四层：body / rim / specular / stroke。
+ * 每一层的理由单独看都成立，叠起来的结果是**五道同心环**：
+ * 宽暗环（壁厚）→ 宽淡亮环（散射光晕）→ 窄亮环（轮廓反光）→ 暖色环（假色散）
+ * → 1dp 上亮下暗描边。环与环之间的每条边界都被眼睛抓到了，于是面板读作甜甜圈。
  *
- * 1. **body**  —— 半透明填充。中心最透（光线直穿），越靠边越实（材料更厚）。
- *    用 radial 而不是 vertical：竖向渐变会让卡片"上下有色差"，而玻璃的透光率
- *    差异是由厚度决定的，厚度在边上。
- * 2. **rim**   —— 菲涅尔轮廓聚光。真实玻璃沿整条轮廓都在聚光，圆角处曲率大、
- *    切线变化快，反射最强，所以四个角最亮。做法是按轮廓描一圈宽环再裁进形状里：
- *    描边以路径为中心，内外各占一半，裁掉外侧后恰好剩一条向内的亮环。
- * 3. **specular** —— 左上角一团柔光。这是"房间里有一盏灯"的唯一证据，
- *    缺了它整块玻璃会显得没有体积，像贴纸。
- * 4. **stroke** —— 上亮下暗的 1dp 边。外沿最亮，向内一步就掉下去，
- *    这一条给出"表面的边界"，而 rim 给出"玻璃的厚度"，两者不能合并。
+ * 教训：**玻璃的边界只有一根线**。所有"厚度感"都该由折射（背景被压弯）给出，
+ * 而不是由一圈圈描边画出来。所以这里只剩：
  *
- * 色散的处理是近似的：外环用偏冷的白（#F2F6FF），内环用偏暖的白（#FFF4E8）。
- * 真实色散是不同波长折射率不同导致的边缘彩虹分离，真正的实现要按 RGB 三个
- * 通道分别做位移采样；这里没有背景纹理可采样（见下），退而求其次，
- * 用外冷内暖的双环把"边缘有光谱倾向"这个印象给出来。
+ * 1. **projection** —— 同形、垂直偏移、一次绘制的软阴影（见 [drawSoftShadow]）。
+ * 2. **refraction** —— 背景在边缘 22dp 内被压弯（见 [drawRefracted]）。
+ * 3. **body** —— 一层极淡的对角渐变。左上迎光略亮、右下背光略暗，
+ *    这不是"渐变装饰"，是唯一的体积线索。
+ * 4. **tint** —— 底部 12% 的一点点暖光，玻璃把背后的光带上来了。
+ * 5. **edge** —— 一根 1dp 的菲涅尔亮线。左上最亮、右下几乎消失。
  *
- * 关于背景模糊：Compose 拿不到 backdrop blur（`Modifier.blur` 与 `RenderEffect`
- * 都只作用于自身内容）。但这一版不再依赖它 —— 背景是自己画的极光 + 光带，
- * 低频且解析可知，玻璃只需要"足够透"让它们穿过来，再靠边缘光学建立厚度。
- * 这比每帧采样一张全屏位图便宜得多，且在 Paparazzi 里可复现。
+ * 色散不再用彩色环假装，交给着色器按 RGB 分别位移（真色散只在强对比处才露彩）。
+ *
+ * ## 关于背景模糊
+ *
+ * Compose 拿不到 backdrop blur（`Modifier.blur` 与 `RenderEffect` 都只作用于自身内容）。
+ * 但这一版不需要 —— 折射本身就是"对背景的一次重采样"，比模糊更接近玻璃的定义。
  */
 private fun DrawScope.drawGlassPanel(
     outline: Outline,
+    shape: Shape,
     fill: Color,
     tint: Color,
     lift: Dp,
     strokeWidth: Float,
+    backdrop: PopBackdrop?,
+    origin: Offset,
 ) {
     val bounds = outline.bounds
-    val path = outline.asPath()
-    val rimBand = PopGlass.RimBand.toPx()
+    val ink = Color(0xFF14141A)
 
+    // ---- 0. 投影 ----
     // lift 为 0 表示"贴着边缘的条"（顶栏/底栏），不该有投影，否则会像浮空错位
     if (lift > 0.dp) {
-        // 关键：投影像素必须**挖掉卡片自己的区域**。
-        // 阴影是向外扩的圆角块，天然包含卡片内部；以前面板足够不透明（alpha 0.5）
-        // 所以看不出来，降到 0.3 后整块面板里透出一层灰 —— 看起来像玻璃脏了。
-        // 真实物体不会在自己的投影里显影，这里用 Difference 裁一刀。
-        clipPath(path, ClipOp.Difference) {
-            drawSoftShadow(outline, Color(0xFF16161A), lift)
+        val blur = ShadowDefaults.blur(this)
+        val spread = ShadowDefaults.spread(this)
+        val drawn = drawSoftShadow(shape, blur, lift.toPx(), spread, PopGlass.ShadowAlpha)
+        if (!drawn) {
+            // 没有 AGSL 的环境：退回一层外扩。注意**不加 topGrowFactor** ——
+            // 上边少扩、下边多扩会让投影形状和卡片不同形，那正是"投影挪位"的来源。
+            val grown = outline.expanded(spread + blur * 0.28f, lift.toPx())
+            if (grown != null) {
+                drawOutlineShape(grown, ink.copy(alpha = PopGlass.ShadowAlpha * 0.7f))
+            }
         }
     }
 
-    // 中心到最远角的距离：用它当 radial 的 1f，四个角才刚好落在"最实"的那一端
-    val span = hypot(bounds.width / 2f, bounds.height / 2f).coerceAtLeast(1f)
+    // ---- 1. 折射 ----
+    if (backdrop != null) {
+        drawRefracted(
+            backdrop = backdrop,
+            origin = origin,
+            shape = shape,
+            bezel = RefractionDefaults.bezel(this),
+            depth = RefractionDefaults.depth(this),
+            peak = RefractionDefaults.Peak,
+            dispersion = RefractionDefaults.dispersion(this),
+        )
+    }
 
-    // ---- 1. body ----
+    // ---- 2. body ----
+    // 对角渐变，左上亮右下暗。为什么不是"中心最透"的径向：
+    // 径向会在边缘形成一圈比中心更实的边 —— 那又是一道环，只是分辨率低一点。
+    //
+    // 渐变的幅度要跟着填充的透明度走：半透明面板（0.10）靠这点明暗差建立体积；
+    // 实心元件（1.0）如果也做同样的渐变，就变成"一块橙色的上浅下深"，
+    // 读作塑料而不是玻璃。实心上必须完全均匀，否则它就不再是同一套材质了。
     if (fill.alpha > 0f) {
+        val a = fill.alpha
+        val softness = (1f - a).coerceIn(0f, 1f)
         drawOutlineShape(
             outline,
-            Brush.radialGradient(
-                0f to fill.copy(alpha = fill.alpha * 0.78f),
-                0.72f to fill,
-                1f to fill.copy(alpha = (fill.alpha * 1.24f).coerceAtMost(1f)),
-                center = bounds.center,
-                radius = span,
+            Brush.linearGradient(
+                0f to fill.copy(alpha = (a * (1f + 0.18f * softness)).coerceAtMost(1f)),
+                0.45f to fill,
+                1f to fill.copy(alpha = a * (1f - 0.22f * softness)),
+                start = Offset(bounds.left, bounds.top),
+                end = Offset(bounds.right, bounds.bottom),
             ),
         )
-    }
-
-    // ---- 2. rim ----
-    // clip 到形状内，把描边的外半边裁掉，只留向内的那条环。
-    //
-    // 环的亮度不能是均匀的。真实玻璃的轮廓高光由菲涅尔项决定：入射角越接近掠射、
-    // 反射越强，再叠上"光从左上来"这个方向，结果就是左上最亮、右下几乎不亮。
-    // 用 sweepGradient 以形状中心扫一圈，亮度按角度调制 —— 这是整块面板里
-    // 最像玻璃的一笔，比填充和高光加起来都重要。
-    val rimLight = Color(0xFFF2F6FF)
-    // 环的亮度由菲涅尔项决定：掠射角（正好在轮廓上）反射最强，向内迅速衰减。
-    // Compose 没有"沿路径的法向渐变"，所以用两层叠加来近似这条衰减曲线：
-    // 一层宽的、很淡（散射光晕），一层窄的、很亮（边缘那道光）。
-    // 只有宽层时，边缘是一圈均匀的白 —— 看着像发光边框，不像玻璃。
-    fun sweep(strength: Float) = Brush.sweepGradient(
-        0.000f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.34f), // 3 点方向
-        0.125f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.12f), // 右下，最暗
-        0.250f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.26f), // 6 点
-        0.375f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.52f), // 左下
-        0.500f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.80f), // 9 点
-        0.625f to rimLight.copy(alpha = PopGlass.RimAlpha * strength),         // 左上，最亮
-        0.750f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.72f), // 12 点
-        0.875f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.40f), // 右上
-        1.000f to rimLight.copy(alpha = PopGlass.RimAlpha * strength * 0.34f),
-        center = bounds.center,
-    )
-    val rimWide = sweep(0.30f)
-    val rimSharp = sweep(1f)
-    val sharpWidth = PopGlass.Dispersion.toPx() // 1dp，只做"一条线"，不做"一圈边"
-
-    clipPath(path) {
-        // 内壁暗边：真实玻璃有厚度，光在壁内折射衰减，紧贴外沿的内侧会压暗一条。
-        // 做法是先画一条更宽的暗环，再用亮环盖住它的外侧 —— 露出来的那 bevel 宽
-        // 的内圈就是"壁厚"。少了这条，面板永远像一张没有厚度的薄膜。
-        drawPath(
-            path,
-            Color(0xFF16161A).copy(alpha = PopGlass.BevelAlpha),
-            style = Stroke(width = (rimBand + PopGlass.Bevel.toPx()) * 2f),
-        )
-        // 宽而淡：向内 ~9dp 的散射光晕
-        drawPath(path, rimWide, style = Stroke(width = rimBand * 2f))
-        // 窄而亮：真正贴着轮廓的那道反光
-        drawPath(path, rimSharp, style = Stroke(width = sharpWidth * 2f))
-        // 内层窄暖环：与外层冷白错开，读作边缘的色散
-        drawPath(
-            path,
-            Color(0xFFFFF3E6).copy(alpha = PopGlass.RimAlpha * 0.30f),
-            style = Stroke(width = rimBand * 0.9f),
-        )
-    }
-
-    // ---- 3. specular ----
-    // 光源固定在左上。半径压得比较小，否则整块卡片都会泛白、通透感全无
-    val specRadius = min(bounds.width, bounds.height) * 0.18f
-    clipPath(path) {
-        drawRect(
-            Brush.radialGradient(
-                0f to Color.White.copy(alpha = PopGlass.SpecularAlpha),
-                1f to Color.White.copy(alpha = 0f),
-                center = Offset(
-                    x = bounds.left + bounds.width * 0.16f,
-                    y = bounds.top + bounds.height * 0.055f,
+        // 实心元件（主按钮、选中态）在玻璃主题里不能只是"一块颜色"。
+        // iOS 的实心控件都有同一条规则：表面上有一道从上往下的反射，
+        // 上沿最亮、很快衰减到无。少了它，按钮会像贴纸贴在玻璃上 ——
+        // 两套材质的对比太生硬，整屏读作"玻璃卡片 + 塑料按钮"。
+        if (a >= 0.9f) {
+            drawOutlineShape(
+                outline,
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = PopGlass.SolidSheenAlpha),
+                    0.40f to Color.White.copy(alpha = PopGlass.SolidSheenAlpha * 0.22f),
+                    1f to Color.Transparent,
                 ),
-                radius = specRadius,
-            ),
-        )
+            )
+        }
     }
 
-    // ---- 4. 底部折射带 ----
-    // 玻璃有厚度，底沿会把背后的暖光带上来一点。alpha 必须很低，否则卡片会被染色
+    // ---- 3. tint 底带 ----
+    // 玻璃有厚度，底沿会把背后的光带上来一点。alpha 必须很低，否则卡片会被染色。
     if (tint.alpha > 0f) {
         drawOutlineShape(
             outline,
             Brush.verticalGradient(
-                0.86f to tint.copy(alpha = 0f),
-                1f to tint.copy(alpha = PopGlass.RefractionAlpha),
+                0.88f to tint.copy(alpha = 0f),
+                1f to tint.copy(alpha = PopGlass.TintAlpha),
             ),
         )
     }
 
-    // ---- 5. stroke ----
-    // 取 rim 的一半宽度：外沿要亮，但要细，粗了就变成"边框"而不是"边缘反光"
-    drawOutlineShape(
-        outline,
-        Brush.verticalGradient(
-            0f to Color.White.copy(alpha = PopGlass.StrokeTopAlpha),
-            0.5f to Color.White.copy(alpha = 0.46f),
-            1f to Color.White.copy(alpha = PopGlass.StrokeBottomAlpha),
-        ),
-        Stroke(strokeWidth),
+    // ---- 4. edge ----
+    // 整块面板上唯一允许被叫作"边框"的东西：一根 1dp 的线，一半在形状内、一半在外。
+    // 亮度由菲涅尔项决定 —— 掠射（轮廓上）最强，再叠"光从左上来"，所以左上最亮。
+    // 背光侧不能完全消失（留 6%），否则右下角的轮廓会像被吃掉一块。
+    //
+    // 强度还要跟填充的透明度挂钩。玻璃的亮边是"表面反射"，越透明越显眼；
+    // 一块实心橙色的按钮如果也镶一圈 92% 的白边，那读作"贴纸描边"，
+    // 是波普语言误闯进玻璃主题 —— 必须按透明度衰减掉。
+    val solidity = fill.alpha.coerceIn(0f, 1f)
+    val edgeScale = 1f - solidity * 0.85f
+    val peak = PopGlass.EdgePeakAlpha * edgeScale
+    val minA = PopGlass.EdgeMinAlpha * edgeScale
+    fun at(v: Float) = minA + (peak - minA) * v
+    val edge = Brush.sweepGradient(
+        0.000f to Color.White.copy(alpha = at(0.42f)), // 3 点
+        0.125f to Color.White.copy(alpha = minA),      // 右下，最暗
+        0.250f to Color.White.copy(alpha = at(0.22f)), // 6 点
+        0.375f to Color.White.copy(alpha = at(0.52f)), // 左下
+        0.500f to Color.White.copy(alpha = at(0.78f)), // 9 点
+        0.625f to Color.White.copy(alpha = peak),      // 左上，最亮
+        0.750f to Color.White.copy(alpha = at(0.66f)), // 12 点
+        0.875f to Color.White.copy(alpha = at(0.34f)), // 右上
+        1.000f to Color.White.copy(alpha = at(0.42f)),
+        center = bounds.center,
     )
-}
-
-/** 把 Outline 转成 Path。rim 的裁切需要路径本身，而不只是能拿来填充的形状。 */
-private fun Outline.asPath(): Path = when (this) {
-    is Outline.Rectangle -> Path().apply { addRect(rect) }
-    is Outline.Rounded -> Path().apply { addRoundRect(roundRect) }
-    is Outline.Generic -> path
-}
-
-/**
- * 柔和投影：两层扩散的圆角块。
- *
- * 不用 `Modifier.shadow`：它不支持 y 偏移，而"卡片浮在表面上"必须有下方的偏移；
- * 也不用 `Paint.setShadowLayer`，那在硬件加速下对非文本不可靠。
- * 两层（大而淡 + 小而实）在浅底上已经看不出硬边，成本只有两次绘制。
- */
-internal fun DrawScope.drawSoftShadow(outline: Outline, ink: Color, lift: Dp) {
-    val grow = PopGlass.ShadowSpread.toPx() * 0.16f
-    val dy = lift.toPx()
-    // 只画"大而淡"的一层。
-    // 早先是两层（大而淡 + 小而实），结果贴边那层在浅色背景上画出一圈灰线，
-    // 看起来像卡片的描边而不是投影 —— 玻璃卡片的边缘必须是干净的白色高光。
-    // 上方几乎不外扩（0.22），光从上面来，物体上沿不该有暗边；
-    // 下方完整外扩并下移，才有"浮起来"的落影
-    val wide = outline.expanded(grow, dy, topGrowFactor = 0.22f)
-    if (wide != null) {
-        drawOutlineShape(wide, ink.copy(alpha = PopGlass.ShadowAlpha * 0.9f))
+    if (strokeWidth > 0f) {
+        drawOutlineShape(outline, edge, Stroke(strokeWidth))
     }
 }
 
-/** 把轮廓向外扩一圈并下移。[Outline.Generic] 无法安全扩张（任意路径），退回不画。 */
-private fun Outline.expanded(grow: Float, dy: Float, topGrowFactor: Float = 1f): Outline? = when (this) {
+/**
+ * 柔和投影：同形、垂直偏移的模糊块。
+ *
+ * 不用 `Modifier.shadow`（不支持 y 偏移），也不用 `Paint.setShadowLayer`
+ * （硬件加速下对非文本不可靠）。用 AGSL 在 [drawSoftShadow] 里一次画完，
+ * 形状和卡片完全同源 —— 投影不可能"挪位"。
+ *
+ * [Outline.Generic] 无法安全扩张（任意路径），降级路径直接不画。
+ */
+private fun Outline.expanded(grow: Float, dy: Float): Outline? = when (this) {
     is Outline.Rectangle -> Outline.Rectangle(
         Rect(
             left = rect.left - grow,
-            top = rect.top - grow * topGrowFactor + dy,
+            top = rect.top - grow + dy,
             right = rect.right + grow,
             bottom = rect.bottom + grow + dy,
         ),
@@ -421,7 +372,7 @@ private fun Outline.expanded(grow: Float, dy: Float, topGrowFactor: Float = 1f):
     is Outline.Rounded -> Outline.Rounded(
         RoundRect(
             left = roundRect.left - grow,
-            top = roundRect.top - grow * topGrowFactor + dy,
+            top = roundRect.top - grow + dy,
             right = roundRect.right + grow,
             bottom = roundRect.bottom + grow + dy,
             cornerRadius = CornerRadius(

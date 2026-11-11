@@ -91,24 +91,25 @@ fun DrawScope.drawAuroraBody(
     val h = size.height
     drawRect(color = canvasColor)
 
-    // 五团椭圆色团，冷暖对冲，四面都铺到。
+    // 六团椭圆色团，冷暖对冲，把画面铺满。
     //
     // 为什么是椭圆而不是圆：玻璃要"透"就要有东西可透，但等大的圆会互相融合成一团
     // 均匀的雾 —— 溶在一起之后，卡片压在哪都看不到层次。改成椭圆、尺寸和位置错开，
     // 相邻色团的交界处就有了明暗与色相的转折。
     //
-    // 为什么要铺到四个角：只放三团时，卡片下半部分的边缘后面是一片纯底色。
-    // 实测那一带的像素标准差只有 1.6 —— 等于在均匀灰上做折射，做得再对也看不出来。
-    // 折射要可见，前提是**卡片边缘后面确实有东西**，所以宁可多两团，也不能留空档。
+    // 为什么要铺满而不是只铺四角：只铺边缘时，屏幕正中是一片纯色底 ——
+    // 那正是内容最密集的地方，玻璃压上去等于在一张白纸上做折射，做得再对也看不见。
+    // 第一版就吃过这个亏：卡片背面的像素标准差只有 1.6。现在中部也有色团过渡。
     //
     // 色相不按主题色派生：低饱和主题色派生 ±140° 会得到脏灰。
     // 这里固定一组冷暖对冲的色板，只让第一枚吃主题色，任何主题色都不会翻车。
     val blobs = listOf(
-        BlobSpec(accent.copy(alpha = 0.44f), 1.02f, 0.66f, 0.04f, 0.08f),
-        BlobSpec(Color(0xFF7FA6FF).copy(alpha = 0.30f), 1.10f, 0.56f, 0.98f, 0.40f),
-        BlobSpec(Color(0xFFFFB59B).copy(alpha = 0.18f), 0.88f, 0.50f, 0.60f, 0.68f),
-        BlobSpec(Color(0xFF8FD6C8).copy(alpha = 0.22f), 0.92f, 0.48f, 0.06f, 0.95f),
-        BlobSpec(Color(0xFFB9A6F0).copy(alpha = 0.24f), 0.82f, 0.44f, 0.96f, 0.86f),
+        BlobSpec(accent.copy(alpha = 0.5f), 1.05f, 0.72f, 0.02f, 0.05f),
+        BlobSpec(Color(0xFF7FA6FF).copy(alpha = 0.40f), 1.15f, 0.62f, 1.00f, 0.32f),
+        BlobSpec(Color(0xFFFFB59B).copy(alpha = 0.28f), 0.95f, 0.58f, 0.62f, 0.58f),
+        BlobSpec(Color(0xFF8FD6C8).copy(alpha = 0.32f), 1.00f, 0.55f, 0.03f, 0.84f),
+        BlobSpec(Color(0xFFB9A6F0).copy(alpha = 0.34f), 0.92f, 0.52f, 0.97f, 0.76f),
+        BlobSpec(Color(0xFFFFD9E6).copy(alpha = 0.24f), 0.86f, 0.50f, 0.44f, 0.24f),
     )
     blobs.forEach { blob ->
         val bw = blob.widthFactor * w
@@ -122,7 +123,7 @@ fun DrawScope.drawAuroraBody(
             0f to blob.color,
             // 衰减不能太快：0.5 处就掉到 30% 的话，色团只剩中心一小团，
             // 屏幕中部会是纯底色，玻璃卡片在那里就没有东西可透。
-            0.58f to blob.color.copy(alpha = blob.color.alpha * 0.62f),
+            0.68f to blob.color.copy(alpha = blob.color.alpha * 0.58f),
             1f to blob.color.copy(alpha = 0f),
             center = Offset(cx, cy),
             radius = radius,
@@ -136,34 +137,112 @@ fun DrawScope.drawAuroraBody(
         }
     }
 
-    // 一条很柔的斜向光，定光位。
+    // 三条有边界的色带，定光位。
     //
-    // 更早的版本是两条 104dp 的硬边光带，边界确实清晰、折射也看得出来，
-    // 但整屏读作"被划了两道"，像漏光而不像玻璃。结构与美感在这里是冲突的，取柔。
-    val bandColor = accent.copy(alpha = PopGlass.FieldBandAlpha * 0.55f)
-    val bandCenterY = h * 0.235f
-    val bandHeight = 132.dp.toPx()
-    val bandWidth = w * 2f
-    val bandBrush = Brush.verticalGradient(
-        0f to bandColor.copy(alpha = 0f),
-        0.26f to bandColor.copy(alpha = bandColor.alpha * 0.34f),
-        0.44f to bandColor,
-        0.56f to bandColor,
-        0.74f to bandColor.copy(alpha = bandColor.alpha * 0.34f),
-        1f to bandColor.copy(alpha = 0f),
-    )
-    rotate(degrees = -27f, pivot = Offset(w / 2f, bandCenterY)) {
-        drawRect(
-            brush = bandBrush,
-            topLeft = Offset(w / 2f - bandWidth / 2f, bandCenterY - bandHeight / 2f),
-            size = Size(bandWidth, bandHeight),
-        )
-    }
+    // 比"一条柔光"多花不了几行，但决定了整块玻璃成不成立。色带的边是软的（十几 dp
+    // 的过渡），却**有位置**：玻璃压上去，那条边会被折断、错开、变陡 —— 眼睛就是靠
+    // 这个判断"中间隔了一层东西"。一路柔到底的渐变位移过去前后一样，弯了也看不出来。
+    drawBands(accent, w, h)
 
     drawFieldArcs(arcInk, w, h)
-    drawWeave(w, h, PopGlass.WeaveSpacing.toPx(), PopGlass.WeaveStroke.toPx())
+    drawBokeh(w, h)
+    drawWeave(w, h, arcInk, PopGlass.WeaveSpacing.toPx(), PopGlass.WeaveStroke.toPx())
     drawRect(grain)
 }
+
+/**
+ * 斜向色带。
+ *
+ * 角度之间刻意差得远（-27° / 38°），宽度也不同 —— 三条同向的带会连成一整片，
+ * 三条等宽正交的带会读作格子布。宽度和色相都错开，才是"光穿过有色玻璃"的样子。
+ */
+private fun DrawScope.drawBands(accent: Color, w: Float, h: Float) {
+    val bands = listOf(
+        BandSpec(-27f, 0.20f, 168f, accent, PopGlass.FieldBandAlpha),
+        BandSpec(-27f, 0.66f, 96f, Color(0xFF7FA6FF), PopGlass.FieldBandAlpha * 0.62f),
+        BandSpec(38f, 0.46f, 132f, Color(0xFF8FD6C8), PopGlass.FieldBandAlpha * 0.52f),
+    )
+    bands.forEach { band ->
+        val thickness = band.thickness.dp.toPx()
+        val cy = band.cy * h
+        val color = band.color.copy(alpha = band.alpha)
+        // 实心段只占 6%，两侧各 7% 过渡 —— 边界可辨但不硬。
+        val brush = Brush.verticalGradient(
+            0f to Color.Transparent,
+            0.40f to Color.Transparent,
+            0.47f to color,
+            0.53f to color,
+            0.60f to Color.Transparent,
+            1f to Color.Transparent,
+        )
+        rotate(band.degrees, pivot = Offset(w / 2f, cy)) {
+            drawRect(
+                brush = brush,
+                topLeft = Offset(w / 2f - w, cy - thickness / 2f),
+                size = Size(w * 2f, thickness),
+            )
+        }
+    }
+}
+
+private data class BandSpec(
+    val degrees: Float,
+    val cy: Float,
+    val thickness: Float,
+    val color: Color,
+    val alpha: Float,
+)
+
+/**
+ * 光斑（bokeh）。
+ *
+ * 背景原来只有低频色团，玻璃压上去前后几乎没有差别 —— 这是"不通透"的真正原因：
+ * 不是玻璃不够透，是**背后没有东西可透**。
+ *
+ * 色团是平滑渐变，被位移之后前后完全一样；光斑不同，它有一个相对实的核心和一圈
+ * 干净的边，玻璃把它推开时，那个圆的形状会被拉长、缺口、错位 —— 一眼就能看出
+ * "中间隔了一层东西"。这是整屏里唯一能证明折射存在的结构（另一个是织纹）。
+ *
+ * 为什么用固定位置而不是随机：随机每次截图都不同，Paparazzi 会变成噪声对比，
+ * 而且卡片压在哪完全不可控。这五个位置是挑过的 —— 四角各一个保证卡片边界外
+ * 总有光斑，中间那个给正文背后一点透光。
+ */
+private fun DrawScope.drawBokeh(w: Float, h: Float) {
+    // (cx, cy, 半径相对宽度, 颜色, 核心透明度)
+    val spots = listOf(
+        BokehSpec(0.14f, 0.13f, 0.20f, Color(0xFFFFE3D2), 0.22f),
+        BokehSpec(0.92f, 0.22f, 0.24f, Color(0xFFD8E4FF), 0.20f),
+        BokehSpec(0.06f, 0.52f, 0.18f, Color(0xFFCDEFE4), 0.18f),
+        BokehSpec(0.86f, 0.63f, 0.22f, Color(0xFFFFD9E6), 0.16f),
+        BokehSpec(0.30f, 0.90f, 0.26f, Color(0xFFE6DCFF), 0.18f),
+        BokehSpec(0.66f, 0.78f, 0.14f, Color(0xFFFFF0CC), 0.20f),
+    )
+    spots.forEach { spot ->
+        val center = Offset(spot.cx * w, spot.cy * h)
+        val radius = spot.radius * w
+        // 核心一直实到 0.62 才开始衰减：边界越"硬"，被折射推开时越看得见。
+        // 一路柔到底的渐变是雾，不是光斑。
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to spot.color.copy(alpha = spot.alpha),
+                0.62f to spot.color.copy(alpha = spot.alpha * 0.88f),
+                1f to spot.color.copy(alpha = 0f),
+                center = center,
+                radius = radius,
+            ),
+            radius = radius,
+            center = center,
+        )
+    }
+}
+
+private data class BokehSpec(
+    val cx: Float,
+    val cy: Float,
+    val radius: Float,
+    val color: Color,
+    val alpha: Float,
+)
 
 /**
  * 右上角外的同心弧。
@@ -200,21 +279,33 @@ private fun DrawScope.drawFieldArcs(ink: Color, w: Float, h: Float) {
  * 试过双向正交（菱形格），瞬间整屏读作"格子布"，把玻璃彻底压成了背景上的印花。
  * 单向就够了 —— 折射错位的可见性来自线段本身的中断，不来自交叉。
  *
+ * 一组线画两遍：深色（墨 5%）压在白色（22%）上，错开半个线宽。
+ * 只画白色时，浅色背景上几乎看不见 —— 而浅色恰好是这个主题的主调；
+ * 只画深色时，深色区域又会把线吃掉。一深一浅叠着，无论背景明暗都有参照。
+ *
  * 角度取 -27°：与那条斜向光带同向，两者的走向叠在一起，线条不显得突兀。
  */
-private fun DrawScope.drawWeave(w: Float, h: Float, spacing: Float, stroke: Float) {
+private fun DrawScope.drawWeave(
+    w: Float,
+    h: Float,
+    ink: Color,
+    spacing: Float,
+    stroke: Float,
+) {
     if (spacing <= 0f) return
-    val color = Color.White.copy(alpha = PopGlass.WeaveAlpha)
     // 旋转之后要盖住整个屏幕，线段长度按对角线给
     val half = hypot(w, h)
+    val light = Color.White.copy(alpha = PopGlass.WeaveAlpha)
+    val dark = ink.copy(alpha = PopGlass.WeaveInkAlpha)
     rotate(-27f) {
         var y = -half
         while (y <= half) {
+            drawLine(color = light, start = Offset(-half, y), end = Offset(half, y), strokeWidth = stroke)
             drawLine(
-                color = color,
-                start = Offset(-half, y),
-                end = Offset(half, y),
-                strokeWidth = stroke,
+                color = dark,
+                start = Offset(-half, y + stroke * 0.5f),
+                end = Offset(half, y + stroke * 0.5f),
+                strokeWidth = stroke * 0.6f,
             )
             y += spacing
         }

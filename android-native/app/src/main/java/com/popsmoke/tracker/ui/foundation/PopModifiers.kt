@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -15,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.PopGlass
 
 /**
  * 描边：**占尺寸**的边，语义等同 CSS 的 `border` + `box-sizing: border-box`。
@@ -94,12 +96,45 @@ fun Modifier.popShadow(
 }
 
 /**
- * 柔和投影：复用 PopSurface 里的两层层叠实现，避免两处各写一份导致观感不一致。
+ * 柔和投影：走 AGSL 的 SDF 阴影，和 [skinSurface] 用的是同一个实现，避免两处观感不一致。
+ *
+ * 形状、圆角、偏移全部与内容同源 —— 只要投影不是内容的"同形平移"，读起来就是投影挪了位。
  */
 fun Modifier.softShadow(
     lift: Dp,
     shape: Shape,
     color: Color = Color.Black,
 ): Modifier = drawBehind {
-    drawSoftShadow(shape.createOutline(size, layoutDirection, this), color, lift)
+    val blur = ShadowDefaults.blur(this)
+    val spread = ShadowDefaults.spread(this)
+    if (!drawSoftShadow(shape, blur, lift.toPx(), spread, PopGlass.ShadowAlpha, color)) {
+        // 没有 AGSL 的环境：一层同形外扩，不加任何方向性的不对称
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val grow = spread + blur * 0.28f
+        val d = lift.toPx()
+        translate(left = 0f, top = d) {
+            when (outline) {
+                is Outline.Rectangle -> drawRect(
+                    color = color.copy(alpha = PopGlass.ShadowAlpha),
+                    topLeft = Offset(outline.rect.left - grow, outline.rect.top - grow),
+                    size = Size(outline.rect.width + grow * 2, outline.rect.height + grow * 2),
+                )
+
+                is Outline.Rounded -> {
+                    val rect = outline.roundRect
+                    drawRoundRect(
+                        color = color.copy(alpha = PopGlass.ShadowAlpha),
+                        topLeft = Offset(rect.left - grow, rect.top - grow),
+                        size = Size(rect.width + grow * 2, rect.height + grow * 2),
+                        cornerRadius = CornerRadius(
+                            rect.topLeftCornerRadius.x + grow,
+                            rect.topLeftCornerRadius.y + grow,
+                        ),
+                    )
+                }
+
+                is Outline.Generic -> Unit
+            }
+        }
+    }
 }
