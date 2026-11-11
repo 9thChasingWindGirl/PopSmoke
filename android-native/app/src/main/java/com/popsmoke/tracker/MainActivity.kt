@@ -10,6 +10,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.popsmoke.tracker.design.PopTheme
+import com.popsmoke.tracker.design.PopThemeStyle
 import com.popsmoke.tracker.design.toPopColor
 import com.popsmoke.tracker.feature.PopViewModel
 
@@ -30,7 +31,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val ui by viewModel.ui.collectAsStateWithLifecycle()
 
-            PopTheme(accent = ui.settings.themeColor.toPopColor()) {
+            PopTheme(
+                accent = ui.settings.themeColor.toPopColor(),
+                style = PopThemeStyle.fromId(ui.settings.themeStyle),
+            ) {
                 PopApp(
                     ui = ui,
                     actions = PopActions(
@@ -41,6 +45,7 @@ class MainActivity : ComponentActivity() {
                         onClearOpLogs = viewModel::clearOpLogs,
                         onSetLanguage = viewModel::setLanguage,
                         onSetThemeColor = viewModel::setThemeColor,
+                        onSetThemeStyle = viewModel::setThemeStyle,
                         onSetDailyLimit = viewModel::setDailyLimit,
                         onSetWarningLimit = viewModel::setWarningLimit,
                         onImportBackup = viewModel::importBackup,

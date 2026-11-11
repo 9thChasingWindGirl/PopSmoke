@@ -33,6 +33,12 @@ import com.popsmoke.tracker.ui.atoms.PopInput
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import androidx.compose.ui.graphics.Color
 
 /**
  * 设置页的「云端账户」区块（Supabase）。
@@ -77,7 +83,7 @@ fun AccountSection(
                     text = strings.cloudNotConfigured,
                     size = PopTypeScale.Sm,
                     weight = FontWeight.Bold,
-                    color = PopColor.Neutral.Gray600,
+                    color = popInkSecondary,
                     maxLines = 3,
                 )
                 PopButton(
@@ -92,7 +98,7 @@ fun AccountSection(
                     text = strings.cloudAccountHint,
                     size = PopTypeScale.Sm,
                     weight = FontWeight.Bold,
-                    color = PopColor.Neutral.Gray600,
+                    color = popInkSecondary,
                     maxLines = 3,
                 )
                 PopInput(
@@ -131,8 +137,8 @@ fun AccountSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PopColor.Neutral.Gray100)
-                        .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                        .background(popSurfaceDeep)
+                        .popBorder(PopStroke.Thin, popInk)
                         .padding(PopSpace.S3),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -146,14 +152,14 @@ fun AccountSection(
                     Box(
                         Modifier
                             .background(PopColor.Status.Success)
-                            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                            .popBorder(PopStroke.Thin, popInk)
                             .padding(horizontal = PopSpace.S2, vertical = 2.dp),
                     ) {
                         PopDisplay(
                             text = strings.signedInAs.uppercase(),
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Black,
-                            color = PopColor.Core.White,
+                            color = Color.White,
                             maxLines = 1,
                         )
                     }
@@ -164,7 +170,7 @@ fun AccountSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                        .popBorder(PopStroke.Thin, popInk)
                         .padding(PopSpace.S2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -177,7 +183,7 @@ fun AccountSection(
                             },
                             size = PopTypeScale.Sm,
                             weight = FontWeight.Black,
-                            color = if (cloud.hasFailedOp) PopColor.Status.Error else PopColor.Core.Black,
+                            color = if (cloud.hasFailedOp) PopColor.Status.Error else popInk,
                             maxLines = 1,
                         )
                         PopBody(
@@ -188,7 +194,7 @@ fun AccountSection(
                             },
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Bold,
-                            color = PopColor.Neutral.Gray500,
+                            color = popInkMuted,
                             maxLines = 2,
                         )
                     }
@@ -232,7 +238,7 @@ fun AccountSection(
                 text = strings.cloudSyncing,
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray500,
+                color = popInkMuted,
                 maxLines = 1,
             )
         }
@@ -253,7 +259,7 @@ internal fun NoticeBand(text: String, isError: Boolean, onClose: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .background(if (isError) PopColor.Neutral.Red200 else PopColor.Status.SuccessLight)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .popBorder(PopStroke.Thin, popInk)
             .padding(PopSpace.S2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -262,7 +268,7 @@ internal fun NoticeBand(text: String, isError: Boolean, onClose: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Bold,
-                color = PopColor.Core.Black,
+                color = popInk,
                 maxLines = 4,
             )
             PopDisplay(

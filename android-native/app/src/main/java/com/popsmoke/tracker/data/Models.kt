@@ -10,6 +10,14 @@ data class SmokeLog(
 data class AppSettings(
     val language: String = "en",
     val themeColor: String = "#F97316",
+    /**
+     * 视觉语言：liquid（液态玻璃，默认）/ pop（波普漫画）。
+     *
+     * 存 id 字符串而不是枚举：这个字段会写进备份文件和云端 app_settings，
+     * 将来增删主题时，旧数据里出现未知值必须能被安静地忽略（PopThemeStyle.fromId 会退回默认），
+     * 而不是让 JSON 解析整个失败、把用户的记录一起赔进去。
+     */
+    val themeStyle: String = "liquid",
     val dailyLimit: Int = 10,
     val warningLimit: Int = 5,
 )

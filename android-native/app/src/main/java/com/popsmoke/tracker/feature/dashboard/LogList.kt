@@ -34,6 +34,13 @@ import com.popsmoke.tracker.ui.foundation.PopIcon
 import com.popsmoke.tracker.ui.foundation.PopIconKind
 import com.popsmoke.tracker.ui.foundation.PopTapTarget
 import com.popsmoke.tracker.ui.foundation.popShadow
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import com.popsmoke.tracker.ui.foundation.skinSurface
 
 /**
  * 今日记录列表。注意两处与 Web 的差异，都是原生该做对的事：
@@ -78,13 +85,29 @@ private fun LogRow(
     onDelete: () -> Unit,
 ) {
     val part = dayPartOf(log.timestamp)
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    val rowShape = androidx.compose.foundation.shape.RoundedCornerShape(current.radiusField)
+    val blockShape = androidx.compose.foundation.shape.RoundedCornerShape(current.radiusChip * 0.72f)
+    // 玻璃下每一行都是一小片玻璃：白色细边 + 柔和落影；波普仍是"纸片 + 硬描边"
+    val blockBorder = if (current.glass) {
+        1.dp to Color.White.copy(alpha = 0.62f)
+    } else {
+        PopStroke.Thin to popInk
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .popShadow(PopShadow.ListItem, color = PopColor.Core.Black.copy(alpha = 0.1f))
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .then(
+                if (current.glass) {
+                    Modifier.skinSurface(current, rowShape, popSurface, lift = 8.dp)
+                } else {
+                    Modifier
+                        .popShadow(PopShadow.ListItem, color = popInk.copy(alpha = 0.1f))
+                        .background(popSurface)
+                        .popBorder(PopStroke.Thin, popInk)
+                },
+            )
             .padding(PopSpace.S3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -97,8 +120,9 @@ private fun LogRow(
             Box(
                 modifier = Modifier
                     .size(PopSpace.S10)
-                    .background(accent.copy(alpha = 0.19f))
-                    .border(PopStroke.Thin, PopColor.Core.Black),
+                    .clip(blockShape)
+                    .background(accent.copy(alpha = if (current.glass) 0.24f else 0.19f))
+                    .border(blockBorder.first, blockBorder.second, blockShape),
                 contentAlignment = Alignment.Center,
             ) {
                 PopBody(part.icon, size = PopTypeScale.Lg, weight = FontWeight.Normal)
@@ -114,7 +138,7 @@ private fun LogRow(
                     text = formatClock(log.timestamp, language),
                     size = PopTypeScale.Xs,
                     weight = FontWeight.Normal,
-                    color = PopColor.Neutral.Gray500,
+                    color = popInkMuted,
                 )
             }
         }
@@ -124,7 +148,7 @@ private fun LogRow(
                 text = "#${log.recordIndex}",
                 size = PopTypeScale.Base,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray600,
+                color = popInkSecondary,
             )
             // 编辑键：Web 是 28px 的黄底铅笔，这里视觉同为 24.5dp、触摸补到 48dp。
             // 两个小键之间不再加间距 —— 48dp 触摸区本身已经有足够的间隔。
@@ -132,8 +156,9 @@ private fun LogRow(
                 Box(
                     modifier = Modifier
                         .size(PopSpace.S7)
-                        .background(PopColor.Neutral.Yellow200)
-                        .border(PopStroke.Thin, PopColor.Core.Black),
+                        .clip(blockShape)
+                        .background(PopColor.Neutral.Yellow200.copy(alpha = if (current.glass) 0.9f else 1f))
+                        .border(blockBorder.first, blockBorder.second, blockShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     PopIcon(PopIconKind.Pencil, size = PopSpace.S4)
@@ -143,8 +168,9 @@ private fun LogRow(
                 Box(
                     modifier = Modifier
                         .size(PopSpace.S7)
-                        .background(PopColor.Neutral.Red200)
-                        .border(PopStroke.Thin, PopColor.Core.Black),
+                        .clip(blockShape)
+                        .background(PopColor.Neutral.Red200.copy(alpha = if (current.glass) 0.9f else 1f))
+                        .border(blockBorder.first, blockBorder.second, blockShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     PopIcon(PopIconKind.Trash, size = PopSpace.S4)

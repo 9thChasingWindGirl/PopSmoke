@@ -1,6 +1,12 @@
 package com.popsmoke.tracker
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +29,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import com.popsmoke.tracker.data.Languages
 import com.popsmoke.tracker.data.SmokeLog
 import com.popsmoke.tracker.data.StoreState
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopPresets
 import com.popsmoke.tracker.design.toHexString
@@ -40,6 +47,7 @@ import com.popsmoke.tracker.ui.atoms.PopDialog
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopTopBar
+import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
 
 /** 所有会改数据的动作集中在一个数据类里，页面只声明"我能做什么"，不持有 ViewModel。 */
@@ -51,6 +59,7 @@ data class PopActions(
     val onClearOpLogs: () -> Unit = {},
     val onSetLanguage: (String) -> Unit = {},
     val onSetThemeColor: (String) -> Unit = {},
+    val onSetThemeStyle: (String) -> Unit = {},
     val onSetDailyLimit: (Int) -> Unit = {},
     val onSetWarningLimit: (Int) -> Unit = {},
     val onImportBackup: (StoreState, Boolean) -> Unit = { _, _ -> },
@@ -116,8 +125,16 @@ fun PopApp(
 
     BackHandler(enabled = tab != PopTab.Tracker) { tabIndex = 0 }
 
-    Box(Modifier.fillMaxSize().background(PopColor.Core.Canvas)) {
-        PopDotGrid(Modifier.matchParentSize())
+    // 背景由皮肤决定：波普是纸面点阵，玻璃是极光光斑。
+    // 玻璃面板是半透明的，背后必须有东西可透，否则整套"通透"就塌成浅灰圆角。
+    val current = LocalSkin.current
+    val glass = current.glass
+    Box(Modifier.fillMaxSize().background(current.palette.canvas)) {
+        if (current.glass) {
+            PopAurora(Modifier.matchParentSize(), accent = ui.dashboard.accent)
+        } else {
+            PopDotGrid(Modifier.matchParentSize())
+        }
 
         Column(Modifier.fillMaxSize()) {
             PopTopBar(
@@ -135,7 +152,26 @@ fun PopApp(
             )
 
             Box(Modifier.weight(1f)) {
-                when (tab) {
+                // 页签切换：淡入 + 极轻微放大。波普主题下时长更短——
+                // 贴纸不该有"飘进来"的缓动，那会让它看起来像塑料。
+                AnimatedContent(
+                    targetState = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        // transitionSpec 不是 composable，皮肤要在外面先取好
+                        val enterSpec = if (glass) {
+                            tween<Float>(durationMillis = 260, delayMillis = 40)
+                        } else {
+                            tween<Float>(durationMillis = 120)
+                        }
+                        (fadeIn(enterSpec) + scaleIn(
+                            initialScale = if (glass) 0.97f else 1f,
+                            animationSpec = enterSpec,
+                        )) togetherWith fadeOut(tween(if (glass) 150 else 80))
+                    },
+                    label = "tab-switch",
+                ) { activeTab ->
+                when (activeTab) {
                     PopTab.Tracker -> DashboardScreen(
                         ui = ui.dashboard,
                         strings = strings,
@@ -193,6 +229,7 @@ fun PopApp(
                         opLogs = ui.opLogs,
                         onSetLanguage = actions.onSetLanguage,
                         onSetThemeColor = actions.onSetThemeColor,
+                        onSetThemeStyle = actions.onSetThemeStyle,
                         onSetDailyLimit = actions.onSetDailyLimit,
                         onSetWarningLimit = actions.onSetWarningLimit,
                         onClearLogs = actions.onClearLogs,
@@ -210,6 +247,7 @@ fun PopApp(
                         onDismissNotice = actions.onDismissNotice,
                         modifier = Modifier.fillMaxSize(),
                     )
+                }
                 }
             }
 

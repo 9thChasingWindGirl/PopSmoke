@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -22,6 +23,9 @@ import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import kotlin.math.roundToInt
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popSurface
 
 /**
  * 单值滑块：灰底轨道 + 主题色进度 + 黑色方形滑块。
@@ -41,6 +45,7 @@ fun PopSlider(
     max: Int = 50,
     enabled: Boolean = true,
 ) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
     val span = (max - min).coerceAtLeast(1)
     val fraction = ((value - min).toFloat() / span).coerceIn(0f, 1f)
     val thumb = PopSpace.S5
@@ -77,17 +82,25 @@ fun PopSlider(
                 },
         )
 
-        // 轨道
+        // 玻璃下轨道是"凹槽"：更细、更透，不加黑边；波普保持方块 + 描边
+        val trackShape = if (current.glass) {
+            androidx.compose.foundation.shape.RoundedCornerShape(percent = 50)
+        } else {
+            androidx.compose.foundation.shape.RoundedCornerShape(PopSpace.S1)
+        }
+        val trackFill = if (current.glass) popInk.copy(alpha = 0.1f) else popHairline
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(trackHeight)
                 .align(Alignment.CenterStart)
-                .background(PopColor.Neutral.Gray200, androidx.compose.foundation.shape.RoundedCornerShape(PopSpace.S1))
-                .border(
-                    PopStroke.Thin,
-                    PopColor.Core.Black,
-                    androidx.compose.foundation.shape.RoundedCornerShape(PopSpace.S1),
+                .background(trackFill, trackShape)
+                .then(
+                    if (current.glass) {
+                        Modifier
+                    } else {
+                        Modifier.border(PopStroke.Thin, popInk, trackShape)
+                    },
                 ),
         )
 
@@ -98,8 +111,17 @@ fun PopSlider(
                 .fillMaxWidth(fraction)
                 .align(Alignment.CenterStart)
                 .background(
-                    com.popsmoke.tracker.design.accent,
-                    androidx.compose.foundation.shape.RoundedCornerShape(PopSpace.S1),
+                    brush = if (current.glass) {
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(
+                                com.popsmoke.tracker.design.accent.copy(alpha = 0.72f),
+                                com.popsmoke.tracker.design.accent,
+                            ),
+                        )
+                    } else {
+                        androidx.compose.ui.graphics.SolidColor(com.popsmoke.tracker.design.accent)
+                    },
+                    shape = trackShape,
                 ),
         )
 
@@ -108,9 +130,18 @@ fun PopSlider(
             Modifier
                 .align(Alignment.CenterStart)
                 .offset { androidx.compose.ui.unit.IntOffset((usable * fraction).roundToInt(), 0) }
-                .size(thumb)
-                .background(PopColor.Core.White)
-                .border(PopStroke.Thin, PopColor.Core.Black),
+                .then(if (current.glass) Modifier.size(PopSpace.S6) else Modifier.size(thumb))
+                .background(
+                    if (current.glass) Color.White.copy(alpha = 0.94f) else popSurface,
+                    androidx.compose.foundation.shape.CircleShape,
+                )
+                .then(
+                    if (current.glass) {
+                        Modifier.border(1.dp, Color.White, androidx.compose.foundation.shape.CircleShape)
+                    } else {
+                        Modifier.border(PopStroke.Thin, popInk)
+                    },
+                ),
         )
     }
 }

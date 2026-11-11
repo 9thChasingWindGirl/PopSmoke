@@ -1,6 +1,7 @@
 package com.popsmoke.tracker.feature.history
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
@@ -57,6 +60,14 @@ import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
 import com.popsmoke.tracker.ui.foundation.popShadow
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import com.popsmoke.tracker.ui.foundation.skinSurface
+import androidx.compose.ui.graphics.Color
 
 /**
  * 历史页：筛选 + 「月 → 日 → 单条」三级展开 + 统计。
@@ -116,7 +127,7 @@ fun HistoryScreen(
                         modifier = Modifier.fillMaxWidth(),
                         size = PopTypeScale.Base,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray700,
+                        color = popInkSecondary,
                         textAlign = TextAlign.Center,
                         maxLines = 3,
                     )
@@ -149,6 +160,7 @@ fun HistoryScreen(
 
 @Composable
 private fun HistoryHeader(strings: PopStrings, total: Int) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -162,9 +174,17 @@ private fun HistoryHeader(strings: PopStrings, total: Int) {
         Box(Modifier.size(PopSpace.S2))
         Row(
             Modifier
-                .graphicsLayer { rotationZ = 1f }
-                .background(PopColor.Core.White)
-                .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                // 玻璃下不旋转：歪斜和高光方向打架（同 PopCard 标题标签的处理）
+                .graphicsLayer { rotationZ = if (current.glass) 0f else 1f }
+                .then(
+                    if (current.glass) {
+                        Modifier
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(current.palette.surfaceDeep)
+                    } else {
+                        Modifier.background(popSurface).popBorder(PopStroke.Thin, popInk)
+                    },
+                )
                 .padding(horizontal = PopSpace.S3, vertical = PopSpace.S1),
         ) {
             PopBody(
@@ -283,12 +303,30 @@ private fun FieldLabel(text: String) {
 
 @Composable
 private fun SortButton(text: String, active: Boolean, arrow: String, onClick: () -> Unit) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    // 玻璃下两个排序键是一枚分段控件：选中项染主题色，未选中项是透明玻璃
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(
+        if (current.glass) current.radiusButton else androidx.compose.ui.unit.Dp(0f),
+    )
     Box(
         Modifier
             .fillMaxWidth()
-            .popShadow(PopShadow.Pop)
-            .background(if (active) accent else PopColor.Neutral.Gray200)
-            .popBorder(PopStroke.Default, PopColor.Core.Black)
+            .then(
+                if (current.glass) {
+                    Modifier.skinSurface(
+                        current = current,
+                        shape = shape,
+                        fill = if (active) accent.copy(alpha = 0.85f) else popSurface,
+                        lift = 8.dp,
+                        tint = if (active) accent else Color.Transparent,
+                    )
+                } else {
+                    Modifier
+                        .popShadow(PopShadow.Pop)
+                        .background(if (active) accent else popHairline)
+                        .popBorder(PopStroke.Default, popInk)
+                },
+            )
             .clickable(onClick = onClick)
             .padding(vertical = PopSpace.S3),
         contentAlignment = Alignment.Center,
@@ -297,8 +335,8 @@ private fun SortButton(text: String, active: Boolean, arrow: String, onClick: ()
             text = text + arrow,
             size = PopTypeScale.Sm,
             weight = FontWeight.Black,
-            color = if (active) onAccent else PopColor.Core.Black,
-            uppercase = true,
+            color = if (active) onAccent else popInk,
+            uppercase = !current.glass,
             maxLines = 1,
         )
     }
@@ -314,15 +352,23 @@ private fun MonthCard(
     onToggleMonth: () -> Unit,
     onToggleDay: (java.time.LocalDate) -> Unit,
 ) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
     PopCard(
         modifier = Modifier.fillMaxWidth(),
         padding = PaddingValues(0.dp),
     ) {
+        // 内容整体裁到卡片圆角里：月标题是整宽的 popSurfaceDeep 底色，
+        // 不裁的话它的直角会从玻璃卡片的圆角边上探出去四个小尖角。
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(current.radiusCard)),
+        ) {
         // 月标题：灰底 + 底部 2dp 分隔线
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Neutral.Gray100)
+                .background(popSurfaceDeep)
                 .clickable(onClick = onToggleMonth)
                 .padding(PopSpace.S3),
             verticalAlignment = Alignment.CenterVertically,
@@ -334,7 +380,7 @@ private fun MonthCard(
                     text = "▶",
                     size = PopTypeScale.Sm,
                     weight = FontWeight.Black,
-                    color = PopColor.Neutral.Gray600,
+                    color = popInkSecondary,
                 )
             }
             Box(Modifier.size(PopSpace.S2))
@@ -347,9 +393,17 @@ private fun MonthCard(
             )
             Box(
                 Modifier
-                    .graphicsLayer { rotationZ = -2f }
-                    .background(accent)
-                    .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                    .graphicsLayer { rotationZ = if (current.glass) 0f else -2f }
+                    .then(
+                        if (current.glass) {
+                            Modifier
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(accent)
+                                .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(percent = 50))
+                        } else {
+                            Modifier.background(accent).popBorder(PopStroke.Thin, popInk)
+                        },
+                    )
                     .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1),
             ) {
                 PopDisplay(
@@ -366,7 +420,7 @@ private fun MonthCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(PopColor.Core.White)
+                    .background(popSurface)
                     .padding(PopSpace.S3),
                 verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
             ) {
@@ -380,6 +434,7 @@ private fun MonthCard(
                 }
             }
         }
+        }
     }
 }
 
@@ -390,12 +445,22 @@ private fun DayRow(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    val rowShape = RoundedCornerShape(if (current.glass) current.radiusField else 0.dp)
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .popShadow(PopShadow.ListItem, color = PopColor.Core.Black.copy(alpha = 0.12f))
-                .background(PopColor.Neutral.Gray100)
+                .then(
+                    if (current.glass) {
+                        Modifier
+                    } else {
+                        Modifier.popShadow(PopShadow.ListItem, color = popInk.copy(alpha = 0.12f))
+                    },
+                )
+                // 先裁圆角再画底色和左竖条：竖条会跟着圆角走，不会在左上角戳出一个方块
+                .clip(rowShape)
+                .background(if (current.glass) current.palette.surfaceDeep else popSurfaceDeep)
                 // Web 是 border-l-4：只有左边一条粗黑，不是四边
                 .drawLeftBar(PopStroke.Default)
                 .clickable(onClick = onToggle)
@@ -407,7 +472,7 @@ private fun DayRow(
                     text = "▶",
                     size = PopTypeScale.Xs,
                     weight = FontWeight.Black,
-                    color = PopColor.Neutral.Gray600,
+                    color = popInkSecondary,
                 )
             }
             Box(Modifier.size(PopSpace.S2))
@@ -420,9 +485,16 @@ private fun DayRow(
             )
             Box(
                 Modifier
-                    .graphicsLayer { rotationZ = 1f }
-                    .background(PopColor.Neutral.Yellow300)
-                    .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                    .graphicsLayer { rotationZ = if (current.glass) 0f else 1f }
+                    .then(
+                        if (current.glass) {
+                            Modifier
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(PopColor.Neutral.Yellow300)
+                        } else {
+                            Modifier.background(PopColor.Neutral.Yellow300).popBorder(PopStroke.Thin, popInk)
+                        },
+                    )
                     .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1),
             ) {
                 PopDisplay(
@@ -443,7 +515,8 @@ private fun DayRow(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(PopColor.Neutral.Gray100.copy(alpha = 0.6f))
+                            .clip(RoundedCornerShape(if (current.glass) current.radiusChip else 0.dp))
+                            .background(popSurfaceDeep.copy(alpha = 0.6f))
                             .drawLeftBar(PopStroke.Thin)
                             .padding(PopSpace.S2),
                         verticalAlignment = Alignment.CenterVertically,
@@ -459,7 +532,7 @@ private fun DayRow(
                             text = "ID: ${log.id.take(8)}…",
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Bold,
-                            color = PopColor.Neutral.Gray500,
+                            color = popInkMuted,
                             maxLines = 1,
                         )
                     }
@@ -469,12 +542,22 @@ private fun DayRow(
     }
 }
 
-/** 左侧竖条：对应 CSS 的 `border-l-4` / `border-l-2`。 */
-private fun Modifier.drawLeftBar(width: Dp): Modifier =
-    this.drawBehind {
-        val w = width.toPx()
-        drawRect(color = PopColor.Core.Black, size = Size(w, size.height))
-    }.padding(start = width)
+/**
+ * 左侧竖条：对应 CSS 的 `border-l-4` / `border-l-2`。
+ *
+ * 玻璃下退成一枚主题色细条 —— 它承担"这是同一天的记录"这个分组信息，
+ * 不能直接删掉，但 4dp 纯黑在这里会立刻把磨砂面切成两块。
+ */
+@Composable
+private fun Modifier.drawLeftBar(width: Dp): Modifier {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    val barColor = if (current.glass) accent.copy(alpha = 0.7f) else popInk
+    val barWidth = if (current.glass) 3.dp else width
+    return this.drawBehind {
+        val w = barWidth.toPx()
+        drawRect(color = barColor, size = Size(w, size.height))
+    }.padding(start = barWidth)
+}
 
 @Composable
 private fun StatsCard(view: HistoryView, strings: PopStrings) {
@@ -519,7 +602,7 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
             text = label,
             size = PopTypeScale.Sm,
             weight = FontWeight.Bold,
-            color = PopColor.Neutral.Gray600,
+            color = popInkSecondary,
             maxLines = 2,
         )
         PopDisplay(

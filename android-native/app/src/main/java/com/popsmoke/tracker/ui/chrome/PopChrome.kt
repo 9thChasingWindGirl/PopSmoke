@@ -23,7 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,8 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.data.Languages
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
+import com.popsmoke.tracker.design.PopSkin
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTracking
@@ -77,14 +81,14 @@ fun PopTopBar(
 ) {
     var themeMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
+    val current = LocalSkin.current
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(PopColor.Core.White)
-            // border 必须在 windowInsets padding 之前：它要包住「含状态栏」的整块矩形，
-            // 放到里面就会变成"状态栏下方一条线"，顶上多出一段白边，看着像预留过高。
-            .border(PopStroke.Default, PopColor.Core.Black)
+            // 波普是白底 + 4dp 黑框（贴纸感的一部分，不能为了沉浸式去掉）；
+            // 玻璃是竖向渐变的半透明白 + 下沿一条发丝线，边缘不加黑框。
+            .chromeSurface(current, lineAtBottom = true)
             .padding(top = topInset)
             .heightIn(min = PopLayout.HeaderHeight)
             .padding(horizontal = PopSpace.S3),
@@ -129,7 +133,10 @@ fun PopTopBar(
                         Modifier
                             .size(PopLayout.Chip)
                             .background(accentColor)
-                            .border(PopStroke.Thin, PopColor.Core.Black),
+                            .border(
+                                if (current.glass) 1.dp else PopStroke.Thin,
+                                if (current.glass) Color.White.copy(alpha = 0.75f) else PopColor.Core.Black,
+                            ),
                     )
                 }
 
@@ -166,7 +173,22 @@ fun PopTopBar(
                     Box(
                         Modifier
                             .size(PopLayout.Chip)
-                            .border(PopStroke.Thin, PopColor.Core.Black),
+                            .then(
+                                if (current.glass) {
+                                    Modifier.background(
+                                        Color.White.copy(alpha = 0.55f),
+                                        androidx.compose.foundation.shape.CircleShape,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .border(
+                                if (current.glass) 1.dp else PopStroke.Thin,
+                                if (current.glass) Color.White.copy(alpha = 0.85f) else PopColor.Core.Black,
+                                androidx.compose.foundation.shape.CircleShape.takeIf { current.glass }
+                                    ?: androidx.compose.ui.graphics.RectangleShape,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         PopDisplay(
@@ -220,18 +242,15 @@ fun PopBottomBar(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val current = LocalSkin.current
+    val topLine = if (current.glass) 1.dp else PopStroke.Default
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(PopLayout.BottomBarHeight + bottomInset)
-            .background(PopColor.Core.White)
-            .drawBehind {
-                drawRect(
-                    color = PopColor.Core.Black,
-                    size = Size(size.width, PopStroke.Default.toPx()),
-                )
-            }
-            .padding(top = PopStroke.Default, bottom = bottomInset, start = PopSpace.S2, end = PopSpace.S2),
+            .chromeSurface(current, lineAtBottom = false)
+            .padding(top = topLine, bottom = bottomInset, start = PopSpace.S2, end = PopSpace.S2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PopSpace.S2),
     ) {
@@ -255,9 +274,39 @@ fun PopBottomBar(
                     size = PopTypeScale.Sm,
                     weight = FontWeight.Normal,
                     tracking = PopTracking.Wide,
-                    color = if (selected) PopColor.Core.Black else PopColor.Neutral.Gray400,
+                    color = if (selected) current.palette.ink else current.palette.inkMuted,
                 )
             }
         }
     }
 }
+
+/**
+ * 顶栏/底栏的底。
+ *
+ * 波普：纯白 + 4dp 黑框（框要包住含状态栏的整块矩形，放到 inset 里面会变成
+ * "状态栏下方一条线"，顶上多出一段白边，看着像预留过高）。
+ * 玻璃：竖向渐变的半透明白，让滚动到条下面的内容隐约透出来；
+ * 边界用一条发丝线收口，而不是黑框——磨砂条上加粗黑边会立刻回到波普味。
+ */
+private fun Modifier.chromeSurface(current: PopSkin, lineAtBottom: Boolean): Modifier =
+    if (current.glass) {
+        background(
+            Brush.verticalGradient(
+                // 导航条比卡片稍实一点，但要能透出背后的光，否则玻璃条会变成白漆条
+                listOf(
+                    current.palette.surfaceStrong.copy(alpha = 0.58f),
+                    current.palette.surfaceStrong.copy(alpha = 0.74f),
+                ),
+            ),
+        ).drawBehind {
+            val h = 1.dp.toPx()
+            drawRect(
+                color = current.palette.hairline,
+                topLeft = Offset(0f, if (lineAtBottom) size.height - h else 0f),
+                size = Size(size.width, h),
+            )
+        }
+    } else {
+        background(PopColor.Core.White).border(PopStroke.Default, PopColor.Core.Black)
+    }

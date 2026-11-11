@@ -31,17 +31,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.PopColor
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
+import com.popsmoke.tracker.design.accent
 import com.popsmoke.tracker.i18n.PopStrings
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popInverseInk
 
 /**
  * 时/分两列滚轮。
@@ -74,6 +81,7 @@ fun PopTimeWheel(
             // 选中高亮条：横贯两列（含中间的冒号），画在滚轮底下。
             // 宽度取 matchParentSize —— 也就是整行滚轮的实际宽度，而不是外层可用宽度：
             // 用 fillMaxWidth 会一路铺到弹窗边缘，右端比「分」列多出一截，视觉上像放歪了。
+            val wheelInk = popInk
             Box(
                 Modifier
                     .matchParentSize()
@@ -86,7 +94,7 @@ fun PopTimeWheel(
                             size = Size(size.width, row),
                         )
                         val line = PopStroke.Thin.toPx()
-                        val ink = PopColor.Core.Black.copy(alpha = 0.5f)
+                        val ink = wheelInk.copy(alpha = 0.5f)
                         drawRect(ink, topLeft = Offset(0f, top), size = Size(size.width, line))
                         drawRect(
                             ink,
@@ -159,10 +167,14 @@ private fun Wheel(
         modifier = Modifier
             .width(PopLayout.TimeWheelColumn)
             .height(PopLayout.TimeWheelHeight)
-            .background(PopColor.Core.White)
+            .background(popSurface)
             // 定死尺寸的盒子用 border 而不是 popBorder：描边在尺寸之内（等价 Web 的 border-box），
             // 行高才刚好等于吸附步长，选中行不会和视觉中线错开。
-            .border(PopStroke.Thin, PopColor.Core.Black),
+            // 所以这里只能手动跟随主题换色，不能换成 skinSurface（那会加 padding，打乱吸附）。
+            .border(
+                width = if (LocalSkin.current.glass) 1.dp else PopStroke.Thin,
+                color = if (LocalSkin.current.glass) LocalSkin.current.palette.hairline else popInk,
+            ),
         state = state,
         flingBehavior = fling,
         contentPadding = PaddingValues(vertical = (PopLayout.TimeWheelHeight - PopLayout.TimeWheelRow) / 2),
@@ -182,11 +194,23 @@ private fun Wheel(
 
 @Composable
 private fun WheelRow(value: Int, selected: Boolean, onClick: () -> Unit) {
+    val current = LocalSkin.current
+    val accentColor = accent
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(PopLayout.TimeWheelRow)
-            .then(if (selected) Modifier.background(PopColor.Core.Black) else Modifier)
+            .then(
+                if (selected) {
+                    // 玻璃下选中行是主题色淡染，不是反色块：滚轮里出现一块纯黑，
+                    // 会像一扇开着的窗，把后面的光全挡住了
+                    Modifier.background(
+                        if (current.glass) accentColor.copy(alpha = 0.18f) else current.palette.inverseSurface,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -194,7 +218,11 @@ private fun WheelRow(value: Int, selected: Boolean, onClick: () -> Unit) {
             text = value.toString().padStart(2, '0'),
             size = PopTypeScale.Xl,
             weight = if (selected) FontWeight.Black else FontWeight.Bold,
-            color = if (selected) PopColor.Core.White else PopColor.Neutral.Gray400,
+            color = when {
+                !selected -> popInkMuted
+                current.glass -> accentColor
+                else -> current.palette.inverseInk
+            },
             maxLines = 1,
         )
     }

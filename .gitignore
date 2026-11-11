@@ -50,3 +50,6 @@ figma-prototypes/
 # Test files (generated during development)
 __tests__/
 AGENTS.md
+
+# WorkBuddy 项目数据
+.workbuddy

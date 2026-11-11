@@ -46,6 +46,12 @@ import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
 import java.io.File
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import androidx.compose.ui.graphics.Color
 
 /**
  * API 配置页。
@@ -90,7 +96,7 @@ fun ApiScreen(
                         text = strings.syncDescription,
                         size = PopTypeScale.Sm,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray600,
+                        color = popInkSecondary,
                         maxLines = 4,
                     )
 
@@ -192,7 +198,7 @@ fun ApiScreen(
                         text = strings.feishuSyncHint,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray600,
+                        color = popInkSecondary,
                         maxLines = 3,
                     )
                     PopButton(
@@ -213,7 +219,7 @@ fun ApiScreen(
                             text = strings.cloudSyncing,
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Bold,
-                            color = PopColor.Neutral.Gray500,
+                            color = popInkMuted,
                             maxLines = 1,
                         )
                     }
@@ -241,7 +247,7 @@ fun ApiScreen(
                         text = strings.apiConfigRequired,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray500,
+                        color = popInkMuted,
                         maxLines = 3,
                     )
                 }
@@ -255,8 +261,8 @@ private fun StatusRow(label: String, configured: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PopColor.Neutral.Gray100)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .background(popSurfaceDeep)
+            .popBorder(PopStroke.Thin, popInk)
             .padding(PopSpace.S2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -270,14 +276,15 @@ private fun StatusRow(label: String, configured: Boolean) {
         Box(
             Modifier
                 .background(if (configured) PopColor.Status.Success else PopColor.Status.Danger)
-                .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                .popBorder(PopStroke.Thin, popInk)
                 .padding(horizontal = PopSpace.S2, vertical = 2.dp),
         ) {
             PopDisplay(
                 text = if (configured) "READY" else "EMPTY",
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Black,
-                color = PopColor.Core.White,
+                // 彩色标签上的字是纯白，不该跟着皮肤走（popSurface 是半透明的）
+                color = Color.White,
                 maxLines = 1,
             )
         }
@@ -292,7 +299,7 @@ private fun KeyValue(key: String, value: String) {
             modifier = Modifier.weight(1f),
             size = PopTypeScale.Xs,
             weight = FontWeight.Bold,
-            color = PopColor.Neutral.Gray600,
+            color = popInkSecondary,
             maxLines = 1,
         )
         PopDisplay(

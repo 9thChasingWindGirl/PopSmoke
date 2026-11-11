@@ -23,9 +23,12 @@ import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopMotion
 import com.popsmoke.tracker.design.PopTracking
+import com.popsmoke.tracker.design.popInk
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInkMuted
 
 /**
  * 半环仪表。这是 L3（平台无对应）组件里最典型的一个，必须自绘。
@@ -56,6 +59,12 @@ fun SemiCircleGauge(
     val strokeWidth = 15.dp
     val containerHeight = 105.dp
 
+    // 玻璃下轨道要更淡：中灰弧线压在磨砂面上会像一道划痕
+    val trackColor = if (com.popsmoke.tracker.design.LocalSkin.current.glass) {
+        popInk.copy(alpha = 0.07f)
+    } else {
+        popHairline
+    }
     Box(modifier.width(gaugeSize).height(containerHeight)) {
         Canvas(Modifier.fillMaxSize()) {
             val sw = strokeWidth.toPx()
@@ -66,7 +75,7 @@ fun SemiCircleGauge(
 
             // 底槽
             drawArc(
-                color = PopColor.Neutral.Gray200,
+                color = trackColor,
                 startAngle = 180f,
                 sweepAngle = 180f,
                 useCenter = false,
@@ -115,7 +124,7 @@ fun SemiCircleGauge(
                 text = label,
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray500,
+                color = popInkMuted,
                 tracking = PopTracking.Wider,
                 uppercase = true,
             )

@@ -117,6 +117,18 @@ class PopViewModel(
     }
 
     /**
+     * 切换视觉语言（液态玻璃 / 波普漫画）。
+     *
+     * 这一项**不进云端**：`app_settings` 表里没有 theme_style 列，往 payload 里塞一个
+     * 不存在的列会让 PostgREST 直接 400，把整个设置同步带崩——为了一个视觉偏好
+     * 赔掉配色和阈值的同步不值得。所以它只存本地，拉取/冲突解决时也保留本机选择。
+     * 将来表加了列再放开。
+     */
+    fun setThemeStyle(id: String) {
+        viewModelScope.launch { repository.updateSettings { it.copy(themeStyle = id) } }
+    }
+
+    /**
      * 每日上限与预警阈值是一对联动值：上限不能低于阈值。
      * Web 版在 onChange 里顺手把阈值一起压下来，这里保持同一语义。
      */
@@ -202,7 +214,10 @@ class PopViewModel(
                 if (remote == null) {
                     notice(CloudIssue.NoCloudSettings)
                 } else {
-                    repository.updateSettings { remote.toAppSettings() }
+                    // themeStyle 是本机偏好，云端拿不到，覆盖时保留本地值
+                    repository.updateSettings { local ->
+                        remote.toAppSettings().copy(themeStyle = local.themeStyle)
+                    }
                     _cloud.update { it.copy(notice = CloudNotice(CloudNoticeKind.SettingsPulled), conflict = null) }
                 }
             }
@@ -221,7 +236,9 @@ class PopViewModel(
         val remote = _cloud.value.conflict
         if (remote == null) return@launchCloud
         if (useCloud) {
-            repository.updateSettings { remote.toAppSettings() }
+            repository.updateSettings { local ->
+                remote.toAppSettings().copy(themeStyle = local.themeStyle)
+            }
             _cloud.update { it.copy(conflict = null, notice = CloudNotice(CloudNoticeKind.SettingsPulled)) }
         } else {
             when (val result = cloud.pushSettings(_ui.value.settings)) {

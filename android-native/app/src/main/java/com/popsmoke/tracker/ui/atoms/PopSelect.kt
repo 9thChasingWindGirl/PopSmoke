@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -33,6 +34,9 @@ import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popSurface
 
 /**
  * 选择器：触发器 + **就地展开**的选项列表。
@@ -51,13 +55,28 @@ fun PopSelect(
     leading: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    val fieldShape = androidx.compose.foundation.shape.RoundedCornerShape(current.radiusField)
+    // 玻璃下选中项不是"反色块"，而是主题色的淡染：整行变黑会像被挖掉一块
+    val selectedFill = if (current.glass) {
+        com.popsmoke.tracker.design.accent.copy(alpha = 0.16f)
+    } else {
+        popInk
+    }
+    val selectedInk = if (current.glass) com.popsmoke.tracker.design.accent else popSurface
+    val restingFill = if (current.glass) {
+        androidx.compose.ui.graphics.Color.Transparent
+    } else {
+        popSurface
+    }
 
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Core.White)
-                .popBorder(PopStroke.Default, PopColor.Core.Black)
+                .clip(fieldShape)
+                .background(popSurface)
+                .popBorder(PopStroke.Default, popInk, fieldShape)
                 .clickable { expanded = !expanded }
                 .semantics { role = Role.Button }
                 .padding(horizontal = PopSpace.S3, vertical = PopSpace.S3),
@@ -93,8 +112,11 @@ fun PopSelect(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = PopSpace.S1)
-                            .background(if (selected) PopColor.Core.Black else PopColor.Core.White)
-                            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+                            .clip(fieldShape)
+                            .background(if (selected) selectedFill else restingFill)
+                            .then(
+                                if (current.glass) Modifier else Modifier.popBorder(PopStroke.Thin, popInk, fieldShape),
+                            )
                             .clickable {
                                 onSelect(option.value)
                                 expanded = false
@@ -106,8 +128,13 @@ fun PopSelect(
                             Box(
                                 Modifier
                                     .size(PopSpace.S6)
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(current.radiusChip * 0.5f))
                                     .background(option.swatch)
-                                    .border(PopStroke.Thin, PopColor.Core.Black),
+                                    .border(
+                                        if (current.glass) 1.dp else PopStroke.Thin,
+                                        if (current.glass) Color.White.copy(alpha = 0.7f) else popInk,
+                                        androidx.compose.foundation.shape.RoundedCornerShape(current.radiusChip * 0.5f),
+                                    ),
                             )
                             Box(Modifier.size(PopSpace.S2))
                         }
@@ -116,7 +143,7 @@ fun PopSelect(
                             modifier = Modifier.weight(1f),
                             size = PopTypeScale.Base,
                             weight = FontWeight.Bold,
-                            color = if (selected) PopColor.Core.White else PopColor.Core.Black,
+                            color = if (selected) selectedInk else popInk,
                             maxLines = 1,
                         )
                         if (option.hint != null) {
@@ -124,7 +151,7 @@ fun PopSelect(
                                 text = option.hint,
                                 size = PopTypeScale.Xs,
                                 weight = FontWeight.Bold,
-                                color = if (selected) PopColor.Core.White else PopColor.Neutral.Gray500,
+                                color = if (selected) selectedInk else popInkMuted,
                                 maxLines = 1,
                             )
                         }

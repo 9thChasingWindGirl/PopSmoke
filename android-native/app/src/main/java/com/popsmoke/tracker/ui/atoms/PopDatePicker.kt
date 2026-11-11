@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,6 +29,7 @@ import com.popsmoke.tracker.data.formatMonthTitle
 import com.popsmoke.tracker.data.formatShortDate
 import com.popsmoke.tracker.data.localeOf
 import com.popsmoke.tracker.design.PopColor
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
@@ -32,6 +38,9 @@ import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popSurface
 
 /**
  * 日期选择：字段 + 月历弹窗。
@@ -54,12 +63,22 @@ fun PopDatePickerField(
     cancelText: String = "CANCEL",
 ) {
     var open by remember { mutableStateOf(false) }
+    val current = LocalSkin.current
+    val fieldShape = RoundedCornerShape(if (current.glass) current.radiusField else 0.dp)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Default, PopColor.Core.Black)
+            .clip(fieldShape)
+            .then(
+                if (current.glass) {
+                    Modifier
+                        .background(current.palette.surfaceDeep)
+                        .border(1.dp, current.palette.hairline, fieldShape)
+                } else {
+                    Modifier.background(popSurface).popBorder(PopStroke.Default, popInk)
+                },
+            )
             .clickable { open = true }
             .padding(horizontal = PopSpace.S3, vertical = PopSpace.S2),
         verticalAlignment = Alignment.CenterVertically,
@@ -69,7 +88,7 @@ fun PopDatePickerField(
             modifier = Modifier.weight(1f),
             size = PopTypeScale.Base,
             weight = FontWeight.Bold,
-            color = if (value == null) PopColor.Neutral.Gray400 else PopColor.Core.Black,
+            color = if (value == null) popInkMuted else popInk,
             maxLines = 1,
         )
         if (value != null) {
@@ -171,7 +190,7 @@ private fun CalendarDialog(
                     modifier = Modifier.weight(1f),
                     size = PopTypeScale.Xs,
                     weight = FontWeight.Black,
-                    color = PopColor.Neutral.Gray500,
+                    color = popInkMuted,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )
@@ -218,14 +237,33 @@ private fun DayCell(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val current = LocalSkin.current
+    val cellShape = RoundedCornerShape(if (current.glass) current.radiusChip else 0.dp)
     Box(
         modifier = modifier
             .padding(horizontal = 1.dp)
             .size(PopSpace.S10)
-            .background(if (selected) accent else PopColor.Core.White)
-            .border(
-                PopStroke.Thin,
-                if (isToday || selected) PopColor.Core.Black else PopColor.Neutral.Gray300,
+            .clip(cellShape)
+            .background(
+                when {
+                    selected -> accent
+                    current.glass -> Color.Transparent
+                    else -> popSurface
+                },
+            )
+            .then(
+                if (current.glass) {
+                    Modifier.border(
+                        1.dp,
+                        if (isToday) accent.copy(alpha = 0.85f) else Color.Transparent,
+                        cellShape,
+                    )
+                } else {
+                    Modifier.border(
+                        PopStroke.Thin,
+                        if (isToday || selected) popInk else PopColor.Neutral.Gray300,
+                    )
+                },
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -234,7 +272,7 @@ private fun DayCell(
             text = day.toString(),
             size = PopTypeScale.Sm,
             weight = if (selected || isToday) FontWeight.Black else FontWeight.Bold,
-            color = if (selected) com.popsmoke.tracker.design.onAccent else PopColor.Core.Black,
+            color = if (selected) com.popsmoke.tracker.design.onAccent else popInk,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
@@ -243,11 +281,20 @@ private fun DayCell(
 
 @Composable
 private fun NavSquare(glyph: String, onClick: () -> Unit) {
+    val current = LocalSkin.current
+    val shape = if (current.glass) CircleShape else RectangleShape
     Box(
         Modifier
             .size(PopSpace.S10)
-            .background(PopColor.Core.White)
-            .border(PopStroke.Thin, PopColor.Core.Black)
+            .clip(shape)
+            .background(if (current.glass) current.palette.surfaceDeep else popSurface)
+            .then(
+                if (current.glass) {
+                    Modifier.border(1.dp, current.palette.hairline, shape)
+                } else {
+                    Modifier.border(PopStroke.Thin, popInk)
+                },
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

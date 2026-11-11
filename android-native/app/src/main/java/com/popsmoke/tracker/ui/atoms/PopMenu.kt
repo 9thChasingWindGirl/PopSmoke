@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,15 +25,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.popsmoke.tracker.design.PopColor
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopShadow
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.foundation.PopDisplay
-import com.popsmoke.tracker.ui.foundation.popBorder
-import com.popsmoke.tracker.ui.foundation.popShadow
+import com.popsmoke.tracker.ui.foundation.skinSurface
 
 /**
  * 锚定浮层：贴在触发元素下方、**右边缘对齐**。
@@ -94,13 +94,17 @@ fun PopMenuPanel(
     padding: PaddingValues = PaddingValues(PopSpace.S3),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val current = LocalSkin.current
     Column(
         modifier
             .then(if (width != null) Modifier.width(width) else Modifier.widthIn(min = PopLayout.MenuMinWidth))
-            // 顺序与 PopCard 一致：阴影先画、底色后盖，反过来阴影会压住内容
-            .popShadow(PopShadow.PopLg)
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Default, PopColor.Core.Black)
+            // 与卡片同一套面板绘制，浮层不会是"另一套玻璃"
+            .skinSurface(
+                current = current,
+                shape = RoundedCornerShape(current.radiusPanel),
+                fill = current.palette.surfaceStrong,
+                lift = PopShadow.PopLg,
+            )
             .padding(padding),
         content = content,
     )
@@ -117,10 +121,14 @@ fun PopMenuItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val current = LocalSkin.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (selected) PopColor.Neutral.Gray200 else PopColor.Core.White)
+            .background(
+                if (selected) current.palette.surfaceDeep else androidx.compose.ui.graphics.Color.Transparent,
+                RoundedCornerShape(current.radiusChip),
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = PopSpace.S4, vertical = PopSpace.S2),
         verticalAlignment = Alignment.CenterVertically,

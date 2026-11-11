@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.popsmoke.tracker.design.skin
 
 enum class PopIconKind { Menu, Close, Plus, Trash, Pencil }
 
@@ -21,15 +22,17 @@ enum class PopIconKind { Menu, Close, Plus, Trash, Pencil }
 fun PopIcon(
     kind: PopIconKind,
     size: Dp,
-    color: Color = Color.Black,
+    color: Color = Color.Unspecified,
     strokeUnits: Float = 2f,
 ) {
+    // 与文字同一套回落：玻璃主题的墨色是 #16161A，图标用纯黑会显得比旁边文字更重
+    val actual = if (color == Color.Unspecified) skin.palette.ink else color
     Canvas(Modifier.size(size)) {
         val unit = this.size.minDimension / 24f
         val w = strokeUnits * unit
         fun p(x: Float, y: Float) = Offset(x * unit, y * unit)
         fun line(x1: Float, y1: Float, x2: Float, y2: Float) =
-            drawLine(color, p(x1, y1), p(x2, y2), strokeWidth = w, cap = StrokeCap.Round)
+            drawLine(actual, p(x1, y1), p(x2, y2), strokeWidth = w, cap = StrokeCap.Round)
 
         when (kind) {
             PopIconKind.Menu -> {

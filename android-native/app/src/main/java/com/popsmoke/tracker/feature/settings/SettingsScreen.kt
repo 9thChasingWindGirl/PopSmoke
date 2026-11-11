@@ -4,8 +4,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +18,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,11 +47,14 @@ import com.popsmoke.tracker.data.OpLog
 import com.popsmoke.tracker.data.SmokeLog
 import com.popsmoke.tracker.data.StoreCodec
 import com.popsmoke.tracker.data.StoreState
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopPresets
+import com.popsmoke.tracker.design.PopShadow
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
+import com.popsmoke.tracker.design.PopThemeStyle
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.design.accent
 import com.popsmoke.tracker.design.onAccent
@@ -61,8 +75,19 @@ import com.popsmoke.tracker.ui.atoms.PopToast
 import com.popsmoke.tracker.ui.atoms.PopToastKind
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
+import com.popsmoke.tracker.ui.foundation.buttonShape
+import com.popsmoke.tracker.ui.foundation.jellyPress
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.ui.foundation.skinSurface
 import java.io.File
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 
 /**
  * 设置页：阈值、语言、主题、数据管理、关于。
@@ -80,6 +105,8 @@ fun SettingsScreen(
     opLogs: List<OpLog>,
     onSetLanguage: (String) -> Unit,
     onSetThemeColor: (String) -> Unit,
+    /** 主题风格（液态玻璃 / 波普漫画）。与主题色正交：同一套配色在两套风格下都成立。 */
+    onSetThemeStyle: (String) -> Unit = {},
     onSetDailyLimit: (Int) -> Unit,
     onSetWarningLimit: (Int) -> Unit,
     onClearLogs: () -> Unit,
@@ -174,7 +201,7 @@ fun SettingsScreen(
                                 text = strings.localModeHint,
                                 size = PopTypeScale.Xs,
                                 weight = FontWeight.Bold,
-                                color = PopColor.Neutral.Gray500,
+                                color = popInkMuted,
                                 maxLines = 2,
                             )
                         }
@@ -193,8 +220,10 @@ fun SettingsScreen(
                         LimitRow(
                             label = strings.dailyLimit,
                             value = settings.dailyLimit,
-                            badgeBg = PopColor.Core.Black,
-                            badgeFg = PopColor.Core.White,
+                            badgeBg = popInk,
+                            // 反色徽标上的数字必须是纯白：popSurface 在玻璃下是半透明白，
+                            // 压在深色徽标上会发灰
+                            badgeFg = Color.White,
                             rotate = -2f,
                         )
                         PopSlider(
@@ -208,7 +237,7 @@ fun SettingsScreen(
                             label = strings.warningLimit,
                             value = settings.warningLimit,
                             badgeBg = PopColor.Neutral.Yellow300,
-                            badgeFg = PopColor.Core.Black,
+                            badgeFg = popInk,
                             rotate = 1f,
                         )
                         PopSlider(
@@ -230,6 +259,15 @@ fun SettingsScreen(
                         )
                     }
 
+                    // 主题风格
+                    Column {
+                        StyleSection(
+                            value = settings.themeStyle,
+                            strings = strings,
+                            onChange = onSetThemeStyle,
+                        )
+                    }
+
                     // 主题
                     Column {
                         SectionTitle(strings.themeColor)
@@ -245,7 +283,7 @@ fun SettingsScreen(
                                         .width(PopSpace.S6)
                                         .height(PopSpace.S6)
                                         .background(accent)
-                                        .popBorder(PopStroke.Thin, PopColor.Core.Black),
+                                        .popBorder(PopStroke.Thin, popInk),
                                 )
                             },
                         )
@@ -306,7 +344,7 @@ fun SettingsScreen(
                             text = strings.backupNote,
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Bold,
-                            color = PopColor.Neutral.Gray500,
+                            color = popInkMuted,
                             maxLines = 3,
                         )
 
@@ -347,14 +385,14 @@ fun SettingsScreen(
                         text = "ver.${BuildConfig.VERSION_NAME}",
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Black,
-                        color = PopColor.Neutral.Gray500,
+                        color = popInkMuted,
                         maxLines = 1,
                     )
                     PopBody(
                         text = strings.fontAttribution,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray400,
+                        color = popInkMuted,
                         maxLines = 2,
                     )
                 }
@@ -402,14 +440,14 @@ fun SettingsScreen(
                         text = "${strings.dailyLimit}: ${it.dailyLimit} · ${strings.warningLimit}: ${it.warningLimit}",
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray600,
+                        color = popInkSecondary,
                         maxLines = 2,
                     )
                     PopBody(
                         text = "${strings.themeColor}: ${it.themeColor} · ${strings.language}: ${it.language.uppercase()}",
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray600,
+                        color = popInkSecondary,
                         maxLines = 2,
                     )
                 }
@@ -528,6 +566,8 @@ private fun LimitRow(
     badgeFg: androidx.compose.ui.graphics.Color,
     rotate: Float,
 ) {
+    val current = com.popsmoke.tracker.design.LocalSkin.current
+    val chip = androidx.compose.foundation.shape.RoundedCornerShape(percent = 50)
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = PopSpace.S2),
         verticalAlignment = Alignment.Bottom,
@@ -541,10 +581,22 @@ private fun LimitRow(
         )
         Box(
             Modifier
-                .graphicsRotation(rotate)
-                .background(badgeBg)
-                .popBorder(PopStroke.Thin, PopColor.Core.Black)
-                .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1),
+                // 玻璃下徽标是一枚小胶囊，不旋转：歪斜会和高光方向打架
+                .graphicsRotation(if (current.glass) 0f else rotate)
+                .then(
+                    if (current.glass) {
+                        Modifier
+                            .clip(chip)
+                            .background(badgeBg.copy(alpha = 0.9f))
+                            .border(1.dp, Color.White.copy(alpha = 0.6f), chip)
+                            .padding(horizontal = PopSpace.S3, vertical = PopSpace.S1)
+                    } else {
+                        Modifier
+                            .background(badgeBg)
+                            .popBorder(PopStroke.Thin, popInk)
+                            .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1)
+                    },
+                ),
         ) {
             PopDisplay(
                 text = value.toString(),
@@ -568,15 +620,15 @@ private fun InfoBlock(label: String, value: String) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(PopColor.Neutral.Gray100)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .background(popSurfaceDeep)
+            .popBorder(PopStroke.Thin, popInk)
             .padding(PopSpace.S3),
     ) {
         PopBody(
             text = label,
             size = PopTypeScale.Sm,
             weight = FontWeight.Bold,
-            color = PopColor.Neutral.Gray600,
+            color = popInkSecondary,
             maxLines = 1,
         )
         PopDisplay(
@@ -593,8 +645,8 @@ private fun LinkRow(text: String, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .background(popSurface)
+            .popBorder(PopStroke.Thin, popInk)
             .clickable(onClick = onClick)
             .padding(PopSpace.S3),
         contentAlignment = Alignment.Center,
@@ -608,5 +660,240 @@ private fun LinkRow(text: String, onClick: () -> Unit) {
         )
     }
 }
+
+// ---------------------------------------------------------------- 主题风格切换
+
+/**
+ * 主题风格：两张可点的预览片，不是下拉。
+ *
+ * 只有两个选项，而"液态玻璃长什么样"用文字说不清 —— 缩略图把两种视觉语言并排摊开，
+ * 用户看到选项的瞬间就已经看到了结果，不需要先切过去、再切回来比较。
+ *
+ * 缩略图固定画**它自己代表的**风格，不跟随当前主题：否则在玻璃主题下，
+ * 波普那张也会被渲染成玻璃，两个选项长得一样，这个控件就失去意义了。
+ */
+@Composable
+private fun StyleSection(
+    value: String,
+    strings: PopStrings,
+    onChange: (String) -> Unit,
+) {
+    val selected = PopThemeStyle.fromId(value)
+    SectionTitle(strings.themeStyle)
+    Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
+        StyleOption(
+            style = PopThemeStyle.Liquid,
+            title = strings.styleLiquid,
+            desc = strings.styleLiquidDesc,
+            selected = selected == PopThemeStyle.Liquid,
+            onClick = { onChange(PopThemeStyle.Liquid.id) },
+        )
+        StyleOption(
+            style = PopThemeStyle.Pop,
+            title = strings.stylePop,
+            desc = strings.stylePopDesc,
+            selected = selected == PopThemeStyle.Pop,
+            onClick = { onChange(PopThemeStyle.Pop.id) },
+        )
+    }
+}
+
+@Composable
+private fun StyleOption(
+    style: PopThemeStyle,
+    title: String,
+    desc: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val current = LocalSkin.current
+    val accentColor = accent
+    // 选中态沿用全站约定：波普是反色块，玻璃是主题色淡染 + 一圈细光环。
+    // 玻璃下不套反色块 —— 磨砂面上挖一块纯黑会像图层破了洞。
+    val shape: Shape = if (current.glass) current.buttonShape() else RectangleShape
+    val fill = when {
+        !selected -> current.palette.surface
+        current.glass -> accentColor.copy(alpha = 0.16f)
+        else -> current.palette.inverseSurface
+    }
+    val inverted = selected && !current.glass
+    val titleColor = if (inverted) current.palette.inverseInk else current.palette.ink
+    val descColor = if (inverted) {
+        current.palette.inverseInk.copy(alpha = 0.72f)
+    } else {
+        current.palette.inkMuted
+    }
+
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .then(if (current.glass) Modifier.jellyPress(interaction) else Modifier)
+            .skinSurface(
+                current = current,
+                shape = shape,
+                fill = fill,
+                lift = if (current.glass) 10.dp else PopShadow.Pop,
+            )
+            .then(
+                if (current.glass && selected) {
+                    Modifier.border(1.5.dp, accentColor.copy(alpha = 0.55f), shape)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(PopSpace.S3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StylePreview(
+            style = style,
+            accentColor = accentColor,
+            modifier = Modifier
+                .width(84.dp)
+                .height(52.dp)
+                .clip(RoundedCornerShape(if (current.glass) 12.dp else 0.dp)),
+        )
+        Box(Modifier.width(PopSpace.S3))
+        Column(Modifier.weight(1f)) {
+            PopDisplay(
+                text = title,
+                size = PopTypeScale.Base,
+                weight = FontWeight.Black,
+                color = titleColor,
+                maxLines = 1,
+            )
+            PopBody(
+                text = desc,
+                size = PopTypeScale.Xs,
+                weight = FontWeight.Bold,
+                color = descColor,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+/**
+ * 84×52 的风格缩略图：背景 + 一张卡片 + 一枚按钮。
+ *
+ * 只画三样东西是有意的 —— 再多就是一张假截图，在 84dp 宽里全是噪点；
+ * 这三样恰好是两套语言分歧最大的地方：背景有没有光、卡片是圆角还是黑框、按钮是彩色块还是彩色胶囊。
+ */
+@Composable
+private fun StylePreview(
+    style: PopThemeStyle,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val glass = style == PopThemeStyle.Liquid
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        if (glass) {
+            // 极光必须画：没有光斑，"透"这件事在静态缩略图里根本看不出来
+            drawRect(Brush.verticalGradient(listOf(Color(0xFFEFEDF8), Color(0xFFD2CFE4))))
+            drawBlob(Offset(w * 0.14f, h * 1.02f), h * 1.25f, accentColor.copy(alpha = 0.7f))
+            drawBlob(Offset(w * 0.94f, h * 0.16f), h * 1.0f, Color(0xFF8FB4FF).copy(alpha = 0.6f))
+        } else {
+            drawRect(PopColor.Core.Paper)
+            // 点阵纸纹：波普的"纸感"一半来自这里，缩略图省略掉会显得比实际更干净
+            val step = 5.dp.toPx()
+            val dot = 0.7.dp.toPx()
+            var y = step / 2f
+            while (y < h) {
+                var x = step / 2f
+                while (x < w) {
+                    drawCircle(Color(0x1A000000), dot, Offset(x, y))
+                    x += step
+                }
+                y += step
+            }
+        }
+
+        val corner = 7.dp.toPx()
+        // 卡片
+        drawPreviewBar(
+            left = w * 0.13f,
+            top = h * 0.22f,
+            width = w * 0.60f,
+            height = h * 0.22f,
+            glass = glass,
+            corner = corner,
+            fill = if (glass) Color.White.copy(alpha = 0.62f) else Color.White,
+        )
+        // 按钮
+        drawPreviewBar(
+            left = w * 0.13f,
+            top = h * 0.58f,
+            width = w * 0.44f,
+            height = h * 0.20f,
+            glass = glass,
+            corner = 999f,
+            fill = if (glass) accentColor.copy(alpha = 0.9f) else accentColor,
+        )
+    }
+}
+
+private fun DrawScope.drawBlob(center: Offset, radius: Float, color: Color) {
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(color, Color.Transparent),
+            center = center,
+            radius = radius,
+        ),
+        radius = radius,
+        center = center,
+    )
+}
+
+/**
+ * 缩略图里的一根"条"。两套语言在这里分开：
+ * 玻璃是柔和落影 + 半透明白填充 + 纯白细边；波普是硬偏移黑块 + 实心填充 + 黑描边。
+ */
+private fun DrawScope.drawPreviewBar(
+    left: Float,
+    top: Float,
+    width: Float,
+    height: Float,
+    glass: Boolean,
+    corner: Float,
+    fill: Color,
+) {
+    if (glass) {
+        val radius = CornerRadius(minOf(corner, height / 2f))
+        drawRoundRect(
+            color = Color(0xFF16161A).copy(alpha = 0.10f),
+            topLeft = Offset(left, top + height * 0.22f),
+            size = Size(width, height),
+            cornerRadius = radius,
+        )
+        drawRoundRect(
+            color = fill,
+            topLeft = Offset(left, top),
+            size = Size(width, height),
+            cornerRadius = radius,
+        )
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.9f),
+            topLeft = Offset(left, top),
+            size = Size(width, height),
+            cornerRadius = radius,
+            style = Stroke(1.dp.toPx()),
+        )
+    } else {
+        val ink = Color(0xFF111111)
+        val offset = 2.dp.toPx()
+        drawRect(ink, topLeft = Offset(left + offset, top + offset), size = Size(width, height))
+        drawRect(fill, topLeft = Offset(left, top), size = Size(width, height))
+        drawRect(
+            color = ink,
+            topLeft = Offset(left, top),
+            size = Size(width, height),
+            style = Stroke(1.5.dp.toPx()),
+        )
+    }
+}
+
 
 

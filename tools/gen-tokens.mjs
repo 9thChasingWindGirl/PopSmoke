@@ -63,6 +63,8 @@ for (const [group, value] of Object.entries(tokens.color)) {
   }
   out(`    object ${pascal(group)} {`);
   for (const [k, v] of Object.entries(value)) {
+    // 以 _ 开头的是给读 JSON 的人看的注释，不生成常量
+    if (k.startsWith('_')) continue;
     out(`        val ${pascal(k)} = ${color(v)}`);
   }
   out('    }');
@@ -165,6 +167,24 @@ for (const [k, v] of Object.entries(tokens.layout)) {
 }
 out('}');
 out('');
+
+// ---------- 液态玻璃 ----------
+// 后缀即单位：*Alpha → 0-1 透明度，*Px → dp，*Ms → 毫秒整数，其余按倍数生成 Float。
+if (tokens.glass) {
+  out('/** 液态玻璃主题参数。后缀即单位：Alpha 为透明度，Px 为 dp，Ms 为毫秒，其余为倍数。 */');
+  out('object PopGlass {');
+  for (const [k, v] of Object.entries(tokens.glass)) {
+    if (k.startsWith('_')) continue;
+    const name = pascal(k);
+    if (k.endsWith('Px')) out(`    val ${name.slice(0, -2)} = ${dp(v)}`);
+    else if (k.endsWith('Ms')) out(`    const val ${name.slice(0, -2)} = ${v}`);
+    // Alpha 后缀保留：ShadowAlpha / ShadowLift 放一起才不会看错
+    else if (k.endsWith('Alpha')) out(`    const val ${name} = ${num(v)}f`);
+    else out(`    const val ${name} = ${num(v)}f`);
+  }
+  out('}');
+  out('');
+}
 
 // ---------- 动效 ----------
 out('object PopMotion {');

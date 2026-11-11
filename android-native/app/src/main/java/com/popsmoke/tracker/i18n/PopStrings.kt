@@ -6,7 +6,7 @@ package com.popsmoke.tracker.i18n
 // 缺失的键在运行时回落到英文，而不是抛异常或显示空白：
 // 宁可露出一句英文，也不要在界面上留一个洞。
 
-val PopStringKeyCount = 485
+val PopStringKeyCount = 490
 
 private val EN_TABLE: Map<String, String> = mapOf(
     "appTitle" to "SMOKE",
@@ -45,6 +45,11 @@ private val EN_TABLE: Map<String, String> = mapOf(
     "customHex" to "Custom Hex",
     "customColor" to "Custom Color",
     "theme" to "Theme",
+    "themeStyle" to "Theme Style",
+    "styleLiquid" to "Liquid Glass",
+    "stylePop" to "Pop Comic",
+    "styleLiquidDesc" to "Frosted glass, light play, jelly motion",
+    "stylePopDesc" to "Hard ink outlines, hard shadows, comic paper",
     "warningMsg" to "WARNING: Approaching Daily Limit!",
     "limitReachedMsg" to "DAILY LIMIT REACHED!",
     "totalCigarettes" to "Total Cigarettes",
@@ -533,6 +538,11 @@ private val ZH_TABLE: Map<String, String> = mapOf(
     "customHex" to "自定义颜色",
     "customColor" to "自定义颜色",
     "theme" to "主题",
+    "themeStyle" to "主题风格",
+    "styleLiquid" to "液态玻璃",
+    "stylePop" to "波普漫画",
+    "styleLiquidDesc" to "磨砂通透、光感流动、果冻回弹",
+    "stylePopDesc" to "粗黑描边、硬阴影、漫画纸感",
     "warningMsg" to "警告：接近每日上限！",
     "limitReachedMsg" to "已达每日上限！",
     "totalCigarettes" to "吸烟总数",
@@ -1021,6 +1031,11 @@ private val JA_TABLE: Map<String, String> = mapOf(
     "customHex" to "カスタム色",
     "customColor" to "カスタム色",
     "theme" to "テーマ",
+    "themeStyle" to "テーマスタイル",
+    "styleLiquid" to "リキッドグラス",
+    "stylePop" to "ポップコミック",
+    "styleLiquidDesc" to "すりガラスの透明感と光の流れ、ジェリーの動き",
+    "stylePopDesc" to "太い黒線とハードシャドウの漫画調",
     "warningMsg" to "警告：制限に近づいています！",
     "limitReachedMsg" to "1日の制限に達しました！",
     "totalCigarettes" to "総本数",
@@ -1509,6 +1524,11 @@ private val KO_TABLE: Map<String, String> = mapOf(
     "customHex" to "사용자 지정 색상",
     "customColor" to "사용자 지정 색상",
     "theme" to "테마",
+    "themeStyle" to "테마 스타일",
+    "styleLiquid" to "리퀴드 글라스",
+    "stylePop" to "팝 코믹",
+    "styleLiquidDesc" to "반투명 유리 질감과 빛의 흐름, 젤리 모션",
+    "stylePopDesc" to "굵은 잉크선과 하드 섀도의 만화풍",
     "warningMsg" to "경고: 일일 한도에 근접!",
     "limitReachedMsg" to "일일 한도 도달!",
     "totalCigarettes" to "총 담배 수",
@@ -2001,6 +2021,11 @@ class PopStrings(private val table: Map<String, String>) {
     val customHex: String get() = get("customHex")
     val customColor: String get() = get("customColor")
     val theme: String get() = get("theme")
+    val themeStyle: String get() = get("themeStyle")
+    val styleLiquid: String get() = get("styleLiquid")
+    val stylePop: String get() = get("stylePop")
+    val styleLiquidDesc: String get() = get("styleLiquidDesc")
+    val stylePopDesc: String get() = get("stylePopDesc")
     val warningMsg: String get() = get("warningMsg")
     val limitReachedMsg: String get() = get("limitReachedMsg")
     val totalCigarettes: String get() = get("totalCigarettes")

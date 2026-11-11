@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopMotion
@@ -33,10 +35,9 @@ import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTracking
 import com.popsmoke.tracker.design.PopTypeScale
-import com.popsmoke.tracker.ui.foundation.popBorder
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
-import com.popsmoke.tracker.ui.foundation.popShadow
+import com.popsmoke.tracker.ui.foundation.skinSurface
 
 /**
  * 全站唯一的弹窗基元。
@@ -54,11 +55,12 @@ fun PopDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     message: String? = null,
-    titleColor: Color = PopColor.Core.Black,
+    titleColor: Color = Color.Unspecified,
     content: (@Composable ColumnScope.() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
 ) {
     BackHandler(enabled = visible, onBack = onDismiss)
+    val current = LocalSkin.current
 
     AnimatedVisibility(
         visible = visible,
@@ -73,7 +75,7 @@ fun PopDialog(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(PopColor.Core.Black.copy(alpha = 0.5f))
+                    .background(current.palette.scrim)
                     .pointerInput(Unit) { detectTapGestures { onDismiss() } },
             )
             Box(
@@ -86,9 +88,14 @@ fun PopDialog(
                     modifier
                         .widthIn(max = PopLayout.DialogMaxWidth)
                         .fillMaxWidth()
-                        .popShadow(PopShadow.Pop)
-                        .background(PopColor.Core.White)
-                        .popBorder(PopStroke.Default, PopColor.Core.Black)
+                        // 弹窗必须是最"实"的一层玻璃：它要压住下面的内容，
+                        // 用跟卡片一样的透明度会透出底下的字，读起来很脏
+                        .skinSurface(
+                            current = current,
+                            shape = RoundedCornerShape(current.radiusPanel),
+                            fill = current.palette.surfaceStrong,
+                            lift = PopShadow.Pop,
+                        )
                         .padding(PopSpace.S6),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -96,7 +103,7 @@ fun PopDialog(
                         text = title,
                         size = PopTypeScale.Xxl,
                         tracking = PopTracking.Normal,
-                        color = titleColor,
+                        color = if (titleColor == Color.Unspecified) current.palette.ink else titleColor,
                         maxLines = 2,
                     )
                     if (message != null) {
@@ -105,7 +112,7 @@ fun PopDialog(
                             modifier = Modifier.padding(top = PopSpace.S3),
                             size = PopTypeScale.Sm,
                             weight = FontWeight.Normal,
-                            color = PopColor.Neutral.Gray700,
+                            color = current.palette.inkSecondary,
                             textAlign = TextAlign.Center,
                             maxLines = 4,
                         )

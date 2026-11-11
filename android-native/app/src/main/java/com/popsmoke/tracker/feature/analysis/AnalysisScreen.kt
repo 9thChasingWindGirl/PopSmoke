@@ -51,6 +51,14 @@ import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
 import java.io.File
 import java.time.LocalDate
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInverseInk
+import com.popsmoke.tracker.design.popSurface
 
 private enum class ViewMode { Week, Month }
 
@@ -238,7 +246,7 @@ fun AnalysisScreen(
                         },
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = if (cloud.hasFailedOp) PopColor.Status.Error else PopColor.Neutral.Gray500,
+                        color = if (cloud.hasFailedOp) PopColor.Status.Error else popInkMuted,
                         maxLines = 3,
                     )
 
@@ -262,7 +270,7 @@ fun AnalysisScreen(
                         text = strings.csvNote,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray500,
+                        color = popInkMuted,
                         maxLines = 3,
                     )
 
@@ -367,18 +375,47 @@ private fun csvName(cursor: LocalDate): String =
 
 @Composable
 private fun ModeChip(text: String, active: Boolean, onClick: () -> Unit) {
+    val current = LocalSkin.current
+    val accentColor = accent
+    // 玻璃下"选中"不是反色块而是主题色淡染 + 胶囊外形：磨砂面上挖一块纯黑，
+    // 会把背面的光全部遮掉，那一小块立刻变成不透的实体
+    val shape = if (current.glass) RoundedCornerShape(percent = 50) else RoundedCornerShape(0.dp)
+    val fill = when {
+        active && current.glass -> accentColor.copy(alpha = 0.22f)
+        active -> current.palette.inverseSurface
+        else -> current.palette.surface
+    }
+    val ink = when {
+        active && current.glass -> accentColor
+        active -> current.palette.inverseInk
+        else -> current.palette.ink
+    }
     Box(
         Modifier
-            .background(if (active) PopColor.Core.Black else PopColor.Core.White)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .clip(shape)
+            .background(fill)
+            .then(
+                if (current.glass) {
+                    Modifier.border(
+                        1.dp,
+                        if (active) accentColor.copy(alpha = 0.5f) else current.palette.hairline,
+                        shape,
+                    )
+                } else {
+                    Modifier.popBorder(PopStroke.Thin, current.palette.ink)
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1),
+            .padding(
+                horizontal = if (current.glass) PopSpace.S3 else PopSpace.S2,
+                vertical = PopSpace.S1,
+            ),
     ) {
         PopDisplay(
             text = text,
             size = PopTypeScale.Xs,
             weight = FontWeight.Black,
-            color = if (active) PopColor.Core.White else PopColor.Core.Black,
+            color = ink,
             uppercase = true,
             maxLines = 1,
         )
@@ -387,12 +424,24 @@ private fun ModeChip(text: String, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun MonthNavChip(text: String, onClick: () -> Unit) {
+    val current = LocalSkin.current
+    val shape = if (current.glass) RoundedCornerShape(percent = 50) else RoundedCornerShape(0.dp)
     Box(
         Modifier
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .clip(shape)
+            .background(current.palette.surface)
+            .then(
+                if (current.glass) {
+                    Modifier.border(1.dp, current.palette.hairline, shape)
+                } else {
+                    Modifier.popBorder(PopStroke.Thin, current.palette.ink)
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = PopSpace.S2, vertical = PopSpace.S1),
+            .padding(
+                horizontal = if (current.glass) PopSpace.S3 else PopSpace.S2,
+                vertical = PopSpace.S1,
+            ),
     ) {
         PopDisplay(
             text = text,

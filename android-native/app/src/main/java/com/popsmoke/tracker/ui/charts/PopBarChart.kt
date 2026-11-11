@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,8 +34,16 @@ import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.PopBodyFont
 import com.popsmoke.tracker.ui.foundation.PopDisplay
+import com.popsmoke.tracker.ui.foundation.chipShape
 import com.popsmoke.tracker.ui.foundation.popBorder
 import com.popsmoke.tracker.ui.foundation.popShadow
+import com.popsmoke.tracker.ui.foundation.skinSurface
+import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
 
 /**
  * 柱状图，全部自绘。
@@ -63,6 +72,7 @@ fun PopBarChart(
 ) {
     val measurer = rememberTextMeasurer()
     var selected by remember(bars) { mutableStateOf<Int?>(null) }
+    val current = LocalSkin.current
 
     val yMax = (bars.maxOfOrNull { it.value } ?: 0).coerceAtLeast(4)
     // Y 轴取整到 2 的倍数，刻度才是整数；柱子矮的时候也不至于顶格
@@ -72,13 +82,13 @@ fun PopBarChart(
         fontFamily = PopBodyFont,
         fontSize = PopTypeScale.Xs,
         fontWeight = FontWeight.Bold,
-        color = PopColor.Neutral.Gray600,
+        color = popInkSecondary,
     )
     val axisStyle = TextStyle(
         fontFamily = PopBodyFont,
         fontSize = PopTypeScale.Xs,
         fontWeight = FontWeight.Bold,
-        color = PopColor.Neutral.Gray500,
+        color = popInkMuted,
     )
 
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -88,6 +98,14 @@ fun PopBarChart(
         val plotWidth = maxWidth - yAxisWidth
         val plotHeight = maxHeight - xAxisHeight
 
+        // Canvas 的 lambda 是绘制阶段，读不到 CompositionLocal
+        val gridLine = popHairline
+        val axisInk = popInk
+        val glass = current.glass
+        // 玻璃下坐标轴不能是纯黑实线：整张图会像被相框框住。退成一条极淡的 ink，
+        // 仍然比网格线重一点，读者才知道"这是轴"而不是"这是又一条网格"
+        val axisLine = if (glass) axisInk.copy(alpha = 0.16f) else axisInk
+        val barRadius = if (glass) 6.dp else 2.dp
         Canvas(
             Modifier
                 .fillMaxSize()
@@ -113,7 +131,7 @@ fun PopBarChart(
             ticks.forEach { t ->
                 val y = bottom - (t.toFloat() / axisTop) * (bottom - top)
                 drawLine(
-                    color = PopColor.Neutral.Gray200,
+                    color = gridLine,
                     start = Offset(left, y),
                     end = Offset(size.width, y),
                     strokeWidth = axisW * 0.5f,
@@ -130,16 +148,16 @@ fun PopBarChart(
 
             // 坐标轴
             drawLine(
-                color = PopColor.Core.Black,
+                color = axisLine,
                 start = Offset(left, top),
                 end = Offset(left, bottom),
-                strokeWidth = axisW,
+                strokeWidth = if (glass) axisW * 0.6f else axisW,
             )
             drawLine(
-                color = PopColor.Core.Black,
+                color = axisLine,
                 start = Offset(left, bottom),
                 end = Offset(size.width, bottom),
-                strokeWidth = axisW,
+                strokeWidth = if (glass) axisW * 0.6f else axisW,
             )
 
             // 柱
@@ -151,19 +169,46 @@ fun PopBarChart(
                     val h = (bar.value.toFloat() / axisTop) * (bottom - top)
                     val fill = if (bar.highlight) overLimitColor else accent
                     val dimmed = selected != null && selected != index
-                    drawRect(
-                        color = if (dimmed) fill.copy(alpha = 0.45f) else fill,
-                        topLeft = Offset(cx - barWidth / 2f, bottom - h),
-                        size = Size(barWidth, h),
-                    )
-                    // 描边：2dp 纯黑，圆角在柱顶只给 2dp（对应 Web 的 radius 2）
-                    drawRoundRect(
-                        color = PopColor.Core.Black,
-                        topLeft = Offset(cx - barWidth / 2f, bottom - h),
-                        size = Size(barWidth, h),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
-                        style = Stroke(width = axisW),
-                    )
+                    if (glass) {
+                        // 玻璃柱：竖向渐变 + 大圆角 + 顶部一条白高光。
+                        // 没有描边 —— 磨砂语言里"边缘"由高光和投影说明，不由黑线说明
+                        val alpha = if (dimmed) 0.45f else 1f
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    fill.copy(alpha = 0.95f * alpha),
+                                    fill.copy(alpha = 0.55f * alpha),
+                                ),
+                                startY = bottom - h,
+                                endY = bottom,
+                            ),
+                            topLeft = Offset(cx - barWidth / 2f, bottom - h),
+                            size = Size(barWidth, h),
+                            cornerRadius = CornerRadius(barRadius.toPx()),
+                        )
+                        if (h > barRadius.toPx() * 1.6f) {
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.35f * alpha),
+                                start = Offset(cx - barWidth / 2f + barRadius.toPx(), bottom - h + 1.5.dp.toPx()),
+                                end = Offset(cx + barWidth / 2f - barRadius.toPx(), bottom - h + 1.5.dp.toPx()),
+                                strokeWidth = 1.dp.toPx(),
+                            )
+                        }
+                    } else {
+                        drawRect(
+                            color = if (dimmed) fill.copy(alpha = 0.45f) else fill,
+                            topLeft = Offset(cx - barWidth / 2f, bottom - h),
+                            size = Size(barWidth, h),
+                        )
+                        // 描边：2dp 纯黑，圆角在柱顶只给 2dp（对应 Web 的 radius 2）
+                        drawRoundRect(
+                            color = axisInk,
+                            topLeft = Offset(cx - barWidth / 2f, bottom - h),
+                            size = Size(barWidth, h),
+                            cornerRadius = CornerRadius(barRadius.toPx()),
+                            style = Stroke(width = axisW),
+                        )
+                    }
                 }
 
                 // X 轴标签：按 maxLabels 抽稀，避免 31 天时挤成一团
@@ -201,11 +246,26 @@ private fun ceilDiv(a: Int, b: Int): Int = (a + b - 1) / b
 
 @Composable
 private fun SelectionBubble(label: String, value: Int, caption: String) {
+    val current = LocalSkin.current
     Column(
         Modifier
-            .background(PopColor.Core.White)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
-            .popShadow(PopShadow.Pop)
+            .then(
+                if (current.glass) {
+                    // 提示条要压在图表上方，所以用 surfaceStrong 而不是 surface：
+                    // 半透明白叠在半透明白柱子上会读不清数字
+                    Modifier.skinSurface(
+                        current = current,
+                        shape = current.chipShape(),
+                        fill = current.palette.surfaceStrong,
+                        lift = 10.dp,
+                    )
+                } else {
+                    Modifier
+                        .background(popSurface)
+                        .popBorder(PopStroke.Thin, popInk)
+                        .popShadow(PopShadow.Pop)
+                },
+            )
             .padding(PopSpace.S2),
     ) {
         PopDisplay(

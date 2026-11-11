@@ -26,6 +26,9 @@ import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
 
 enum class PopToastKind { Success, Error, Info, Warning }
 
@@ -50,7 +53,7 @@ fun PopToast(
         PopToastKind.Info -> PopColor.Status.Info to "i"
         PopToastKind.Warning -> PopColor.Status.Warning to "!"
     }
-    val onBar = if (kind == PopToastKind.Warning) PopColor.Core.Black else PopColor.Core.White
+    val onBar = if (kind == PopToastKind.Warning) popInk else popSurface
 
     AnimatedVisibility(
         visible = visible,
@@ -61,8 +64,8 @@ fun PopToast(
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(PopColor.Core.White)
-                .popBorder(PopStroke.Thin, PopColor.Core.Black),
+                .background(popSurface)
+                .popBorder(PopStroke.Thin, popInk),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -89,7 +92,7 @@ fun PopToast(
                         text = message,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray600,
+                        color = popInkSecondary,
                         maxLines = 2,
                     )
                 }

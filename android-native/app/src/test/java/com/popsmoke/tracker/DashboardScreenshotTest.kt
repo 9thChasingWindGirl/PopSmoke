@@ -10,6 +10,7 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +35,9 @@ import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopPresets
 import com.popsmoke.tracker.design.PopSpace
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopTheme
+import com.popsmoke.tracker.design.PopThemeStyle
 import com.popsmoke.tracker.design.toHexString
 import com.popsmoke.tracker.design.toPopColor
 import com.popsmoke.tracker.feature.analysis.AnalysisScreen
@@ -54,6 +57,7 @@ import com.popsmoke.tracker.ui.atoms.PopSyncQueue
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopTopBar
+import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
 import org.junit.Rule
 import org.junit.Test
@@ -135,10 +139,13 @@ class DashboardScreenshotTest {
     }
 
     @Composable
-    private fun Screen(state: DashboardUiState, accent: Color) {
-        PopTheme(accent = accent) {
-            Box(Modifier.fillMaxSize().background(PopColor.Core.Canvas)) {
-                PopDotGrid(Modifier.matchParentSize())
+    private fun Screen(
+        state: DashboardUiState,
+        accent: Color,
+        style: PopThemeStyle = PopThemeStyle.Pop,
+    ) {
+        PopTheme(accent = accent, style = style) {
+            Backdrop(accent) {
                 DashboardScreen(
                     ui = state,
                     strings = popStrings(state.settings.language),
@@ -151,6 +158,23 @@ class DashboardScreenshotTest {
         }
     }
 
+    /**
+     * 页面底：波普是点阵纸纹，玻璃是极光光斑。
+     * 必须和 PopApp 用同一套判断 —— 否则截图里的底和真机上不一样，基准就失去意义。
+     */
+    @Composable
+    private fun Backdrop(accent: Color, content: @Composable BoxScope.() -> Unit) {
+        val skin = LocalSkin.current
+        Box(Modifier.fillMaxSize().background(skin.palette.canvas)) {
+            if (skin.glass) {
+                PopAurora(Modifier.matchParentSize(), accent = accent, animate = false)
+            } else {
+                PopDotGrid(Modifier.matchParentSize())
+            }
+            content()
+        }
+    }
+
     /** 整屏骨架：顶栏 + 内容 + 底栏。所有整屏用例共用，避免每处重复三段式。 */
     @Composable
     private fun Chrome(
@@ -158,10 +182,10 @@ class DashboardScreenshotTest {
         languageLabel: String,
         tabs: List<String>,
         flipped: Boolean = false,
+        style: PopThemeStyle = PopThemeStyle.Pop,
     ) {
-        PopTheme(accent = state.accent) {
-            Box(Modifier.fillMaxSize().background(PopColor.Core.Canvas)) {
-                PopDotGrid(Modifier.matchParentSize())
+        PopTheme(accent = state.accent, style = style) {
+            Backdrop(state.accent) {
                 Column(Modifier.fillMaxSize()) {
                     PopTopBar(
                         accentColor = state.accent,
@@ -288,13 +312,13 @@ class DashboardScreenshotTest {
         languageLabel: String,
         tabs: List<String>,
         selectedIndex: Int,
+        style: PopThemeStyle = PopThemeStyle.Pop,
         content: @Composable () -> Unit,
     ) {
         val accent = settings.themeColor.toPopColor()
-        PopTheme(accent = accent) {
+        PopTheme(accent = accent, style = style) {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides EmptyRegistryOwner()) {
-                Box(Modifier.fillMaxSize().background(PopColor.Core.Canvas)) {
-                    PopDotGrid(Modifier.matchParentSize())
+                Backdrop(accent) {
                     Column(Modifier.fillMaxSize()) {
                         PopTopBar(
                             accentColor = accent,
@@ -532,7 +556,7 @@ class DashboardScreenshotTest {
     @Test
     fun sync_queue_card_zh() {
         paparazzi.snapshot {
-            PopTheme(accent = "#4ECDC4".toPopColor()) {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Pop) {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -558,7 +582,7 @@ class DashboardScreenshotTest {
     @Test
     fun sync_queue_empty_zh() {
         paparazzi.snapshot {
-            PopTheme(accent = "#4ECDC4".toPopColor()) {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Pop) {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -594,7 +618,7 @@ class DashboardScreenshotTest {
     fun time_picker_dialog_zh() {
         val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
         paparazzi.snapshot {
-            PopTheme(accent = settings.themeColor.toPopColor()) {
+            PopTheme(accent = settings.themeColor.toPopColor(), style = PopThemeStyle.Pop) {
                 Box(Modifier.fillMaxSize().background(PopColor.Core.Canvas)) {
                     PopTimePickerDialog(
                         visible = true,
@@ -614,7 +638,7 @@ class DashboardScreenshotTest {
         val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
         val strings = popStrings("zh")
         paparazzi.snapshot {
-            PopTheme(accent = settings.themeColor.toPopColor()) {
+            PopTheme(accent = settings.themeColor.toPopColor(), style = PopThemeStyle.Pop) {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -644,7 +668,7 @@ class DashboardScreenshotTest {
     @Test
     fun topbar_theme_menu_zh() {
         paparazzi.snapshot {
-            PopTheme(accent = "#4ECDC4".toPopColor()) {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Pop) {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -668,7 +692,7 @@ class DashboardScreenshotTest {
     @Test
     fun topbar_language_menu_zh() {
         paparazzi.snapshot {
-            PopTheme(accent = "#4ECDC4".toPopColor()) {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Pop) {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -686,6 +710,153 @@ class DashboardScreenshotTest {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 液态玻璃主题
+    //
+    // 与上面那批波普用例并存，而不是替换它们：两套皮肤共用同一批组件，
+    // 只留一套基准的话，另一套被改坏时没有任何信号。
+    // ------------------------------------------------------------------
+
+    /** 首屏：看玻璃卡片的高光边、柔和投影，以及光斑有没有被卡片"吃掉"。 */
+    @Test
+    fun glass_front_en() {
+        val state = sampleState(count = 3, language = "en", themeColor = "#F97316")
+        paparazzi.snapshot { Screen(state, state.accent, PopThemeStyle.Liquid) }
+    }
+
+    @Test
+    fun glass_front_empty_zh() {
+        val state = sampleState(count = 0, language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot { Screen(state, state.accent, PopThemeStyle.Liquid) }
+    }
+
+    /** 整屏：顶栏底栏的半透明条、发丝线，以及极光背景在整屏上的分布。 */
+    @Test
+    fun glass_full_screen_zh() {
+        val state = sampleState(count = 6, language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Chrome(state, "中", listOf("记录", "分析", "历史", "接口", "设置"), style = PopThemeStyle.Liquid)
+        }
+    }
+
+    /** 翻转背面：记录列表在玻璃上的分隔线密度。 */
+    @Test
+    fun glass_back_flipped_zh() {
+        val state = sampleState(count = 5, language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Chrome(state, "中", listOf("记录", "分析", "历史", "接口", "设置"), flipped = true, style = PopThemeStyle.Liquid)
+        }
+    }
+
+    /** 取色浮层：玻璃面板 + 色盘，最容易出现"浮层顶出屏幕"或"高光把内容糊住"。 */
+    @Test
+    fun glass_theme_menu_zh() {
+        paparazzi.snapshot {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Liquid) {
+                Backdrop("#4ECDC4".toPopColor()) {
+                    Box(
+                        Modifier.fillMaxSize().padding(PopSpace.S6),
+                        contentAlignment = Alignment.TopEnd,
+                    ) {
+                        PopMenuPanel(width = PopLayout.ThemePanelWidth) {
+                            PopColorPicker(
+                                value = "#4ECDC4",
+                                onChange = {},
+                                presets = PopPresets.All.map { it.color.toHexString() },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 队列卡与操作日志是"深色头 + 彩色状态"的密集区域，玻璃下最容易脏。 */
+    @Test
+    fun glass_sync_queue_zh() {
+        paparazzi.snapshot {
+            PopTheme(accent = "#4ECDC4".toPopColor(), style = PopThemeStyle.Liquid) {
+                Backdrop("#4ECDC4".toPopColor()) {
+                    Box(Modifier.fillMaxSize().padding(PopSpace.S4)) {
+                        PopSyncQueue(
+                            ops = sampleQueueOps(),
+                            strings = popStrings("zh"),
+                            busy = false,
+                            onSyncAll = {},
+                            onSyncOne = {},
+                            onRemove = {},
+                            onClear = {},
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** 设置页在玻璃下是最"密"的一屏：卡片、输入、开关、彩色标签全在一页里。 */
+    @Test
+    fun glass_settings_zh() {
+        val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Page(settings, "中", listOf("记录", "分析", "历史", "接口", "设置"), 4, style = PopThemeStyle.Liquid) {
+                SettingsScreen(
+                    settings = settings,
+                    strings = popStrings("zh"),
+                    language = "zh",
+                    logs = crossMonthLogs(),
+                    opLogs = sampleOpLogs(),
+                    onSetLanguage = {},
+                    onSetThemeColor = {},
+                    onSetDailyLimit = {},
+                    onSetWarningLimit = {},
+                    onClearLogs = {},
+                    onImportBackup = { _, _ -> },
+                    onGoToApi = {},
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun glass_history_zh() {
+        val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Page(settings, "中", listOf("记录", "分析", "历史", "接口", "设置"), 2, style = PopThemeStyle.Liquid) {
+                HistoryScreen(
+                    logs = crossMonthLogs(),
+                    settings = settings,
+                    strings = popStrings("zh"),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun glass_analysis_zh() {
+        val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Page(settings, "中", listOf("记录", "分析", "历史", "接口", "设置"), 1, style = PopThemeStyle.Liquid) {
+                AnalysisScreen(
+                    logs = crossMonthLogs(),
+                    settings = settings,
+                    opLogs = sampleOpLogs(),
+                    strings = popStrings("zh"),
+                    onClearOpLogs = {},
+                    onGoToSettings = {},
+                    modifier = Modifier.fillMaxSize(),
+                    cloud = CloudUiState(),
+                    onSyncNow = {},
+                    onSyncOneOp = {},
+                    onRemoveOp = {},
+                    onClearQueue = {},
+                )
             }
         }
     }

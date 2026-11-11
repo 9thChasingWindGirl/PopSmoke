@@ -48,6 +48,11 @@ export const i18n_ZH = {
   customHex: '自定义颜色',
   customColor: '自定义颜色',
   theme: '主题',
+  themeStyle: '主题风格',
+  styleLiquid: '液态玻璃',
+  stylePop: '波普漫画',
+  styleLiquidDesc: '磨砂通透、光感流动、果冻回弹',
+  stylePopDesc: '粗黑描边、硬阴影、漫画纸感',
   
   // ============ Dashboard - Messages ============
   warningMsg: '警告：接近每日上限！',

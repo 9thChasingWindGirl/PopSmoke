@@ -21,6 +21,7 @@ object StoreCodec {
         val settings = JSONObject()
             .put("language", state.settings.language)
             .put("themeColor", state.settings.themeColor)
+            .put("themeStyle", state.settings.themeStyle)
             .put("dailyLimit", state.settings.dailyLimit)
             .put("warningLimit", state.settings.warningLimit)
 
@@ -67,6 +68,8 @@ object StoreCodec {
             AppSettings(
                 language = settingsJson.optString("language", "en"),
                 themeColor = settingsJson.optString("themeColor", "#F97316"),
+                // 旧备份没有这个字段，取默认值即可，不要因此判定备份无效
+                themeStyle = settingsJson.optString("themeStyle", "liquid"),
                 dailyLimit = settingsJson.optInt("dailyLimit", 10),
                 warningLimit = settingsJson.optInt("warningLimit", 5),
             )

@@ -47,6 +47,15 @@ object PopColor {
         val Muted = Color(0xFF6B7280)
         val Light = Color(0xFF9CA3AF)
     }
+    object Glass {
+        val Canvas = Color(0xFFDCDAE9)
+        val Tint = Color(0xFFFFFFFF)
+        val Ink = Color(0xFF16161A)
+        val InkSecondary = Color(0xFF4E4E5C)
+        val InkMuted = Color(0xFF8B8B99)
+        val Hairline = Color(0xFFC9C9D4)
+        val Scrim = Color(0xFF12121A)
+    }
     object Neutral {
         val Gray100 = Color(0xFFF3F4F6)
         val Gray200 = Color(0xFFE5E7EB)
@@ -208,6 +217,36 @@ object PopLayout {
     val TimeWheelColumn = 80.dp
     val SvPanelHeight = 120.dp
     val HueBarHeight = 28.dp
+}
+
+/** 液态玻璃主题参数。后缀即单位：Alpha 为透明度，Px 为 dp，Ms 为毫秒，其余为倍数。 */
+object PopGlass {
+    const val SurfaceAlpha = 0.5f
+    const val SurfaceStrongAlpha = 0.68f
+    const val SurfaceDeepAlpha = 0.28f
+    const val StrokeTopAlpha = 0.72f
+    const val StrokeBottomAlpha = 0.3f
+    const val SheenAlpha = 0.24f
+    const val RefractionAlpha = 0.2f
+    const val ShadowAlpha = 0.085f
+    val ShadowLift = 10.dp
+    val ShadowSpread = 26.dp
+    val RadiusCard = 28.dp
+    val RadiusPanel = 24.dp
+    val RadiusField = 18.dp
+    val RadiusChip = 14.dp
+    val RadiusButton = 22.dp
+    val AuroraBlob = 560.dp
+    val AuroraSecondary = 420.dp
+    const val AuroraAlpha = 0.78f
+    const val GrainAlpha = 0.03f
+    const val DriftDuration = 48000
+    const val JellyPressScale = 0.945f
+    const val JellyPressSquash = 1.03f
+    const val JellyPressDamping = 0.42f
+    const val JellyPressStiffness = 780f
+    const val JellyReleaseDamping = 0.3f
+    const val JellyReleaseStiffness = 420f
 }
 
 object PopMotion {

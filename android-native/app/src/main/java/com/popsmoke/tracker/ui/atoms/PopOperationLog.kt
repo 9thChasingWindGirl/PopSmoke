@@ -37,6 +37,12 @@ import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.PopMono
 import java.time.Instant
 import java.time.ZoneId
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import com.popsmoke.tracker.design.popInverseInk
 
 private val BodyHeight = 192.dp
 
@@ -71,7 +77,7 @@ fun PopOperationLog(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Core.Black)
+                .background(popInk)
                 .padding(horizontal = PopSpace.S4, vertical = PopSpace.S1),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -80,7 +86,8 @@ fun PopOperationLog(
                 text = strings.operationLog,
                 size = PopTypeScale.Sm,
                 weight = FontWeight.Black,
-                color = PopColor.Core.White,
+                // 黑头上的字是"反色墨"，不是白玻璃 —— 用 popSurface 会在深底上发灰
+                color = popInverseInk,
                 tracking = PopTracking.Wider,
                 uppercase = true,
                 maxLines = 1,
@@ -99,14 +106,14 @@ fun PopOperationLog(
             Modifier
                 .fillMaxWidth()
                 .height(BodyHeight)
-                .background(PopColor.Core.White),
+                .background(popSurface),
         ) {
             if (logs.isEmpty()) {
                 PopMono(
                     text = strings.opEmpty,
                     modifier = Modifier.padding(PopSpace.S4),
                     size = PopTypeScale.Sm,
-                    color = PopColor.Neutral.Gray500,
+                    color = popInkMuted,
                     maxLines = 2,
                 )
             } else {
@@ -124,13 +131,14 @@ fun PopOperationLog(
         }
 
         // ---- STATUS ----
+        val divider = popInk
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Neutral.Gray100)
+                .background(popSurfaceDeep)
                 .drawBehind {
                     drawRect(
-                        color = PopColor.Core.Black,
+                        color = divider,
                         size = Size(size.width, PopStroke.Default.toPx()),
                     )
                 }
@@ -142,7 +150,7 @@ fun PopOperationLog(
             PopMono(
                 text = "${logs.size} ${strings.opEntries}",
                 size = PopTypeScale.Xs,
-                color = PopColor.Neutral.Gray600,
+                color = popInkSecondary,
             )
             PopMono(
                 text = if (isPaused) strings.opPaused else strings.opLive,
@@ -165,25 +173,26 @@ private fun LogLine(log: OpLog, strings: PopStrings) {
         PopMono(
             text = clockWithSeconds(log.at),
             size = PopTypeScale.Xs,
-            color = PopColor.Neutral.Gray500,
+            color = popInkMuted,
         )
         PopMono(text = prefix, size = PopTypeScale.Xs, weight = FontWeight.Bold, color = tint)
         PopMono(
             text = messageOf(log, strings),
             modifier = Modifier.weight(1f),
             size = PopTypeScale.Xs,
-            color = PopColor.Neutral.Gray700,
+            color = popInkSecondary,
         )
     }
 }
 
+@Composable
 private fun prefixOf(type: OpLogType): Pair<String, Color> = when (type) {
     OpLogType.Create -> "[+]" to PopColor.Status.Success
     OpLogType.Update -> "[~]" to PopColor.Status.Info
     OpLogType.Delete -> "[-]" to PopColor.Status.Error
     OpLogType.Clear -> "[×]" to PopColor.Status.Amber
     OpLogType.Sync -> "[↓]" to PopColor.Theme.Purple
-    OpLogType.System -> "[·]" to PopColor.Neutral.Gray500
+    OpLogType.System -> "[·]" to popInkMuted
 }
 
 /**

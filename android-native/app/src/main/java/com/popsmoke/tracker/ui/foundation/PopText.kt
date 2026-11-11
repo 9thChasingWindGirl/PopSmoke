@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import com.popsmoke.tracker.design.PopLineHeight
+import com.popsmoke.tracker.design.skin
 import com.popsmoke.tracker.design.PopTracking
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.PopBodyFont
@@ -45,6 +46,9 @@ private fun PopTextBase(
     // 改成 40sp 后，标签高度一个像素都没变）。必须同时写 LineHeightStyle(Center, Trim.None)
     // 才是 CSS line-height 的 half-leading 语义。
     val lh = if (lineHeight == TextUnit.Unspecified) PopLineHeight.of(size) else lineHeight
+    // 默认色来自皮肤而不是写死黑：玻璃主题的"墨"是 #16161A，纯黑压在磨砂面上会发脏。
+    // 用 Unspecified 做哨兵，避免在每个组件里各写一遍 LocalSkin.current。
+    val actual = if (color == Color.Unspecified) skin.palette.ink else color
 
     BasicText(
         text = if (uppercase) text.uppercase() else text,
@@ -53,7 +57,7 @@ private fun PopTextBase(
             fontFamily = family,
             fontSize = size,
             fontWeight = weight,
-            color = color,
+            color = actual,
             letterSpacing = tracking,
             fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
             textAlign = textAlign,
@@ -69,14 +73,21 @@ private fun PopTextBase(
     )
 }
 
-/** 展示字体（Bangers）：标题、数字、按钮文案。 */
+/**
+ * 展示字体：标题、数字、按钮文案。
+ *
+ * 波普用 Bangers —— 那种手绘漫画字（自带倾斜、笔画粗细不均）是整站"贴纸感"的来源。
+ * 液态玻璃主题必须换成 HarmonyOS Sans：Bangers 在磨砂玻璃上会立刻破功，
+ * 因为玻璃的语言是"精确的几何 + 细腻的材质"，漫画字讲的是"手绘 + 粗粝"，
+ * 两种语言放一起，前者会显得像给玻璃贴了一张手写便签。
+ */
 @Composable
 fun PopDisplay(
     text: String,
     modifier: Modifier = Modifier,
     size: TextUnit = PopTypeScale.Xl,
     weight: FontWeight = FontWeight.Black,
-    color: Color = Color.Black,
+    color: Color = Color.Unspecified,
     tracking: TextUnit = PopTracking.Normal,
     italic: Boolean = false,
     uppercase: Boolean = false,
@@ -85,13 +96,14 @@ fun PopDisplay(
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) = PopTextBase(
     text = text,
-    family = PopDisplayFont,
+    family = if (skin.glass) PopBodyFont else PopDisplayFont,
     modifier = modifier,
     size = size,
     weight = weight,
     color = color,
     tracking = tracking,
-    italic = italic,
+    // 玻璃主题下忽略斜体：真斜体在磨砂面上会显得歪，而且和"光从上往下打"的假设打架
+    italic = if (skin.glass) false else italic,
     uppercase = uppercase,
     textAlign = textAlign,
     maxLines = maxLines,
@@ -105,7 +117,7 @@ fun PopBody(
     modifier: Modifier = Modifier,
     size: TextUnit = PopTypeScale.Base,
     weight: FontWeight = FontWeight.Bold,
-    color: Color = Color.Black,
+    color: Color = Color.Unspecified,
     tracking: TextUnit = PopTracking.Normal,
     italic: Boolean = false,
     uppercase: Boolean = false,
@@ -139,7 +151,7 @@ fun PopMono(
     modifier: Modifier = Modifier,
     size: TextUnit = PopTypeScale.Sm,
     weight: FontWeight = FontWeight.Normal,
-    color: Color = Color.Black,
+    color: Color = Color.Unspecified,
     textAlign: TextAlign = TextAlign.Start,
     maxLines: Int = 1,
 ) = PopTextBase(

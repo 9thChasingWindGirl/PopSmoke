@@ -48,6 +48,11 @@ export const i18n_EN = {
   customHex: 'Custom Hex',
   customColor: 'Custom Color',
   theme: 'Theme',
+  themeStyle: 'Theme Style',
+  styleLiquid: 'Liquid Glass',
+  stylePop: 'Pop Comic',
+  styleLiquidDesc: 'Frosted glass, light play, jelly motion',
+  stylePopDesc: 'Hard ink outlines, hard shadows, comic paper',
   
   // ============ Dashboard - Messages ============
   warningMsg: 'WARNING: Approaching Daily Limit!',

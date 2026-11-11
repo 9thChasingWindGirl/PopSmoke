@@ -38,6 +38,10 @@ import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.PopTapTarget
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurfaceDeep
 
 /**
  * 折叠行：▶/▼ + 标题 + 计数徽标，点击展开。
@@ -55,7 +59,7 @@ fun PopAccordionRow(
     badgeColor: Color = com.popsmoke.tracker.design.accent,
     badgeTextColor: Color = Color.Black,
     subtitle: String? = null,
-    background: Color = PopColor.Neutral.Gray100,
+    background: Color = popSurfaceDeep,
     borderWidth: Dp = PopStroke.Thin,
     titleSize: androidx.compose.ui.unit.TextUnit = PopTypeScale.Lg,
     content: @Composable ColumnScope.() -> Unit = {},
@@ -65,7 +69,7 @@ fun PopAccordionRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(background)
-                .popBorder(borderWidth, PopColor.Core.Black)
+                .popBorder(borderWidth, popInk)
                 .clickable(onClick = onToggle)
                 .semantics { role = Role.Button }
                 .padding(horizontal = PopSpace.S3, vertical = PopSpace.S3),
@@ -76,7 +80,7 @@ fun PopAccordionRow(
                 modifier = Modifier.graphicsLayer { rotationZ = if (expanded) 90f else 0f },
                 size = PopTypeScale.Sm,
                 weight = FontWeight.Black,
-                color = PopColor.Neutral.Gray600,
+                color = popInkSecondary,
             )
             Spacer(Modifier.width(PopSpace.S2))
             Column(Modifier.weight(1f)) {
@@ -91,7 +95,7 @@ fun PopAccordionRow(
                         text = subtitle,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray500,
+                        color = popInkMuted,
                         maxLines = 1,
                     )
                 }
@@ -100,7 +104,7 @@ fun PopAccordionRow(
                 Box(
                     Modifier
                         .background(badgeColor)
-                        .border(PopStroke.Thin, PopColor.Core.Black)
+                        .border(PopStroke.Thin, popInk)
                         .padding(horizontal = PopSpace.S3, vertical = PopSpace.S1),
                 ) {
                     PopDisplay(

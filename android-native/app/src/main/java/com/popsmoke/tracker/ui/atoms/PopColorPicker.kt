@@ -41,6 +41,12 @@ import com.popsmoke.tracker.design.parseHexColor
 import com.popsmoke.tracker.design.toHexString
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.PopGlass
 
 /**
  * 取色器：色相条 + 饱和度/明度面板 + 色号输入 + 预设色块。
@@ -82,7 +88,8 @@ fun PopColorPicker(
                 Modifier
                     .size(PopSpace.S10)
                     .background(current)
-                    .popBorder(PopStroke.Thin, PopColor.Core.Black),
+                    .clip(pickerShape())
+            .popBorder(PopStroke.Thin, popInk),
             )
             Box(Modifier.size(PopSpace.S2))
             PopInput(
@@ -123,17 +130,31 @@ fun PopColorPicker(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(PopSpace.S2),
             ) {
+                val glassSwatch = LocalSkin.current.glass
                 presets.forEach { hex ->
                     val color = parseHexColor(hex) ?: return@forEach
                     val selected = hex.equals(value, ignoreCase = true)
+                    // 玻璃下色块是"玻璃片"：圆角 + 白色细边，选中时加粗。
+                    // 原来 2dp/4dp 的纯黑边是波普的贴纸语言，压在磨砂面上会像 6 块黑板擦。
+                    val swatchShape = pickerShape(0.55f)
                     Box(
                         Modifier
                             .weight(1f)
                             .height(PopSpace.S10)
+                            .clip(swatchShape)
                             .background(color)
                             .border(
-                                if (selected) PopStroke.Default else PopStroke.Thin,
-                                PopColor.Core.Black,
+                                width = if (glassSwatch) {
+                                    if (selected) 2.dp else 1.dp
+                                } else {
+                                    if (selected) PopStroke.Default else PopStroke.Thin
+                                },
+                                color = if (glassSwatch) {
+                                    Color.White.copy(alpha = if (selected) 0.95f else 0.5f)
+                                } else {
+                                    popInk
+                                },
+                                shape = swatchShape,
                             )
                             .clickable {
                                 draft = hex
@@ -147,7 +168,7 @@ fun PopColorPicker(
                 text = "TAP A SWATCH OR TYPE A HEX",
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray400,
+                color = popInkMuted,
                 maxLines = 1,
             )
         }
@@ -168,7 +189,8 @@ private fun SvPanel(
         Modifier
             .fillMaxWidth()
             .height(PopLayout.SvPanelHeight)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .clip(pickerShape())
+            .popBorder(PopStroke.Thin, popInk)
             .pointerInput(hue) {
                 // size 是 PointerInputScope 的属性，awaitEachGesture 里看不到，先取出来
                 val width = size.width.toFloat().coerceAtLeast(1f)
@@ -212,11 +234,14 @@ private fun HueBar(
     onPick: (Float) -> Unit,
     onCommit: () -> Unit,
 ) {
+    // 绘制阶段读不到 CompositionLocal，先取出来
+    val glass = LocalSkin.current.glass
     Box(
         Modifier
             .fillMaxWidth()
             .height(PopLayout.HueBarHeight)
-            .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .clip(pickerShape())
+            .popBorder(PopStroke.Thin, popInk)
             .pointerInput(Unit) {
                 val width = size.width.toFloat().coerceAtLeast(1f)
                 awaitEachGesture {
@@ -251,17 +276,36 @@ private fun HueBar(
                 ),
             )
             val x = (hue / 360f) * size.width
-            drawRect(
-                color = Color.White,
-                topLeft = Offset(x - 4.dp.toPx(), 0f),
-                size = Size(8.dp.toPx(), size.height),
-            )
-            drawRect(
-                color = Color.Black,
-                topLeft = Offset(x - 4.dp.toPx(), 0f),
-                size = Size(8.dp.toPx(), size.height),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()),
-            )
+            if (glass) {
+                // 玻璃下指示器是一枚白色胶囊 + 一圈淡淡的投影环形，
+                // 纯黑硬边会在这条彩虹上像一根贴上去的黑胶带
+                val w = 9.dp.toPx()
+                val h = size.height
+                drawRoundRect(
+                    color = Color(0xFF16161A).copy(alpha = 0.18f),
+                    topLeft = Offset(x - w / 2f - 1.dp.toPx(), -1.dp.toPx()),
+                    size = Size(w + 2.dp.toPx(), h + 2.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius((w + 2.dp.toPx()) / 2f),
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(x - w / 2f, 0f),
+                    size = Size(w, h),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2f),
+                )
+            } else {
+                drawRect(
+                    color = Color.White,
+                    topLeft = Offset(x - 4.dp.toPx(), 0f),
+                    size = Size(8.dp.toPx(), size.height),
+                )
+                drawRect(
+                    color = Color.Black,
+                    topLeft = Offset(x - 4.dp.toPx(), 0f),
+                    size = Size(8.dp.toPx(), size.height),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()),
+                )
+            }
         }
     }
 }
@@ -273,3 +317,14 @@ private fun Color.toHsv(): FloatArray = FloatArray(3).also { out ->
         out,
     )
 }
+
+/**
+ * 取色块/色盘/色相条的圆角。
+ *
+ * 波普是 0（直角色块贴在纸上），玻璃下是圆角：一块直角彩色区域压在磨砂面上
+ * 会像"没裁干净的贴纸"，圆角才能和周围的面板、按钮咬合。
+ */
+@Composable
+private fun pickerShape(scale: Float = 1f) = RoundedCornerShape(
+    if (LocalSkin.current.glass) PopGlass.RadiusField * scale else 0.dp,
+)

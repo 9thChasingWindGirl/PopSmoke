@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +14,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLineHeight
 import com.popsmoke.tracker.design.PopSpace
@@ -44,11 +46,12 @@ fun PopInput(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
+    val current = LocalSkin.current
     val style = TextStyle(
         fontFamily = PopDisplayFont,
         fontSize = PopTypeScale.Base,
         fontWeight = FontWeight.Bold,
-        color = PopColor.Core.Black,
+        color = current.palette.ink,
         lineHeight = PopLineHeight.of(PopTypeScale.Base),
         platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
     )
@@ -60,7 +63,7 @@ fun PopInput(
         enabled = enabled,
         singleLine = singleLine,
         textStyle = style,
-        cursorBrush = SolidColor(PopColor.Core.Black),
+        cursorBrush = SolidColor(current.palette.ink),
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
@@ -68,10 +71,15 @@ fun PopInput(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(if (error) PopColor.Status.ErrorLight else PopColor.Core.White)
+                    // 玻璃下输入框是"凹槽"：比卡片更透、更暗一点，才读得出可以输入
+                    .background(
+                        if (error) PopColor.Status.ErrorLight.copy(alpha = 0.66f) else current.palette.surfaceDeep,
+                        RoundedCornerShape(current.radiusField),
+                    )
                     .popBorder(
                         PopStroke.Default,
-                        if (error) PopColor.Status.Error else PopColor.Core.Black,
+                        if (error) PopColor.Status.Error else current.palette.ink,
+                        RoundedCornerShape(current.radiusField),
                     )
                     // Web 是 p-1/p-2；原生给足高度，否则触摸目标太小
                     .padding(horizontal = PopSpace.S3, vertical = PopSpace.S2),
@@ -81,7 +89,7 @@ fun PopInput(
                         text = placeholder,
                         size = PopTypeScale.Base,
                         weight = FontWeight.Bold,
-                        color = PopColor.Neutral.Gray400,
+                        color = current.palette.inkMuted,
                     )
                 }
                 inner()

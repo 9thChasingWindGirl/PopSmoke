@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Canvas as BitmapCanvas
 import androidx.compose.ui.platform.LocalDensity
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
+import com.popsmoke.tracker.design.popInk
 
 /**
  * 页面底纹：20dp 网格上每格一个 1dp 黑点。
@@ -29,7 +30,7 @@ import com.popsmoke.tracker.design.PopLayout
 @Composable
 fun PopDotGrid(
     modifier: Modifier = Modifier,
-    color: Color = PopColor.Core.Black,
+    color: Color = popInk,
 ) {
     val density = LocalDensity.current
     val brush = remember(density, color) {

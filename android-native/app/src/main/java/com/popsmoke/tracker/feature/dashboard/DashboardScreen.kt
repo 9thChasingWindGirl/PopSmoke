@@ -60,6 +60,18 @@ import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.PopIcon
 import com.popsmoke.tracker.ui.foundation.PopIconKind
 import com.popsmoke.tracker.ui.foundation.PopPressable
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.ui.foundation.jellyPress
+import com.popsmoke.tracker.ui.foundation.skinSurface
+import androidx.compose.runtime.remember
 
 /**
  * 第 3 批的关键节点：仪表盘一屏。
@@ -151,7 +163,7 @@ private fun DashboardFront(
                 modifier = Modifier.weight(1f),
                 size = PopTypeScale.Xl,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray600,
+                color = popInk,
                 tracking = PopTracking.Wider,
                 uppercase = true,
                 maxLines = 2,
@@ -186,6 +198,8 @@ private fun DashboardFront(
                 .padding(top = PopSpace.S4),
         )
 
+        // 绘制阶段读不到 CompositionLocal，颜色必须在组合期先取出来
+        val hairlineColor = popHairline
         // 上次记录 / 每日上限
         Row(
             modifier = Modifier
@@ -193,7 +207,7 @@ private fun DashboardFront(
                 .padding(top = PopSpace.S4)
                 .drawBehind {
                     drawRect(
-                        color = PopColor.Neutral.Gray200,
+                        color = hairlineColor,
                         size = Size(size.width, PopStroke.Thin.toPx()),
                     )
                 }
@@ -225,14 +239,14 @@ private fun FooterCell(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    valueColor: Color = PopColor.Core.Black,
+    valueColor: Color = popInk,
 ) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         PopBody(
             text = label,
             size = PopTypeScale.Sm,
             weight = FontWeight.Bold,
-            color = PopColor.Neutral.Gray400,
+            color = popInkMuted,
             uppercase = true,
             maxLines = 1,
         )
@@ -246,8 +260,11 @@ private fun FooterCell(
 }
 
 /**
- * BOOM 按钮。整站按压反馈的样板：阴影 7dp → 3.5dp，按钮同步位移 3.5dp，两者差值归零。
- * 圆角和阴影共用同一个 Shape，圆角才对得上。
+ * BOOM 按钮 —— 整屏最大的一块颜色，两套皮肤的差别在这里最明显。
+ *
+ * 波普：7dp 硬阴影 + 按下位移 3.5dp，配合漫画字斜着压上来，读作"盖章"。
+ * 玻璃：胶囊形、果冻按压、彩色半透明，光从顶部打下来在胶囊上留一道高光。
+ * 文案也不再是斜体 "BOOM!"，而是正常字重的主标题 + 一行副标题。
  */
 @Composable
 private fun SmokeButton(
@@ -257,6 +274,75 @@ private fun SmokeButton(
 ) {
     val themeAccent = accent
     val themeOnAccent = onAccent
+    val current = LocalSkin.current
+
+    if (current.glass) {
+        val interaction = remember { MutableInteractionSource() }
+        val pill = RoundedCornerShape(percent = 50)
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(top = PopSpace.S4),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                modifier = Modifier
+                    .widthIn(max = PopLayout.SmokeButtonMax)
+                    .fillMaxWidth()
+                    .jellyPress(interaction)
+                    .skinSurface(
+                        current = current,
+                        shape = pill,
+                        fill = themeAccent.copy(alpha = 0.9f),
+                        lift = 18.dp,
+                        tint = themeAccent,
+                    )
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                    .semantics {
+                        contentDescription = description
+                        role = Role.Button
+                    }
+                    .padding(
+                        start = PopSpace.S6,
+                        end = PopSpace.S4,
+                        top = PopSpace.S4,
+                        bottom = PopSpace.S4,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    PopDisplay(
+                        text = label,
+                        size = PopTypeScale.Xxl,
+                        weight = FontWeight.Bold,
+                        color = themeOnAccent,
+                        tracking = PopTracking.Tight,
+                    )
+                    PopBody(
+                        text = "BOOM!",
+                        size = PopTypeScale.Sm,
+                        weight = FontWeight.Bold,
+                        color = themeOnAccent.copy(alpha = 0.78f),
+                        tracking = PopTracking.Wider,
+                        uppercase = true,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(PopSpace.S12)
+                        .background(Color.White.copy(alpha = 0.24f), CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.55f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PopIcon(PopIconKind.Plus, size = PopSpace.S6, strokeUnits = 2.5f, color = themeOnAccent)
+                }
+            }
+        }
+        return
+    }
 
     Box(
         modifier = Modifier.fillMaxWidth().padding(top = PopSpace.S4),
@@ -281,7 +367,7 @@ private fun SmokeButton(
                     .background(themeAccent, RoundedCornerShape(PopRadius.Md))
                     .popBorder(
                         PopStroke.Default,
-                        PopColor.Core.Black,
+                        popInk,
                         RoundedCornerShape(PopRadius.Md),
                     )
                     .padding(PopSpace.S5),
@@ -309,8 +395,8 @@ private fun SmokeButton(
                 Box(
                     modifier = Modifier
                         .size(PopSpace.S14)
-                        .background(PopColor.Core.White, CircleShape)
-                        .border(PopStroke.Default, PopColor.Core.Black, CircleShape),
+                        .background(popSurface, CircleShape)
+                        .border(PopStroke.Default, popInk, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     PopIcon(PopIconKind.Plus, size = PopSpace.S7, strokeUnits = 3f)
@@ -330,7 +416,7 @@ private fun DashboardBack(
 ) {
     PopCard(
         modifier = Modifier.fillMaxSize(),
-        background = PopColor.Core.SurfaceMuted,
+        background = popSurfaceDeep,
         padding = PaddingValues(PopSpace.S2),
     ) {
         Row(
@@ -359,7 +445,7 @@ private fun DashboardBack(
                 PopDisplay(
                     text = strings.noRecords,
                     size = PopTypeScale.Xl,
-                    color = PopColor.Neutral.Gray400,
+                    color = popInkMuted,
                 )
             }
         } else {
@@ -385,7 +471,8 @@ private fun AlertBanner(
 ) {
     val reached = alert == LimitAlert.Reached
     val background = if (reached) PopColor.Status.Error else PopColor.Status.WarningBorder
-    val foreground = if (reached) PopColor.Core.White else PopColor.Core.Black
+    val glass = LocalSkin.current.glass
+    val foreground = if (reached) Color.White else popInk
     val text = if (reached) "🚫 ${strings.limitReachedMsg}" else "⚠️ ${strings.warningMsg}"
 
     val transition = rememberInfiniteTransition(label = "alert")
@@ -414,12 +501,28 @@ private fun AlertBanner(
             .widthIn(max = PopLayout.AlertMax)
             .fillMaxWidth()
             .graphicsLayer {
+                // 玻璃下不做上下弹跳：那是"贴纸被风吹"的语言。这里只做极轻的呼吸。
                 alpha = if (reached) 1f else pulse
-                translationY = if (reached) -PopSpace.S2.toPx() * bounce else 0f
+                translationY = if (reached && !glass) -PopSpace.S2.toPx() * bounce else 0f
             }
-            .background(background)
-            .popBorder(PopStroke.Default, PopColor.Core.Black)
-            .padding(PopSpace.S3),
+            .then(
+                if (glass) {
+                    Modifier
+                        .skinSurface(
+                            current = LocalSkin.current,
+                            shape = RoundedCornerShape(percent = 50),
+                            fill = background.copy(alpha = 0.88f),
+                            lift = 14.dp,
+                            tint = background,
+                        )
+                        .padding(horizontal = PopSpace.S5, vertical = PopSpace.S3)
+                } else {
+                    Modifier
+                        .background(background)
+                        .popBorder(PopStroke.Default, popInk)
+                        .padding(PopSpace.S3)
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         PopBody(

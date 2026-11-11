@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.data.sync.SyncOp
 import com.popsmoke.tracker.data.sync.SyncOpStatus
 import com.popsmoke.tracker.data.sync.SyncOpType
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
@@ -35,8 +38,16 @@ import com.popsmoke.tracker.design.accent
 import com.popsmoke.tracker.i18n.PopStrings
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.PopMono
+import com.popsmoke.tracker.ui.foundation.skinSurface
 import java.time.Instant
 import java.time.ZoneId
+import com.popsmoke.tracker.design.popHairline
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.design.popInkSecondary
+import com.popsmoke.tracker.design.popSurface
+import com.popsmoke.tracker.design.popSurfaceDeep
+import com.popsmoke.tracker.design.popInverseInk
 
 private val SyncBodyHeight = 192.dp
 private val SyncBadgeMinWidth = 56.dp
@@ -64,12 +75,34 @@ fun PopSyncQueue(
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
+    val current = LocalSkin.current
+    val glass = current.glass
+    // 玻璃下整块是"一片"面板：表头、内容、状态栏统一裁到同一个圆角里，
+    // 否则三段各自的直角会在边缘错开，看着像三张卡片叠在一起
+    val panelShape = RoundedCornerShape(if (glass) current.radiusPanel else 0.dp)
+    Column(
+        modifier
+            // 玻璃下整块是一枚真正的玻璃面板：先在底层画投影/高光/描边，再裁圆角给内部三段
+            .then(
+                if (glass) {
+                    Modifier.skinSurface(
+                        current = current,
+                        shape = panelShape,
+                        fill = current.palette.surface,
+                        lift = 12.dp,
+                        tint = accent,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .clip(panelShape),
+    ) {
         // ---- HEADER ----
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Core.Black)
+                .background(if (glass) accent.copy(alpha = 0.14f) else popInk)
                 .padding(horizontal = PopSpace.S4, vertical = PopSpace.S1),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -78,7 +111,8 @@ fun PopSyncQueue(
                 text = strings.syncQueue,
                 size = PopTypeScale.Sm,
                 weight = FontWeight.Black,
-                color = PopColor.Core.White,
+                // 玻璃表头是浅底，文字必须从"反白"切回 ink；继续用 popInverseInk 会变成白字白底
+                color = if (glass) popInk else popInverseInk,
                 tracking = PopTracking.Wider,
                 uppercase = true,
                 maxLines = 1,
@@ -105,14 +139,14 @@ fun PopSyncQueue(
             Modifier
                 .fillMaxWidth()
                 .then(if (ops.isEmpty()) Modifier else Modifier.height(SyncBodyHeight))
-                .background(PopColor.Core.White),
+                .background(if (glass) Color.Transparent else popSurface),
         ) {
             if (ops.isEmpty()) {
                 PopMono(
                     text = strings.syncQueueEmpty,
                     modifier = Modifier.padding(PopSpace.S4),
                     size = PopTypeScale.Sm,
-                    color = PopColor.Neutral.Gray500,
+                    color = popInkMuted,
                     maxLines = 2,
                 )
             } else {
@@ -135,26 +169,29 @@ fun PopSyncQueue(
 
         // ---- STATUS ----
         if (ops.isEmpty()) {
-            // 空态没有状态栏，用一条黑线收口，否则白底会直接消失在画布上。
+            // 空态没有状态栏，用一条线收口，否则浅底会直接消失在画布上。
+            // 玻璃下这条线是发丝而不是 4dp 黑条：磨砂面板的收口靠明度差，不靠黑边
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(PopStroke.Default)
-                    .background(PopColor.Core.Black),
+                    .height(if (glass) 1.dp else PopStroke.Default)
+                    .background(if (glass) current.palette.hairline else popHairline),
             )
             return@Column
         }
+        val divider = if (glass) current.palette.hairline else popInk
+        val dividerHeight = if (glass) 1.dp else PopStroke.Default
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PopColor.Neutral.Gray100)
+                .background(if (glass) current.palette.surfaceDeep else popSurfaceDeep)
                 .drawBehind {
                     drawRect(
-                        color = PopColor.Core.Black,
-                        size = Size(size.width, PopStroke.Default.toPx()),
+                        color = divider,
+                        size = Size(size.width, dividerHeight.toPx()),
                     )
                 }
-                .padding(top = PopStroke.Default)
+                .padding(top = dividerHeight)
                 .padding(horizontal = PopSpace.S4, vertical = PopSpace.S1),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -162,7 +199,7 @@ fun PopSyncQueue(
             PopMono(
                 text = "${ops.size} ${strings.syncEntries}",
                 size = PopTypeScale.Xs,
-                color = PopColor.Neutral.Gray600,
+                color = popInkSecondary,
             )
             val (label, tint) = when {
                 busy -> strings.syncProcessing to PopColor.Status.Info
@@ -189,12 +226,13 @@ private fun OpRow(
     }
     val failed = op.status == SyncOpStatus.Failed
 
+    val rowLine = popHairline
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .drawBehind {
                 drawRect(
-                    color = PopColor.Neutral.Gray200,
+                    color = rowLine,
                     topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - 1f),
                     size = Size(size.width, 1f),
                 )
@@ -210,7 +248,7 @@ private fun OpRow(
             PopMono(
                 text = clock(op.enqueuedAt),
                 size = PopTypeScale.Xs,
-                color = PopColor.Neutral.Gray500,
+                color = popInkMuted,
             )
             PopMono(text = prefix, size = PopTypeScale.Xs, weight = FontWeight.Bold, color = tint)
             PopMono(
@@ -218,7 +256,7 @@ private fun OpRow(
                 text = "${labelOf(op.type, strings)} #${op.recordIndex}",
                 modifier = Modifier.weight(1f),
                 size = PopTypeScale.Xs,
-                color = PopColor.Neutral.Gray700,
+                color = popInkSecondary,
                 maxLines = 1,
             )
         }
@@ -247,10 +285,23 @@ private fun labelOf(type: SyncOpType, strings: PopStrings): String = when (type)
 /** 状态徽标：黄底待同步、红底失败。字很小，靠底色而不是字重来区分。 */
 @Composable
 private fun StatusBadge(text: String, failed: Boolean) {
+    val current = LocalSkin.current
+    val glass = current.glass
+    val shape = RoundedCornerShape(if (glass) 999.dp else 0.dp)
+    val bg = if (failed) PopColor.Status.ErrorLight else PopColor.Status.WarningLight
     Box(
         modifier = Modifier
-            .background(if (failed) PopColor.Status.ErrorLight else PopColor.Status.WarningLight)
-            .border(PopStroke.Thin, PopColor.Core.Black)
+            .clip(shape)
+            .background(if (glass) bg.copy(alpha = 0.9f) else bg)
+            .then(
+                if (glass) {
+                    // 玻璃下用白边代替黑边：一块红/黄的小胶囊上压 2dp 纯黑，
+                    // 会立刻把它变回"贴纸"
+                    Modifier.border(1.dp, Color.White.copy(alpha = 0.75f), shape)
+                } else {
+                    Modifier.border(PopStroke.Thin, popInk)
+                },
+            )
             // 最小宽度是给中文留的："待同步"三个字在 10sp 下几乎顶满，
             // 不留余量时描边会贴着字，看着像被裁掉一截。
             .defaultMinSize(minWidth = SyncBadgeMinWidth)
@@ -283,13 +334,23 @@ fun PopMiniButton(
     text: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    color: Color = PopColor.Neutral.Gray200,
+    color: Color = popHairline,
 ) {
+    val current = LocalSkin.current
+    val glass = current.glass
+    val shape = RoundedCornerShape(if (glass) 999.dp else 0.dp)
     Box(
         modifier = Modifier
             .alpha(if (enabled) 1f else 0.45f)
-            .background(color)
-            .border(PopStroke.Thin, PopColor.Core.Black)
+            .clip(shape)
+            .background(if (glass) color.copy(alpha = 0.9f) else color)
+            .then(
+                if (glass) {
+                    Modifier.border(1.dp, Color.White.copy(alpha = 0.7f), shape)
+                } else {
+                    Modifier.border(PopStroke.Thin, popInk)
+                },
+            )
             .clickable(enabled = enabled, onClick = onClick)
             .defaultMinSize(minHeight = PopSpace.S7)
             .padding(horizontal = PopSpace.S2, vertical = 1.dp),

@@ -25,6 +25,8 @@ import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.design.accent
 import com.popsmoke.tracker.ui.foundation.PopDisplay
+import com.popsmoke.tracker.design.popInk
+import com.popsmoke.tracker.design.popInkSecondary
 
 /**
  * 加载态：旋转的方块 + 文案。
@@ -58,7 +60,7 @@ fun PopLoading(
                 .size(PopSpace.S14)
                 .graphicsLayer { rotationZ = angle }
                 .background(accent)
-                .border(PopStroke.Default, PopColor.Core.Black),
+                .border(PopStroke.Default, popInk),
         )
         if (label != null) {
             Box(Modifier.size(PopSpace.S4))
@@ -66,7 +68,7 @@ fun PopLoading(
                 text = label,
                 size = PopTypeScale.Base,
                 weight = FontWeight.Bold,
-                color = PopColor.Neutral.Gray600,
+                color = popInkSecondary,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
             )
