@@ -1,5 +1,6 @@
 package com.popsmoke.tracker
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,8 +29,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import com.popsmoke.tracker.data.Languages
 import com.popsmoke.tracker.data.SmokeLog
 import com.popsmoke.tracker.data.StoreState
@@ -55,10 +62,12 @@ import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopNavMetrics
 import com.popsmoke.tracker.ui.chrome.PopTabItem
 import com.popsmoke.tracker.ui.chrome.PopTopBar
+import com.popsmoke.tracker.ui.foundation.GlassTone
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
 import com.popsmoke.tracker.ui.foundation.PopIconKind
+import com.popsmoke.tracker.ui.foundation.PopWallpaper
 import com.popsmoke.tracker.ui.foundation.rememberBackdrop
 
 /** 所有会改数据的动作集中在一个数据类里，页面只声明"我能做什么"，不持有 ViewModel。 */
@@ -106,6 +115,13 @@ private enum class PopTab { Tracker, Analysis, History, Api, Settings }
 fun PopApp(
     ui: AppUiState,
     actions: PopActions,
+    /**
+     * 当日壁纸。null 表示还没有图（首启未联网 / 无缓存），此时退回程序化极光。
+     *
+     * 做成参数而不是在这里直接取：截图测试要能塞一张固定的图进去，
+     * 否则每跑一次快照都是在和网络赛跑。
+     */
+    wallpaper: ImageBitmap? = null,
 ) {
     val language = ui.settings.language
     val strings: PopStrings = remember(language) { popStrings(language) }
@@ -136,21 +152,29 @@ fun PopApp(
 
     BackHandler(enabled = tab != PopTab.Tracker) { tabIndex = 0 }
 
-    // 背景由皮肤决定：波普是纸面点阵，玻璃是极光光斑。
-    // 玻璃面板是半透明的，背后必须有东西可透，否则整套"通透"就塌成浅灰圆角。
+    // 背景由皮肤决定：波普是纸面点阵，玻璃是壁纸（没有壁纸时退回程序化极光）。
+    // 玻璃面板是半透明的，背后必须有东西可透，否则整套"通透"就塌成浅灰圆角 ——
+    // 而"有东西"不是随便一层渐变就够：位移二三十像素前后必须看得出差别，
+    // 那需要照片级别的结构（有边、有纹理、彼此咬合的明暗）。
     val current = LocalSkin.current
     val glass = current.glass
     BoxWithConstraints(Modifier.fillMaxSize().background(current.palette.canvas)) {
         if (current.glass) {
-            PopAurora(Modifier.matchParentSize(), accent = ui.dashboard.accent)
+            if (wallpaper != null) {
+                PopWallpaper(wallpaper, Modifier.matchParentSize())
+            } else {
+                PopAurora(Modifier.matchParentSize(), accent = ui.dashboard.accent)
+            }
         } else {
             PopDotGrid(Modifier.matchParentSize())
         }
 
-        // 背景快照：玻璃面板靠它做折射。背景是静态的，所以这张位图只在
-        // 尺寸或主题色变化时重算一次，之后一直复用。波普主题不需要，给 null。
+        // 背景快照：玻璃面板靠它做折射与明暗判断。来源是静态的（壁纸 / 程序化背景），
+        // 所以这张位图只在来源或尺寸变化时重算一次，之后一直复用。
+        // 波普主题不需要，给 null。
         val backdrop = if (glass) {
             rememberBackdrop(
+                wallpaper = wallpaper,
                 accent = ui.dashboard.accent,
                 widthPx = constraints.maxWidth,
                 heightPx = constraints.maxHeight,
@@ -167,6 +191,41 @@ fun PopApp(
             PopNavMetrics.Height + PopNavMetrics.Margin + bottomInset
         } else {
             PopLayout.BottomBarHeight + bottomInset
+        }
+
+        // 顶栏和底栏各自读一次背后明度：它们可能压着完全不同的区域（顶栏是天空、
+        // 底栏是草地），共用一份色调会出现"上面白字下面黑字"的错判。
+        //
+        // 位置在这里是算出来的，不需要等布局 —— 两个 chrome 都是贴边固定尺寸，
+        // 这比让每个组件自己 onGloballyPositioned 再回调更稳，也不会闪一帧默认色。
+        val density = LocalDensity.current
+        val topTone = remember(backdrop, chromeTop, constraints.maxWidth, density) {
+            backdrop?.toneAt(
+                Rect(0f, 0f, constraints.maxWidth.toFloat(), with(density) { chromeTop.toPx() }),
+            ) ?: GlassTone.Light
+        }
+        val bottomTone = remember(backdrop, chromeBottom, constraints.maxWidth, constraints.maxHeight, density) {
+            if (backdrop == null) {
+                GlassTone.Light
+            } else {
+                val margin = with(density) { PopNavMetrics.Margin.toPx() }
+                val height = with(density) { PopNavMetrics.Height.toPx() }
+                val inset = with(density) { bottomInset.toPx() }
+                val bottom = constraints.maxHeight - inset - margin
+                backdrop.toneAt(
+                    Rect(margin, bottom - height, constraints.maxWidth - margin, bottom),
+                )
+            }
+        }
+
+        // 状态栏/手势条的图标色必须跟着面板走：深色壁纸 + 深色图标 = 看不见。
+        // 这段在 Paparazzi 里不会执行（context 不是 Activity），那里也不显示系统栏。
+        val view = LocalView.current
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !topTone.dark
+            controller.isAppearanceLightNavigationBars = !bottomTone.dark
         }
 
         CompositionLocalProvider(
@@ -278,6 +337,7 @@ fun PopApp(
                     accentColor = ui.dashboard.accent,
                     languageLabel = Languages.shortLabel(language),
                     topInset = topInset,
+                    tone = topTone,
                     themeDescription = strings.cdThemeColor,
                     languageDescription = strings.cdLanguage,
                     customColorLabel = strings.customColor,
@@ -294,6 +354,7 @@ fun PopApp(
                     items = tabs,
                     selectedIndex = tabIndex,
                     bottomInset = bottomInset,
+                    tone = bottomTone,
                     onSelect = { tabIndex = it },
                 )
             }

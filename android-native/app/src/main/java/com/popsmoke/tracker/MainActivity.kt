@@ -30,6 +30,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val ui by viewModel.ui.collectAsStateWithLifecycle()
+            // 壁纸是独立的一条流：它比记录数据晚到（要联网），不能拖住首帧。
+            val wallpaper by viewModel.wallpaperImage.collectAsStateWithLifecycle()
 
             PopTheme(
                 accent = ui.settings.themeColor.toPopColor(),
@@ -37,6 +39,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 PopApp(
                     ui = ui,
+                    wallpaper = wallpaper,
                     actions = PopActions(
                         onRecord = viewModel::record,
                         onDelete = viewModel::delete,

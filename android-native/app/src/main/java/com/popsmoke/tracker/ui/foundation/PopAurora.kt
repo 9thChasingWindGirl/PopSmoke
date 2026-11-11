@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Paint
@@ -17,9 +18,12 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.skin
@@ -72,6 +76,45 @@ fun PopAurora(
         modifier
             .background(canvasColor)
             .drawBehind { drawAuroraBody(accent, grain, canvasColor, arcInk) },
+    )
+}
+
+/**
+ * 壁纸层。
+ *
+ * 直接用照片，**不做任何效果** —— 不压暗、不加渐变、不叠色彩滤镜。
+ * 这一条是刻意的：壁纸唯一的职责是"提供可被弯折的结构"，
+ * 一旦开始给它调色，玻璃里的世界就和外面不一样了，读起来像两层贴图。
+ *
+ * 可读性不靠给背景打补丁，靠玻璃自己采样明度（见 [GlassTone]）。
+ *
+ * 铺法是 CSS `background-size: cover`：短边贴满、长边居中裁掉。
+ * 用 fitXY 会把 16:9 的照片压成 9:20，人脸直接变形；
+ * 用 fit 会留出上下两条底色，比不做壁纸还难看。
+ */
+@Composable
+fun PopWallpaper(wallpaper: ImageBitmap, modifier: Modifier = Modifier) {
+    val canvasColor = skin.palette.canvas
+    Box(
+        modifier
+            .background(canvasColor)
+            .drawBehind {
+                if (wallpaper.width <= 0 || wallpaper.height <= 0) return@drawBehind
+                val scale = max(size.width / wallpaper.width, size.height / wallpaper.height)
+                val dw = wallpaper.width * scale
+                val dh = wallpaper.height * scale
+                clipRect(0f, 0f, size.width, size.height) {
+                    drawImage(
+                        image = wallpaper,
+                        dstOffset = IntOffset(
+                            ((size.width - dw) / 2f).toInt(),
+                            ((size.height - dh) / 2f).toInt(),
+                        ),
+                        dstSize = IntSize(dw.toInt(), dh.toInt()),
+                        filterQuality = FilterQuality.Medium,
+                    )
+                }
+            },
     )
 }
 

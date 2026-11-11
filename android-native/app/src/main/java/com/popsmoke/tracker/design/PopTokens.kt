@@ -200,7 +200,7 @@ object PopIconSize {
 
 object PopLayout {
     val ContentMax = 448.dp
-    val HeaderHeight = 60.dp
+    val HeaderHeight = 64.dp
     val BottomBarHeight = 60.dp
     val DotGridSize = 20.dp
     val DotRadius = 1.dp
@@ -221,9 +221,9 @@ object PopLayout {
 
 /** 液态玻璃主题参数。后缀即单位：Alpha 为透明度，Px 为 dp，Ms 为毫秒，其余为倍数。 */
 object PopGlass {
-    const val SurfaceAlpha = 0.02f
-    const val SurfaceStrongAlpha = 0.1f
-    const val SurfaceDeepAlpha = 0.09f
+    const val SurfaceAlpha = 0.3f
+    const val SurfaceStrongAlpha = 0.5f
+    const val SurfaceDeepAlpha = 0.22f
     val EdgeStroke = 1.dp
     const val EdgePeakAlpha = 0.6f
     const val EdgeMinAlpha = 0.03f
@@ -262,11 +262,11 @@ object PopGlass {
     const val WeaveInkAlpha = 0.075f
     const val SolidSheenAlpha = 0.16f
     const val InnerShadeAlpha = 0.15f
-    const val GroupAlpha = 0.18f
+    const val GroupAlpha = 0.34f
     const val DividerAlpha = 0.07f
-    const val ChromeVeilAlpha = 0.1f
+    const val ChromeVeilAlpha = 0.06f
     const val NavAlpha = 0.62f
-    const val ControlAlpha = 0.2f
+    const val ControlAlpha = 0.3f
     const val OverlayAlpha = 0.66f
 }
 

@@ -85,10 +85,10 @@ fun PopButton(
         val fill = when (variant) {
             // 主按钮：彩色玻璃而不是实心色块，要能透出背后的光
             PopButtonVariant.Primary -> themeAccent.copy(alpha = 0.58f)
-            // 次要：白玻璃。0.2 刚好能从静默分组（0.3 但无折射、无投影、无亮边）里
-            // 分出来，又不会变成第二块玻璃板
-            PopButtonVariant.Secondary ->
-                current.palette.surfaceStrong.copy(alpha = PopGlass.ControlAlpha)
+            // 次要：白玻璃。要能从静默分组里分出来，又不能变成第二块玻璃板 ——
+            // 分组的浓度是跟着背后照片走的（暗处更实），按钮如果固定 0.15，
+            // 在夜景上会彻底消失。所以直接用 surfaceStrong，让同一个明度补偿链路管它。
+            PopButtonVariant.Secondary -> current.palette.surfaceStrong
             // 危险：淡红底 + 红字，而不是一整块实心红。
             // 实心红在浅色玻璃场景里是全屏最响的一块色，会盖过主题色的焦点；
             // 而"红"这个信号由文字和底色的色相承担就够了，不需要饱和度来喊。

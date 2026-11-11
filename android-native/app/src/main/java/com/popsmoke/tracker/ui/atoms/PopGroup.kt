@@ -13,23 +13,37 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.PopShadow
+import com.popsmoke.tracker.design.PopSkin
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
 import com.popsmoke.tracker.design.PopTracking
 import com.popsmoke.tracker.design.PopTypeScale
 import com.popsmoke.tracker.design.popInk
 import com.popsmoke.tracker.design.popInkMuted
+import com.popsmoke.tracker.ui.foundation.GlassTone
+import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
@@ -64,15 +78,7 @@ fun PopGroup(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (current.glass) {
-                    Modifier.background(Color.White.copy(alpha = PopGlass.GroupAlpha), resolved)
-                } else {
-                    Modifier
-                        .popShadow(PopShadow.Pop, shape = resolved)
-                        .background(current.palette.surface, resolved)
-                },
-            )
+            .groupSurface(current, resolved)
             // 描边在玻璃下自动退成 hairline（见 popBorder），不必在这里分支
             .popBorder(PopStroke.Default, current.palette.ink, resolved)
             .clip(resolved)
@@ -80,6 +86,45 @@ fun PopGroup(
         content = content,
     )
 }
+
+/**
+ * 分组底：白，但浓度跟着背后的照片走。
+ *
+ * 固定的"白 18%"只在一个明度区间里成立：压在夜景照片上，18% 的白只到 70 的灰，
+ * 深色正文压上去等于没有；压在雪山上，18% 和背景几乎同色，整块消失。
+ *
+ * 所以这里读一次背后的明度，把浓度乘上去（夜景 ×3、雪景 ×1.6）。
+ * **只调浓度、不改色相** —— 分组里是固定的深色字，底板一旦压暗就等于删掉内容。
+ * 需要"变深色 + 浅字"的只有浮层（见 [GlassTone.adaptFill]）。
+ */
+@Composable
+private fun Modifier.groupSurface(current: PopSkin, shape: Shape): Modifier =
+    if (!current.glass) {
+        popShadow(PopShadow.Pop, shape = shape)
+            .background(current.palette.surface, shape)
+    } else {
+        composed {
+            val backdrop = LocalPopBackdrop.current
+            val origin = remember { mutableStateOf(Offset.Zero) }
+            this
+                .onGloballyPositioned { coords -> origin.value = coords.positionInRoot() }
+                .drawBehind {
+                    val tone = backdrop?.toneAt(
+                        Rect(
+                            origin.value.x,
+                            origin.value.y,
+                            origin.value.x + size.width,
+                            origin.value.y + size.height,
+                        ),
+                    ) ?: GlassTone.Light
+                    val alpha = (PopGlass.GroupAlpha * tone.contentAlphaScale()).coerceAtMost(0.90f)
+                    val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
+                    clipPath(path) {
+                        drawRect(Color.White.copy(alpha = alpha))
+                    }
+                }
+        }
+    }
 
 /**
  * 分组标题：放在**组外面**，不是组里面的第一行。

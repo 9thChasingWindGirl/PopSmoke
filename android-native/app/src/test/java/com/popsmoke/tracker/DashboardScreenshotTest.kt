@@ -20,7 +20,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.data.AppSettings
 import com.popsmoke.tracker.data.OpLog
@@ -59,12 +70,14 @@ import com.popsmoke.tracker.ui.atoms.PopSyncQueue
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
 import com.popsmoke.tracker.ui.chrome.PopTabItem
+import com.popsmoke.tracker.ui.foundation.GlassTone
 import com.popsmoke.tracker.ui.foundation.PopIconKind
 import com.popsmoke.tracker.ui.chrome.PopTopBar
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.rememberBackdrop
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
+import com.popsmoke.tracker.ui.foundation.PopWallpaper
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -169,16 +182,24 @@ class DashboardScreenshotTest {
      * 必须和 PopApp 用同一套判断 —— 否则截图里的底和真机上不一样，基准就失去意义。
      */
     @Composable
-    private fun Backdrop(accent: Color, content: @Composable BoxScope.() -> Unit) {
+    private fun Backdrop(
+        accent: Color,
+        wallpaper: ImageBitmap? = null,
+        content: @Composable BoxScope.() -> Unit,
+    ) {
         val skin = LocalSkin.current
         BoxWithConstraints(Modifier.fillMaxSize().background(skin.palette.canvas)) {
             if (skin.glass) {
-                PopAurora(Modifier.matchParentSize(), accent = accent)
+                if (wallpaper != null) {
+                    PopWallpaper(wallpaper, Modifier.matchParentSize())
+                } else {
+                    PopAurora(Modifier.matchParentSize(), accent = accent)
+                }
             } else {
                 PopDotGrid(Modifier.matchParentSize())
             }
             val backdrop = if (skin.glass) {
-                rememberBackdrop(accent, constraints.maxWidth, constraints.maxHeight)
+                rememberBackdrop(wallpaper, accent, constraints.maxWidth, constraints.maxHeight)
             } else {
                 null
             }
@@ -196,14 +217,16 @@ class DashboardScreenshotTest {
         tabs: List<String>,
         flipped: Boolean = false,
         style: PopThemeStyle = PopThemeStyle.Pop,
+        wallpaper: ImageBitmap? = null,
     ) {
         PopTheme(accent = state.accent, style = style) {
-            Backdrop(state.accent) {
+            Backdrop(state.accent, wallpaper) {
                 Column(Modifier.fillMaxSize()) {
                     PopTopBar(
                         accentColor = state.accent,
                         languageLabel = languageLabel,
                         topInset = 24.dp,
+                        tone = GlassTone.Light,
                         themeDescription = "",
                         languageDescription = "",
                         customColorLabel = "Custom",
@@ -227,6 +250,7 @@ class DashboardScreenshotTest {
                         items = tabs.asTabItems(),
                         selectedIndex = 0,
                         bottomInset = 16.dp,
+                        tone = GlassTone.Light,
                         onSelect = {},
                     )
                 }
@@ -338,6 +362,7 @@ class DashboardScreenshotTest {
                             accentColor = accent,
                             languageLabel = languageLabel,
                             topInset = 24.dp,
+                            tone = GlassTone.Light,
                             themeDescription = "",
                             languageDescription = "",
                             customColorLabel = "Custom",
@@ -353,6 +378,7 @@ class DashboardScreenshotTest {
                             items = tabs.asTabItems(),
                             selectedIndex = selectedIndex,
                             bottomInset = 16.dp,
+                            tone = GlassTone.Light,
                             onSelect = {},
                         )
                     }
@@ -876,6 +902,181 @@ class DashboardScreenshotTest {
                     )
                 }
             }
+        }
+    }
+
+
+    // ------------------------------------------------------------------
+    // 壁纸 + 明度自适应
+    // ------------------------------------------------------------------
+
+    /**
+     * 测试用壁纸：程序化画一张有"照片感"的图。
+     *
+     * 不用真实照片有两个原因：快照必须逐像素可复现（一张 JP/PNG 也要进仓库）；
+     * 而且这里要验证的是**明度分布**，不是某张图好不好看。
+     * 斜纹和点阵是故意的 —— 它们是折射唯一能被人眼抓到的参照物。
+     */
+    private fun wallpaperBitmap(dark: Boolean, width: Int = 461, height: Int = 1000): ImageBitmap {
+        val image = ImageBitmap(width, height)
+        val canvas = Canvas(image)
+        CanvasDrawScope().draw(
+            density = Density(1f),
+            layoutDirection = LayoutDirection.Ltr,
+            canvas = canvas,
+            size = Size(width.toFloat(), height.toFloat()),
+        ) {
+            val w = size.width
+            val h = size.height
+            if (dark) {
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color(0xFF060B14),
+                        0.45f to Color(0xFF16243A),
+                        0.72f to Color(0xFF0B1420),
+                        1f to Color(0xFF05090E),
+                    ),
+                )
+                // 城市灯火：高频小点，只有这种结构才能证明"背景被压弯了"
+                for (row in 0 until 26) {
+                    for (col in 0 until 18) {
+                        val x = (col * 27 + row * 11) % w.toInt()
+                        val y = (h * 0.52f).toInt() + row * 9
+                        val alpha = 0.10f + ((row * 7 + col * 13) % 9) / 30f
+                        drawCircle(
+                            color = Color(0xFFFFD9A0).copy(alpha = alpha),
+                            radius = 1.6f + ((row + col) % 3),
+                            center = Offset(x.toFloat(), y.toFloat()),
+                        )
+                    }
+                }
+            } else {
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color(0xFF7FB3E8),
+                        0.34f to Color(0xFFD9E9F6),
+                        0.52f to Color(0xFFF2E4C8),
+                        1f to Color(0xFF6F9A5E),
+                    ),
+                )
+                // 云：几块边界清晰的浅色椭圆 —— 玻璃边缘扫过时会被推开、拉长
+                for (i in 0 until 5) {
+                    val cx = size.width * (0.12f + i * 0.19f)
+                    val cy = size.height * (0.10f + (i % 3) * 0.06f)
+                    drawOval(
+                        color = Color.White.copy(alpha = 0.62f),
+                        topLeft = Offset(cx, cy),
+                        size = Size(size.width * 0.22f, 46f),
+                    )
+                }
+                // 远山：一条深色剪影，横跨整屏，是折射最容易露馅的硬边界
+                val ridge = Path().apply {
+                    moveTo(0f, size.height * 0.50f)
+                    lineTo(size.width * 0.22f, size.height * 0.40f)
+                    lineTo(size.width * 0.46f, size.height * 0.47f)
+                    lineTo(size.width * 0.70f, size.height * 0.38f)
+                    lineTo(size.width, size.height * 0.46f)
+                    lineTo(size.width, size.height * 0.56f)
+                    lineTo(0f, size.height * 0.56f)
+                    close()
+                }
+                drawPath(ridge, Color(0xFF5C7A63).copy(alpha = 0.55f))
+                // 草地：越往下越密的斜线
+                for (i in 0 until 420) {
+                    val x = ((i * 37) % w.toInt()).toFloat()
+                    val y = h * 0.56f + ((i * 53) % (h * 0.44f).toInt())
+                    drawLine(
+                        color = Color(0xFF3F6B36).copy(alpha = 0.18f + (i % 5) * 0.06f),
+                        start = Offset(x, y),
+                        end = Offset(x + 4f + (i % 7), y - 30f - (i % 11) * 3f),
+                        strokeWidth = 1.8f,
+                    )
+                }
+            }
+        }
+        return image
+    }
+
+    /** 真机结构：内容铺满、顶栏底栏浮在上面 —— 只有这样才看得出过渡带和浮岛。 */
+    @Composable
+    private fun Stacked(
+        state: DashboardUiState,
+        languageLabel: String,
+        tabs: List<String>,
+        selectedIndex: Int,
+        wallpaper: ImageBitmap,
+    ) {
+        PopTheme(accent = state.accent, style = PopThemeStyle.Liquid) {
+            val skin = LocalSkin.current
+            BoxWithConstraints(Modifier.fillMaxSize().background(skin.palette.canvas)) {
+                PopWallpaper(wallpaper, Modifier.matchParentSize())
+                val backdrop = rememberBackdrop(wallpaper, state.accent, constraints.maxWidth, constraints.maxHeight)
+                // 和 PopApp 里同一套算法：顶栏 / 底栏各自读一次背后明度。
+                val density = LocalDensity.current
+                val topTone = backdrop?.toneAt(
+                    Rect(0f, 0f, constraints.maxWidth.toFloat(), with(density) { 90.dp.toPx() }),
+                ) ?: GlassTone.Light
+                val bottomTone = backdrop?.toneAt(
+                    Rect(
+                        with(density) { 14.dp.toPx() },
+                        constraints.maxHeight - with(density) { 88.dp.toPx() },
+                        constraints.maxWidth - with(density) { 14.dp.toPx() },
+                        constraints.maxHeight - with(density) { 16.dp.toPx() },
+                    ),
+                ) ?: GlassTone.Light
+                CompositionLocalProvider(LocalPopBackdrop provides backdrop) {
+                    Box(Modifier.fillMaxSize()) {
+                        DashboardScreen(
+                            ui = state,
+                            strings = popStrings(state.settings.language),
+                            onRecord = {},
+                            onRequestEdit = {},
+                            onRequestDelete = {},
+                            modifier = Modifier.fillMaxSize().padding(top = 90.dp, bottom = 88.dp),
+                        )
+                        PopTopBar(
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            accentColor = state.accent,
+                            languageLabel = languageLabel,
+                            topInset = 24.dp,
+                            tone = topTone,
+                            themeDescription = "",
+                            languageDescription = "",
+                            customColorLabel = "Custom",
+                            currentTheme = state.settings.themeColor,
+                            currentLanguage = state.settings.language,
+                            themePresets = emptyList(),
+                            onTitleClick = {},
+                            onSelectTheme = {},
+                            onSelectLanguage = {},
+                        )
+                        PopBottomBar(
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                            items = tabs.asTabItems(),
+                            selectedIndex = selectedIndex,
+                            bottomInset = 16.dp,
+                            tone = bottomTone,
+                            onSelect = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun glass_wallpaper_light_zh() {
+        val state = sampleState(count = 5, language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Stacked(state, "中", listOf("记录", "分析", "历史", "接口", "设置"), 0, wallpaperBitmap(dark = false))
+        }
+    }
+
+    @Test
+    fun glass_wallpaper_dark_zh() {
+        val state = sampleState(count = 5, language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Stacked(state, "中", listOf("记录", "分析", "历史", "接口", "设置"), 0, wallpaperBitmap(dark = true))
         }
     }
 

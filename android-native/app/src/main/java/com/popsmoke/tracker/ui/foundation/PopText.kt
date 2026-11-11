@@ -157,9 +157,14 @@ fun PopBrand(
     accent: Color,
     modifier: Modifier = Modifier,
     size: TextUnit = PopTypeScale.Xl,
+    /**
+     * 前半段的字色。壁纸是照片，顶栏压着的那块可能是夜空 —— 固定用墨色会在
+     * 一半的图片上消失。调用方按背后明度给（见 [GlassTone.ink]）。
+     */
+    ink: Color = Color.Unspecified,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        PopLogotype(text = "POP", size = size)
+        PopLogotype(text = "POP", size = size, color = ink)
         Spacer(Modifier.width(3.dp))
         PopLogotype(text = "SMOKE", size = size, color = accent)
     }

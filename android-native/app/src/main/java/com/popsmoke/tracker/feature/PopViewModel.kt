@@ -1,6 +1,7 @@
 package com.popsmoke.tracker.feature
 
 import android.content.Context
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,7 @@ import com.popsmoke.tracker.data.sync.FileSyncQueueStore
 import com.popsmoke.tracker.data.sync.SyncQueue
 import com.popsmoke.tracker.data.formatClock
 import com.popsmoke.tracker.data.startOfDayMillis
+import com.popsmoke.tracker.data.wallpaper.DailyWallpaper
 import com.popsmoke.tracker.feature.cloud.CloudNotice
 import com.popsmoke.tracker.feature.cloud.CloudNoticeKind
 import com.popsmoke.tracker.feature.cloud.CloudUiState
@@ -51,6 +53,7 @@ class PopViewModel(
     private val apiConfigStore: ApiConfigStore,
     private val queue: SyncQueue,
     private val logSync: LogSyncService,
+    private val wallpaper: DailyWallpaper,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(AppUiState())
@@ -58,7 +61,23 @@ class PopViewModel(
 
     private val _cloud = MutableStateFlow(CloudUiState())
 
+    /**
+     * 当日壁纸。null 表示还没有图 —— 玻璃会退回程序化背景。
+     *
+     * 放在 ViewModel 而不是 Composable 的 `produceState`：转屏、返回前台时
+     * Compose 会重建，而这张位图有 8MB，重复解码是能感觉到的卡顿。
+     * ViewModel 活着，它就只解一次。
+     */
+    private val _wallpaper = MutableStateFlow<ImageBitmap?>(null)
+    val wallpaperImage: StateFlow<ImageBitmap?> = _wallpaper.asStateFlow()
+
     init {
+        // 壁纸失败不影响任何功能：拿不到就是没有，界面退回程序化背景。
+        viewModelScope.launch {
+            runCatching {
+                wallpaper.wallpapers().collect { _wallpaper.value = it }
+            }
+        }
         viewModelScope.launch {
             // 读盘失败也要往下走：登录态恢复不该被一份坏数据文件拖死。
             runCatching { repository.init() }
@@ -452,7 +471,10 @@ class PopViewModel(
                     // 但仓库本身不认识网络层，只拿一个取 id 的函数。
                     val repository = LogRepository(store, queue) { cloud.currentUser()?.id }
                     val logSync = LogSyncService(queue, cloud, repository)
-                    return PopViewModel(repository, cloud, configStore, queue, logSync) as T
+                    return PopViewModel(
+                        repository, cloud, configStore, queue, logSync,
+                        wallpaper = DailyWallpaper(appContext),
+                    ) as T
                 }
             }
         }
