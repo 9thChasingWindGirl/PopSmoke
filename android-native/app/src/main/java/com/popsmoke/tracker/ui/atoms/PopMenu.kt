@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopShadow
 import com.popsmoke.tracker.design.PopSpace
@@ -102,7 +103,7 @@ fun PopMenuPanel(
             .skinSurface(
                 current = current,
                 shape = RoundedCornerShape(current.radiusPanel),
-                fill = current.palette.surfaceStrong,
+                fill = current.palette.surfaceStrong.copy(alpha = PopGlass.OverlayAlpha),
                 lift = PopShadow.PopLg,
             )
             .padding(padding),

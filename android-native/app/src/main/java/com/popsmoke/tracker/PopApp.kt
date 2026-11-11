@@ -10,12 +10,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -33,6 +34,7 @@ import com.popsmoke.tracker.data.SmokeLog
 import com.popsmoke.tracker.data.StoreState
 import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
+import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopPresets
 import com.popsmoke.tracker.design.toHexString
 import com.popsmoke.tracker.feature.AppUiState
@@ -47,11 +49,16 @@ import com.popsmoke.tracker.ui.atoms.PopButton
 import com.popsmoke.tracker.ui.atoms.PopButtonVariant
 import com.popsmoke.tracker.ui.atoms.PopDialog
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
+import com.popsmoke.tracker.ui.chrome.ChromeInsets
+import com.popsmoke.tracker.ui.chrome.LocalChromeInsets
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
+import com.popsmoke.tracker.ui.chrome.PopNavMetrics
+import com.popsmoke.tracker.ui.chrome.PopTabItem
 import com.popsmoke.tracker.ui.chrome.PopTopBar
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
 import com.popsmoke.tracker.ui.foundation.PopDotGrid
+import com.popsmoke.tracker.ui.foundation.PopIconKind
 import com.popsmoke.tracker.ui.foundation.rememberBackdrop
 
 /** 所有会改数据的动作集中在一个数据类里，页面只声明"我能做什么"，不持有 ViewModel。 */
@@ -120,11 +127,11 @@ fun PopApp(
     val themePresets = remember { PopPresets.All.map { it.color.toHexString() } }
 
     val tabs = listOf(
-        strings.tracker,
-        strings.analysis,
-        strings.history,
-        strings.api,
-        strings.settings,
+        PopTabItem(strings.tracker, PopIconKind.Flame),
+        PopTabItem(strings.analysis, PopIconKind.Chart),
+        PopTabItem(strings.history, PopIconKind.Clock),
+        PopTabItem(strings.api, PopIconKind.Plug),
+        PopTabItem(strings.settings, PopIconKind.Gear),
     )
 
     BackHandler(enabled = tab != PopTab.Tracker) { tabIndex = 0 }
@@ -152,25 +159,21 @@ fun PopApp(
             null
         }
 
-        CompositionLocalProvider(LocalPopBackdrop provides backdrop) {
-        Column(Modifier.fillMaxSize()) {
-            PopTopBar(
-                accentColor = ui.dashboard.accent,
-                languageLabel = Languages.shortLabel(language),
-                topInset = topInset,
-                themeDescription = strings.cdThemeColor,
-                languageDescription = strings.cdLanguage,
-                currentTheme = ui.settings.themeColor,
-                currentLanguage = language,
-                themePresets = themePresets,
-                onTitleClick = { tabIndex = 0 },
-                onSelectTheme = actions.onSetThemeColor,
-                onSelectLanguage = actions.onSetLanguage,
-            )
+        // 顶栏/底栏现在是浮层，不再是 Column 的成员 —— 这样内容能滚到它们底下，
+        // 顶栏的模糊才有东西可糊，底栏的通透才有意义。
+        // 代价是内容得自己让出这两条的高度，所以往下传一份 insets。
+        val chromeTop = PopLayout.HeaderHeight + topInset
+        val chromeBottom = if (glass) {
+            PopNavMetrics.Height + PopNavMetrics.Margin + bottomInset
+        } else {
+            PopLayout.BottomBarHeight + bottomInset
+        }
 
-            Box(Modifier.weight(1f)) {
-                // 页签切换：淡入 + 极轻微放大。波普主题下时长更短——
-                // 贴纸不该有"飘进来"的缓动，那会让它看起来像塑料。
+        CompositionLocalProvider(
+            LocalPopBackdrop provides backdrop,
+            LocalChromeInsets provides ChromeInsets(top = chromeTop, bottom = chromeBottom),
+        ) {
+            Box(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = tab,
                     modifier = Modifier.fillMaxSize(),
@@ -202,7 +205,10 @@ fun PopApp(
                         },
                         onRequestEdit = { pendingEdit = it },
                         onRequestDelete = { pendingDelete = it },
-                        modifier = Modifier.fillMaxSize(),
+                        // 这一页不滚动，直接在布局上让出两条 chrome 的高度即可
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = chromeTop, bottom = chromeBottom),
                     )
 
                     PopTab.Analysis -> AnalysisScreen(
@@ -266,15 +272,30 @@ fun PopApp(
                     )
                 }
                 }
-            }
 
-            PopBottomBar(
-                items = tabs,
-                selectedIndex = tabIndex,
-                bottomInset = bottomInset,
-                onSelect = { tabIndex = it },
-            )
-        }
+                PopTopBar(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    accentColor = ui.dashboard.accent,
+                    languageLabel = Languages.shortLabel(language),
+                    topInset = topInset,
+                    themeDescription = strings.cdThemeColor,
+                    languageDescription = strings.cdLanguage,
+                    currentTheme = ui.settings.themeColor,
+                    currentLanguage = language,
+                    themePresets = themePresets,
+                    onTitleClick = { tabIndex = 0 },
+                    onSelectTheme = actions.onSetThemeColor,
+                    onSelectLanguage = actions.onSetLanguage,
+                )
+
+                PopBottomBar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    items = tabs,
+                    selectedIndex = tabIndex,
+                    bottomInset = bottomInset,
+                    onSelect = { tabIndex = it },
+                )
+            }
         }
 
         PopDialog(

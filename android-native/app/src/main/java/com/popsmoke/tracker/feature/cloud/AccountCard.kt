@@ -62,6 +62,11 @@ fun AccountSection(
     onPullSettings: () -> Unit,
     onDismissNotice: () -> Unit,
     onSyncNow: () -> Unit = {},
+    /**
+     * 组内标题。设置页里这段内容的上面已经有分组标题（在组外面），
+     * 这里再画一次会得到两行一样的字，所以由调用方决定要不要。
+     */
+    showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
@@ -70,12 +75,14 @@ fun AccountSection(
     val busy = cloud.busy
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
-        PopDisplay(
-            text = strings.cloudAccount,
-            size = PopTypeScale.Base,
-            weight = FontWeight.Black,
-            maxLines = 1,
-        )
+        if (showTitle) {
+            PopDisplay(
+                text = strings.cloudAccount,
+                size = PopTypeScale.Base,
+                weight = FontWeight.Black,
+                maxLines = 1,
+            )
+        }
 
         when {
             !cloud.supabaseReady -> {

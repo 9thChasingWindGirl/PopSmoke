@@ -38,6 +38,10 @@ import com.popsmoke.tracker.i18n.PopStrings
 import com.popsmoke.tracker.ui.atoms.PopButton
 import com.popsmoke.tracker.ui.atoms.PopButtonVariant
 import com.popsmoke.tracker.ui.atoms.PopCard
+import com.popsmoke.tracker.ui.atoms.PopGroup
+import com.popsmoke.tracker.ui.atoms.PopGroupLabel
+import com.popsmoke.tracker.ui.atoms.PopPageTitle
+import com.popsmoke.tracker.ui.chrome.LocalChromeInsets
 import com.popsmoke.tracker.ui.atoms.PopDialog
 import com.popsmoke.tracker.ui.atoms.PopOperationLog
 import com.popsmoke.tracker.ui.atoms.PopSyncQueue
@@ -121,19 +125,19 @@ fun AnalysisScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        // 顶栏/底栏是浮层，页面要自己让出这两条的高度（见 PopChrome.ChromeInsets）
         contentPadding = PaddingValues(
             start = PopSpace.S4,
             end = PopSpace.S4,
-            top = PopSpace.S4,
-            bottom = PopSpace.S8,
+            top = LocalChromeInsets.current.top + PopSpace.S4,
+            bottom = LocalChromeInsets.current.bottom + PopSpace.S6,
         ),
         verticalArrangement = Arrangement.spacedBy(PopSpace.S6),
     ) {
+        item { PopPageTitle(strings.analysis) }
+
         item {
-            PopCard(
-                modifier = Modifier.fillMaxWidth(),
-                padding = PaddingValues(PopSpace.S4),
-            ) {
+            PopGroup(padding = PaddingValues(PopSpace.S4)) {
                 // 图头：标题 + 周/月切换
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -182,7 +186,9 @@ fun AnalysisScreen(
         }
 
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.stats) {
+            Column {
+                PopGroupLabel(strings.stats)
+                PopGroup {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
                     if (mode == ViewMode.Week) {
                         PopStatTile(
@@ -213,11 +219,14 @@ fun AnalysisScreen(
                         )
                     }
                 }
+                }
             }
         }
 
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.data) {
+            Column {
+                PopGroupLabel(strings.data)
+                PopGroup {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S3)) {
                     // 已登录就真的同步（推队列 + 拉云端），没登录才引导去设置页。
                     // 上批这里是个只会跳页的按钮，用户点完以为同步过了，其实什么都没发生。
@@ -285,12 +294,15 @@ fun AnalysisScreen(
                         )
                     }
                 }
+                }
             }
         }
 
         // 同步队列在操作日志之前：队列是"还欠什么"，需要动作；日志是"发生过什么"，只需查阅。
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.syncQueue) {
+            Column {
+                PopGroupLabel(strings.syncQueue)
+                PopGroup {
                 PopSyncQueue(
                     ops = cloud.queueOps,
                     strings = strings,
@@ -301,19 +313,23 @@ fun AnalysisScreen(
                     onClear = { clearQueueConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                }
             }
         }
 
         // 操作日志放在最后一屏：它是"查账"用的，不该挡在图表和统计前面。
         // 标题沿用卡片标签样式，面板本身是黑头终端，两层视觉有意撞在一起（Web 版就是这样）。
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.operationLog) {
-                PopOperationLog(
-                    logs = opLogs,
-                    strings = strings,
-                    onClear = onClearOpLogs,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            Column {
+                PopGroupLabel(strings.operationLog)
+                PopGroup {
+                    PopOperationLog(
+                        logs = opLogs,
+                        strings = strings,
+                        onClear = onClearOpLogs,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }

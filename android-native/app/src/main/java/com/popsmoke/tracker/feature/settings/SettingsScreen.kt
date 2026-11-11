@@ -65,19 +65,24 @@ import com.popsmoke.tracker.feature.cloud.message
 import com.popsmoke.tracker.i18n.PopStrings
 import com.popsmoke.tracker.ui.atoms.PopButton
 import com.popsmoke.tracker.ui.atoms.PopButtonVariant
-import com.popsmoke.tracker.ui.atoms.PopCard
 import com.popsmoke.tracker.ui.atoms.PopColorPicker
 import com.popsmoke.tracker.ui.atoms.PopDialog
+import com.popsmoke.tracker.ui.atoms.PopDivider
+import com.popsmoke.tracker.ui.atoms.PopGroup
+import com.popsmoke.tracker.ui.atoms.PopGroupLabel
+import com.popsmoke.tracker.ui.atoms.PopPageTitle
 import com.popsmoke.tracker.ui.atoms.PopSelect
 import com.popsmoke.tracker.ui.atoms.PopSelectOption
 import com.popsmoke.tracker.ui.atoms.PopSlider
 import com.popsmoke.tracker.ui.atoms.PopToast
 import com.popsmoke.tracker.ui.atoms.PopToastKind
+import com.popsmoke.tracker.ui.chrome.LocalChromeInsets
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.buttonShape
 import com.popsmoke.tracker.ui.foundation.jellyPress
 import com.popsmoke.tracker.ui.foundation.popBorder
+import com.popsmoke.tracker.ui.foundation.popShadow
 import com.popsmoke.tracker.ui.foundation.skinSurface
 import java.io.File
 import com.popsmoke.tracker.design.popInk
@@ -166,235 +171,265 @@ fun SettingsScreen(
         PopSelectOption("ko", "한국어"),
     )
 
+    val chrome = LocalChromeInsets.current
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = PopSpace.S4,
             end = PopSpace.S4,
-            top = PopSpace.S4,
-            bottom = PopSpace.S8,
+            top = chrome.top + PopSpace.S4,
+            bottom = chrome.bottom + PopSpace.S6,
         ),
-        verticalArrangement = Arrangement.spacedBy(PopSpace.S6),
+        verticalArrangement = Arrangement.spacedBy(PopSpace.S5),
     ) {
+        item { PopPageTitle(strings.settings) }
+
+        // 云端账户
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.settings) {
-                Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S6)) {
-                    // 账户 / 云端
-                    Column {
-                        AccountSection(
-                            cloud = cloud,
-                            strings = strings,
-                            onGoToApi = onGoToApi,
-                            onSignIn = onSignIn,
-                            onSignUp = onSignUp,
-                            onSignOut = onSignOut,
-                            onPushSettings = onPushSettings,
-                            onPullSettings = onPullSettings,
-                            onDismissNotice = onDismissNotice,
-                            onSyncNow = onSyncNow,
-                        )
-                        // "当前使用本地模式"只在没登录时成立：已登录还说自己是本地模式，
-                        // 用户会以为刚才的登录没生效。
-                        if (!cloud.signedIn) {
-                            Box(Modifier.height(PopSpace.S3))
-                            PopBody(
-                                text = strings.localModeHint,
-                                size = PopTypeScale.Xs,
-                                weight = FontWeight.Bold,
-                                color = popInkMuted,
-                                maxLines = 2,
-                            )
-                        }
-                        Box(Modifier.height(PopSpace.S2))
-                        PopButton(
-                            text = if (apiConfig.isEmpty) strings.api else strings.apiManagement,
-                            onClick = onGoToApi,
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = PopButtonVariant.Secondary,
-                        )
-                    }
-
-                    // 阈值
-                    Column {
-                        SectionTitle(strings.thresholdSettings)
-                        LimitRow(
-                            label = strings.dailyLimit,
-                            value = settings.dailyLimit,
-                            badgeBg = popInk,
-                            // 反色徽标上的数字必须是纯白：popSurface 在玻璃下是半透明白，
-                            // 压在深色徽标上会发灰
-                            badgeFg = Color.White,
-                            rotate = -2f,
-                        )
-                        PopSlider(
-                            value = settings.dailyLimit,
-                            onValueChange = onSetDailyLimit,
-                            min = 1,
-                            max = 50,
-                        )
-                        Box(Modifier.height(PopSpace.S4))
-                        LimitRow(
-                            label = strings.warningLimit,
-                            value = settings.warningLimit,
-                            badgeBg = PopColor.Neutral.Yellow300,
-                            badgeFg = popInk,
-                            rotate = 1f,
-                        )
-                        PopSlider(
-                            value = settings.warningLimit,
-                            onValueChange = onSetWarningLimit,
-                            min = 1,
-                            max = settings.dailyLimit,
-                        )
-                    }
-
-                    // 语言
-                    Column {
-                        SectionTitle("${strings.language}")
-                        PopSelect(
-                            label = strings.language,
-                            value = languages.first { it.value == settings.language }.label,
-                            options = languages,
-                            onSelect = onSetLanguage,
-                        )
-                    }
-
-                    // 主题风格
-                    Column {
-                        StyleSection(
-                            value = settings.themeStyle,
-                            strings = strings,
-                            onChange = onSetThemeStyle,
-                        )
-                    }
-
-                    // 主题
-                    Column {
-                        SectionTitle(strings.themeColor)
-                        PopSelect(
-                            label = strings.theme,
-                            value = settings.themeColor,
-                            options = presets,
-                            onSelect = onSetThemeColor,
-                            leading = {
-                                Box(
-                                    Modifier
-                                        .padding(end = PopSpace.S2)
-                                        .width(PopSpace.S6)
-                                        .height(PopSpace.S6)
-                                        .background(accent)
-                                        .popBorder(PopStroke.Thin, popInk),
-                                )
-                            },
-                        )
-                        Box(Modifier.height(PopSpace.S2))
-                        PopColorPicker(
-                            value = settings.themeColor,
-                            onChange = onSetThemeColor,
-                            presets = PopPresets.All.map { it.color.toHexString() },
-                        )
-                    }
-
-                    // 数据
-                    Column {
-                        SectionTitle(strings.dataManagement)
-                        InfoBlock(strings.storageMethod, "JSON / app-private")
-                        Box(Modifier.height(PopSpace.S2))
-                        InfoBlock(
-                            strings.storageUsage,
-                            "${storageBytes / 1024.0f}".take(5) + " KB",
-                        )
-                        Box(Modifier.height(PopSpace.S3))
-
-                        // 备份 / 恢复：这是"换手机"那一天唯一能救命的东西，
-                        // 所以给足两条路径 —— 导出到文件、从文件选回来（SAF，不要存储权限）。
-                        PopDisplay(
-                            text = strings.backupSection,
-                            modifier = Modifier.padding(bottom = PopSpace.S2),
-                            size = PopTypeScale.Base,
-                            weight = FontWeight.Black,
-                            maxLines = 1,
-                        )
-                        PopButton(
-                            text = strings.backupExport,
-                            onClick = {
-                                val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US)
-                                    .format(java.util.Date())
-                                val file = File(context.getExternalFilesDir(null), "popsmoke-$stamp.json")
-                                val json = StoreCodec.encode(
-                                    StoreState(logs = logs, settings = settings, opLogs = opLogs),
-                                    exportedAt = System.currentTimeMillis(),
-                                )
-                                toast = runCatching { file.writeText(json, Charsets.UTF_8) }
-                                    .map { true to "${strings.backupExported} · ${file.absolutePath}" }
-                                    .getOrElse { false to (it.message ?: strings.exportFailed) }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = PopButtonVariant.Secondary,
-                        )
-                        Box(Modifier.height(PopSpace.S2))
-                        PopButton(
-                            text = strings.backupImport,
-                            onClick = { importPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = PopButtonVariant.Secondary,
-                        )
+            Column {
+                PopGroupLabel(strings.cloudAccount)
+                PopGroup {
+                    AccountSection(
+                        cloud = cloud,
+                        strings = strings,
+                        showTitle = false,
+                        onGoToApi = onGoToApi,
+                        onSignIn = onSignIn,
+                        onSignUp = onSignUp,
+                        onSignOut = onSignOut,
+                        onPushSettings = onPushSettings,
+                        onPullSettings = onPullSettings,
+                        onDismissNotice = onDismissNotice,
+                        onSyncNow = onSyncNow,
+                    )
+                    // "当前使用本地模式"只在没登录时成立：已登录还说自己是本地模式，
+                    // 用户会以为刚才的登录没生效。
+                    if (!cloud.signedIn) {
                         Box(Modifier.height(PopSpace.S2))
                         PopBody(
-                            text = strings.backupNote,
+                            text = strings.localModeHint,
                             size = PopTypeScale.Xs,
                             weight = FontWeight.Bold,
                             color = popInkMuted,
-                            maxLines = 3,
-                        )
-
-                        val currentToast = toast
-                        if (currentToast != null) {
-                            Box(Modifier.height(PopSpace.S3))
-                            PopToast(
-                                visible = true,
-                                title = if (currentToast.first) strings.notificationSuccess else strings.notificationError,
-                                message = currentToast.second,
-                                kind = if (currentToast.first) PopToastKind.Success else PopToastKind.Error,
-                                onClose = { toast = null },
-                            )
-                        }
-
-                        Box(Modifier.height(PopSpace.S4))
-                        PopButton(
-                            text = strings.clearOldData,
-                            onClick = { showClearDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = PopButtonVariant.Danger,
+                            maxLines = 2,
                         )
                     }
+                    Box(Modifier.height(PopSpace.S3))
+                    PopButton(
+                        text = if (apiConfig.isEmpty) strings.api else strings.apiManagement,
+                        onClick = onGoToApi,
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = PopButtonVariant.Secondary,
+                    )
                 }
             }
         }
 
+        // 阈值
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.about) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
-                ) {
-                    LinkRow(strings.blog) { pendingLink = BLOG_URL }
-                    LinkRow(strings.github) { pendingLink = GITHUB_URL }
+            Column {
+                PopGroupLabel(strings.thresholdSettings)
+                PopGroup {
+                    LimitRow(
+                        label = strings.dailyLimit,
+                        value = settings.dailyLimit,
+                        badgeBg = popInk,
+                        // 反色徽标上的数字必须是纯白：popSurface 在玻璃下是半透明白，
+                        // 压在深色徽标上会发灰
+                        badgeFg = Color.White,
+                        rotate = -2f,
+                    )
+                    PopSlider(
+                        value = settings.dailyLimit,
+                        onValueChange = onSetDailyLimit,
+                        min = 1,
+                        max = 50,
+                    )
+                    PopDivider(Modifier.padding(vertical = PopSpace.S3))
+                    LimitRow(
+                        label = strings.warningLimit,
+                        value = settings.warningLimit,
+                        badgeBg = PopColor.Neutral.Yellow300,
+                        badgeFg = popInk,
+                        rotate = 1f,
+                    )
+                    PopSlider(
+                        value = settings.warningLimit,
+                        onValueChange = onSetWarningLimit,
+                        min = 1,
+                        max = settings.dailyLimit,
+                    )
+                }
+            }
+        }
+
+        // 语言
+        item {
+            Column {
+                PopGroupLabel(strings.language)
+                PopGroup {
+                    PopSelect(
+                        label = strings.language,
+                        value = languages.first { it.value == settings.language }.label,
+                        options = languages,
+                        onSelect = onSetLanguage,
+                    )
+                }
+            }
+        }
+
+        // 主题风格
+        item {
+            Column {
+                PopGroupLabel(strings.themeStyle)
+                PopGroup(padding = PaddingValues(PopSpace.S2)) {
+                    StyleSection(
+                        value = settings.themeStyle,
+                        strings = strings,
+                        onChange = onSetThemeStyle,
+                    )
+                }
+            }
+        }
+
+        // 主题色
+        item {
+            Column {
+                PopGroupLabel(strings.themeColor)
+                PopGroup {
+                    PopSelect(
+                        label = strings.theme,
+                        value = settings.themeColor,
+                        options = presets,
+                        onSelect = onSetThemeColor,
+                        leading = {
+                            Box(
+                                Modifier
+                                    .padding(end = PopSpace.S2)
+                                    .width(PopSpace.S6)
+                                    .height(PopSpace.S6)
+                                    .background(accent)
+                                    .popBorder(PopStroke.Thin, popInk),
+                            )
+                        },
+                    )
+                    Box(Modifier.height(PopSpace.S3))
+                    PopColorPicker(
+                        value = settings.themeColor,
+                        onChange = onSetThemeColor,
+                        presets = PopPresets.All.map { it.color.toHexString() },
+                    )
+                }
+            }
+        }
+
+        // 数据
+        item {
+            Column {
+                PopGroupLabel(strings.dataManagement)
+                PopGroup {
+                    InfoBlock(strings.storageMethod, "JSON / app-private")
+                    Box(Modifier.height(PopSpace.S2))
+                    InfoBlock(
+                        strings.storageUsage,
+                        "${storageBytes / 1024.0f}".take(5) + " KB",
+                    )
+                    Box(Modifier.height(PopSpace.S3))
+
+                    // 备份 / 恢复：这是"换手机"那一天唯一能救命的东西，
+                    // 所以给足两条路径 —— 导出到文件、从文件选回来（SAF，不要存储权限）。
                     PopDisplay(
-                        text = "ver.${BuildConfig.VERSION_NAME}",
-                        size = PopTypeScale.Xs,
+                        text = strings.backupSection,
+                        modifier = Modifier.padding(bottom = PopSpace.S2),
+                        size = PopTypeScale.Base,
                         weight = FontWeight.Black,
-                        color = popInkMuted,
                         maxLines = 1,
                     )
+                    PopButton(
+                        text = strings.backupExport,
+                        onClick = {
+                            val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US)
+                                .format(java.util.Date())
+                            val file = File(context.getExternalFilesDir(null), "popsmoke-$stamp.json")
+                            val json = StoreCodec.encode(
+                                StoreState(logs = logs, settings = settings, opLogs = opLogs),
+                                exportedAt = System.currentTimeMillis(),
+                            )
+                            toast = runCatching { file.writeText(json, Charsets.UTF_8) }
+                                .map { true to "${strings.backupExported} · ${file.absolutePath}" }
+                                .getOrElse { false to (it.message ?: strings.exportFailed) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = PopButtonVariant.Secondary,
+                    )
+                    Box(Modifier.height(PopSpace.S2))
+                    PopButton(
+                        text = strings.backupImport,
+                        onClick = { importPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = PopButtonVariant.Secondary,
+                    )
+                    Box(Modifier.height(PopSpace.S2))
                     PopBody(
-                        text = strings.fontAttribution,
+                        text = strings.backupNote,
                         size = PopTypeScale.Xs,
                         weight = FontWeight.Bold,
                         color = popInkMuted,
-                        maxLines = 2,
+                        maxLines = 3,
                     )
+
+                    val currentToast = toast
+                    if (currentToast != null) {
+                        Box(Modifier.height(PopSpace.S3))
+                        PopToast(
+                            visible = true,
+                            title = if (currentToast.first) strings.notificationSuccess else strings.notificationError,
+                            message = currentToast.second,
+                            kind = if (currentToast.first) PopToastKind.Success else PopToastKind.Error,
+                            onClose = { toast = null },
+                        )
+                    }
+
+                    Box(Modifier.height(PopSpace.S4))
+                    PopButton(
+                        text = strings.clearOldData,
+                        onClick = { showClearDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = PopButtonVariant.Danger,
+                    )
+                }
+            }
+        }
+
+        // 关于
+        item {
+            Column {
+                PopGroupLabel(strings.about)
+                PopGroup(padding = PaddingValues(0.dp)) {
+                    LinkRow(strings.blog) { pendingLink = BLOG_URL }
+                    PopDivider()
+                    LinkRow(strings.github) { pendingLink = GITHUB_URL }
+                    PopDivider()
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(PopSpace.S4),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
+                    ) {
+                        PopDisplay(
+                            text = "ver.${BuildConfig.VERSION_NAME}",
+                            size = PopTypeScale.Xs,
+                            weight = FontWeight.Black,
+                            color = popInkMuted,
+                            maxLines = 1,
+                        )
+                        PopBody(
+                            text = strings.fontAttribution,
+                            size = PopTypeScale.Xs,
+                            weight = FontWeight.Bold,
+                            color = popInkMuted,
+                            maxLines = 2,
+                        )
+                    }
                 }
             }
         }
@@ -548,17 +583,6 @@ private const val BLOG_URL = "https://blog.whysoserious.dpdns.org/"
 private const val GITHUB_URL = "https://github.com/9thChasingWindGirl"
 
 @Composable
-private fun SectionTitle(text: String) {
-    PopDisplay(
-        text = text,
-        modifier = Modifier.padding(bottom = PopSpace.S2),
-        size = PopTypeScale.Base,
-        weight = FontWeight.Black,
-        maxLines = 2,
-    )
-}
-
-@Composable
 private fun LimitRow(
     label: String,
     value: Int,
@@ -649,20 +673,27 @@ private fun InfoBlock(label: String, value: String) {
 
 @Composable
 private fun LinkRow(text: String, onClick: () -> Unit) {
-    Box(
+    // 组内行：不再自己带底色和描边（那会让"组里还有一块板"），
+    // 只留一行字 + 一个右向箭头 —— 箭头是"点了会去别处"的语法，比底色更省
+    Row(
         Modifier
             .fillMaxWidth()
-            .background(popSurface)
-            .popBorder(PopStroke.Thin, popInk)
             .clickable(onClick = onClick)
-            .padding(PopSpace.S3),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = PopSpace.S4, vertical = PopSpace.S3),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         PopDisplay(
             text = text,
+            modifier = Modifier.weight(1f),
             size = PopTypeScale.Base,
             weight = FontWeight.Black,
-            uppercase = true,
+            maxLines = 1,
+        )
+        PopDisplay(
+            text = "›",
+            size = PopTypeScale.Lg,
+            weight = FontWeight.Black,
+            color = popInkMuted,
             maxLines = 1,
         )
     }
@@ -686,7 +717,6 @@ private fun StyleSection(
     onChange: (String) -> Unit,
 ) {
     val selected = PopThemeStyle.fromId(value)
-    SectionTitle(strings.themeStyle)
     Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
         StyleOption(
             style = PopThemeStyle.Liquid,
@@ -715,12 +745,14 @@ private fun StyleOption(
 ) {
     val current = LocalSkin.current
     val accentColor = accent
-    // 选中态沿用全站约定：波普是反色块，玻璃是主题色淡染 + 一圈细光环。
-    // 玻璃下不套反色块 —— 磨砂面上挖一块纯黑会像图层破了洞。
+    // 选中态沿用全站约定：波普是反色块，玻璃下是主题色淡染 + 一圈细光环。
+    //
+    // 这两片原来是玻璃卡片（有投影、有折射）。放进"静默分组"里之后必须压平 ——
+    // 一组里铺两张玻璃，等于把刚刚收起来的材质又放回来了。
     val shape: Shape = if (current.glass) current.buttonShape() else RectangleShape
     val fill = when {
-        !selected -> current.palette.surface
-        current.glass -> accentColor.copy(alpha = 0.16f)
+        !selected -> Color.Transparent
+        current.glass -> accentColor.copy(alpha = 0.14f)
         else -> current.palette.inverseSurface
     }
     val inverted = selected && !current.glass
@@ -737,11 +769,15 @@ private fun StyleOption(
             .fillMaxWidth()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .then(if (current.glass) Modifier.jellyPress(interaction) else Modifier)
-            .skinSurface(
-                current = current,
-                shape = shape,
-                fill = fill,
-                lift = if (current.glass) 10.dp else PopShadow.Pop,
+            .then(
+                if (current.glass) {
+                    Modifier.clip(shape).background(fill, shape)
+                } else {
+                    Modifier
+                        .popShadow(PopShadow.Pop, shape = shape)
+                        .background(fill)
+                        .popBorder(PopStroke.Default, popInk, shape)
+                },
             )
             .then(
                 if (current.glass && selected) {
@@ -750,7 +786,7 @@ private fun StyleOption(
                     Modifier
                 },
             )
-            .padding(PopSpace.S3),
+            .padding(PopSpace.S2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StylePreview(

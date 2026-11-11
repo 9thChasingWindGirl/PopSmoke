@@ -57,6 +57,8 @@ import com.popsmoke.tracker.ui.atoms.PopOperationLog
 import com.popsmoke.tracker.ui.atoms.PopSyncQueue
 import com.popsmoke.tracker.ui.atoms.PopTimePickerDialog
 import com.popsmoke.tracker.ui.chrome.PopBottomBar
+import com.popsmoke.tracker.ui.chrome.PopTabItem
+import com.popsmoke.tracker.ui.foundation.PopIconKind
 import com.popsmoke.tracker.ui.chrome.PopTopBar
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopAurora
@@ -220,7 +222,7 @@ class DashboardScreenshotTest {
                         initialFlipped = flipped,
                     )
                     PopBottomBar(
-                        items = tabs,
+                        items = tabs.asTabItems(),
                         selectedIndex = 0,
                         bottomInset = 16.dp,
                         onSelect = {},
@@ -345,7 +347,7 @@ class DashboardScreenshotTest {
                         )
                         Box(Modifier.weight(1f)) { content() }
                         PopBottomBar(
-                            items = tabs,
+                            items = tabs.asTabItems(),
                             selectedIndex = selectedIndex,
                             bottomInset = 16.dp,
                             onSelect = {},
@@ -870,4 +872,16 @@ class DashboardScreenshotTest {
             }
         }
     }
+}
+
+/** 测试里只关心文案顺序，图标按位置补齐 —— 底栏图标不影响任何一条断言。 */
+private fun List<String>.asTabItems(): List<PopTabItem> {
+    val icons = listOf(
+        PopIconKind.Flame,
+        PopIconKind.Chart,
+        PopIconKind.Clock,
+        PopIconKind.Plug,
+        PopIconKind.Gear,
+    )
+    return mapIndexed { index, label -> PopTabItem(label, icons[index % icons.size]) }
 }

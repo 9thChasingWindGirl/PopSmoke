@@ -55,7 +55,12 @@ import com.popsmoke.tracker.ui.atoms.PopButton
 import com.popsmoke.tracker.ui.atoms.PopButtonVariant
 import com.popsmoke.tracker.ui.atoms.PopCard
 import com.popsmoke.tracker.ui.atoms.PopDatePickerField
+import com.popsmoke.tracker.ui.atoms.PopDivider
+import com.popsmoke.tracker.ui.atoms.PopGroup
+import com.popsmoke.tracker.ui.atoms.PopGroupLabel
 import com.popsmoke.tracker.ui.atoms.PopInput
+import com.popsmoke.tracker.ui.atoms.PopPageTitle
+import com.popsmoke.tracker.ui.chrome.LocalChromeInsets
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.popBorder
@@ -92,36 +97,45 @@ fun HistoryScreen(
         buildHistoryView(logs = logs, filter = filter, sort = sort)
     }
 
+    val chrome = LocalChromeInsets.current
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             start = PopSpace.S4,
             end = PopSpace.S4,
-            top = PopSpace.S4,
-            bottom = PopSpace.S8,
+            top = chrome.top + PopSpace.S4,
+            bottom = chrome.bottom + PopSpace.S6,
         ),
-        verticalArrangement = Arrangement.spacedBy(PopSpace.S6),
+        verticalArrangement = Arrangement.spacedBy(PopSpace.S5),
     ) {
-        item { HistoryHeader(strings = strings, total = logs.size) }
+        item {
+            PopPageTitle(
+                title = strings.history,
+                subtitle = "${strings.totalCigarettes}: ${logs.size}",
+            )
+        }
 
         item {
-            FilterCard(
-                filter = filter,
-                sort = sort,
-                strings = strings,
-                language = settings.language,
-                onFilterChange = { filter = it },
-                onSortChange = { sort = it },
-                onReset = {
-                    filter = HistoryFilter()
-                    sort = HistorySort()
-                },
-            )
+            Column {
+                PopGroupLabel(strings.filtersAndSort)
+                FilterCard(
+                    filter = filter,
+                    sort = sort,
+                    strings = strings,
+                    language = settings.language,
+                    onFilterChange = { filter = it },
+                    onSortChange = { sort = it },
+                    onReset = {
+                        filter = HistoryFilter()
+                        sort = HistorySort()
+                    },
+                )
+            }
         }
 
         if (view.months.isEmpty()) {
             item {
-                PopCard(modifier = Modifier.fillMaxWidth()) {
+                PopGroup {
                     PopBody(
                         text = if (filter.isActive) strings.noMatchingRecords else strings.noRecords,
                         modifier = Modifier.fillMaxWidth(),
@@ -154,45 +168,11 @@ fun HistoryScreen(
             }
         }
 
-        item { StatsCard(view = view, strings = strings) }
-    }
-}
-
-@Composable
-private fun HistoryHeader(strings: PopStrings, total: Int) {
-    val current = com.popsmoke.tracker.design.LocalSkin.current
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        PopDisplay(
-            text = strings.history,
-            size = PopTypeScale.Xxxl,
-            weight = FontWeight.Black,
-            maxLines = 1,
-        )
-        Box(Modifier.size(PopSpace.S2))
-        Row(
-            Modifier
-                // 玻璃下不旋转：歪斜和高光方向打架（同 PopCard 标题标签的处理）
-                .graphicsLayer { rotationZ = if (current.glass) 0f else 1f }
-                .then(
-                    if (current.glass) {
-                        Modifier
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(current.palette.surfaceDeep)
-                    } else {
-                        Modifier.background(popSurface).popBorder(PopStroke.Thin, popInk)
-                    },
-                )
-                .padding(horizontal = PopSpace.S3, vertical = PopSpace.S1),
-        ) {
-            PopBody(
-                text = "${strings.totalCigarettes}: $total",
-                size = PopTypeScale.Sm,
-                weight = FontWeight.Bold,
-                maxLines = 1,
-            )
+        item {
+            Column {
+                PopGroupLabel(strings.stats)
+                StatsCard(view = view, strings = strings)
+            }
         }
     }
 }
@@ -207,7 +187,10 @@ private fun FilterCard(
     onSortChange: (HistorySort) -> Unit,
     onReset: () -> Unit,
 ) {
-    PopCard(modifier = Modifier.fillMaxWidth(), title = strings.filtersAndSort) {
+    // 上一版这是一整块玻璃，标题「筛选和排序」做成悬浮玻璃胶囊压在它的上沿 ——
+    // 那是全页最难看的一处：两层玻璃叠着，胶囊圆角和面板圆角只差几像素，
+    // 读起来像贴纸贴歪了。现在标题在组外，组本身是平的。
+    PopGroup {
         Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
             FieldLabel(strings.startDate)
             PopDatePickerField(
@@ -304,7 +287,8 @@ private fun FieldLabel(text: String) {
 @Composable
 private fun SortButton(text: String, active: Boolean, arrow: String, onClick: () -> Unit) {
     val current = com.popsmoke.tracker.design.LocalSkin.current
-    // 玻璃下两个排序键是一枚分段控件：选中项染主题色，未选中项是透明玻璃
+    // 玻璃下两个排序键是一枚分段控件：选中项染主题色，未选中项是浅底。
+    // 不再用玻璃 —— 组里已经有一层静默底，按钮再起一层玻璃会打架。
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(
         if (current.glass) current.radiusButton else androidx.compose.ui.unit.Dp(0f),
     )
@@ -313,13 +297,11 @@ private fun SortButton(text: String, active: Boolean, arrow: String, onClick: ()
             .fillMaxWidth()
             .then(
                 if (current.glass) {
-                    Modifier.skinSurface(
-                        current = current,
-                        shape = shape,
-                        fill = if (active) accent.copy(alpha = 0.62f) else popSurface,
-                        lift = 8.dp,
-                        tint = if (active) accent else Color.Transparent,
-                    )
+                    Modifier
+                        .clip(shape)
+                        // 选中项要**更实**，不是更淡：浅染 + 主题色文字的结果是
+                        // "选中的那个看起来比没选中的还弱"，正好反了。
+                        .background(if (active) accent else current.palette.ink.copy(alpha = 0.05f), shape)
                 } else {
                     Modifier
                         .popShadow(PopShadow.Pop)
@@ -353,24 +335,14 @@ private fun MonthCard(
     onToggleDay: (java.time.LocalDate) -> Unit,
 ) {
     val current = com.popsmoke.tracker.design.LocalSkin.current
-    PopCard(
-        modifier = Modifier.fillMaxWidth(),
-        padding = PaddingValues(0.dp),
-    ) {
-        // 内容整体裁到卡片圆角里：月标题是整宽的 popSurfaceDeep 底色，
-        // 不裁的话它的直角会从玻璃卡片的圆角边上探出去四个小尖角。
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(current.radiusCard)),
-        ) {
-        // 月标题：灰底 + 底部 2dp 分隔线
+    // 一个月 = 一个分组，不是一张玻璃卡。整页十几张玻璃卡的时候，
+    // 眼睛在每一张上都停一下，等于哪里都没停。
+    PopGroup(modifier = Modifier.fillMaxWidth(), padding = PaddingValues(0.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(popSurfaceDeep)
                 .clickable(onClick = onToggleMonth)
-                .padding(PopSpace.S3),
+                .padding(horizontal = PopSpace.S4, vertical = PopSpace.S3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -378,12 +350,12 @@ private fun MonthCard(
             ) {
                 PopDisplay(
                     text = "▶",
-                    size = PopTypeScale.Sm,
+                    size = PopTypeScale.Xs,
                     weight = FontWeight.Black,
-                    color = popInkSecondary,
+                    color = popInkMuted,
                 )
             }
-            Box(Modifier.size(PopSpace.S2))
+            Box(Modifier.size(PopSpace.S3))
             PopDisplay(
                 text = formatMonthTitle(month.year, month.month, language),
                 modifier = Modifier.weight(1f),
@@ -396,16 +368,9 @@ private fun MonthCard(
                     .graphicsLayer { rotationZ = if (current.glass) 0f else -2f }
                     .then(
                         if (current.glass) {
-                            // 这里原来是不透明 accent + 1dp 白边，是整页里最"塑料"的一块。
-                            // 改成彩色玻璃后，徽标能透出下面月份卡的颜色，和卡片成为一体。
                             Modifier
-                                .skinSurface(
-                                    current = current,
-                                    shape = RoundedCornerShape(percent = 50),
-                                    fill = accent.copy(alpha = 0.58f),
-                                    lift = 6.dp,
-                                    tint = accent,
-                                )
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(accent)
                         } else {
                             Modifier.background(accent).popBorder(PopStroke.Thin, popInk)
                         },
@@ -423,14 +388,14 @@ private fun MonthCard(
         }
 
         if (expanded) {
+            PopDivider()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(popSurface)
-                    .padding(PopSpace.S3),
-                verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
+                    .padding(vertical = PopSpace.S1),
             ) {
-                month.days.forEach { day ->
+                month.days.forEachIndexed { index, day ->
+                    if (index > 0) PopDivider(startIndent = PopSpace.S7)
                     DayRow(
                         day = day,
                         language = language,
@@ -439,7 +404,6 @@ private fun MonthCard(
                     )
                 }
             }
-        }
         }
     }
 }
@@ -459,18 +423,20 @@ private fun DayRow(
                 .fillMaxWidth()
                 .then(
                     if (current.glass) {
+                        // 组内的行不再自带底和投影：整块月分组已经是一个容器，
+                        // 行里再套一层浅底，会读成"组里还有卡"
                         Modifier
                     } else {
-                        Modifier.popShadow(PopShadow.ListItem, color = popInk.copy(alpha = 0.12f))
+                        Modifier
+                            .clip(rowShape)
+                            .background(popSurfaceDeep)
+                            .popShadow(PopShadow.ListItem, color = popInk.copy(alpha = 0.12f))
                     },
                 )
                 // 先裁圆角再画底色和左竖条：竖条会跟着圆角走，不会在左上角戳出一个方块
-                .clip(rowShape)
-                .background(if (current.glass) current.palette.surfaceDeep else popSurfaceDeep)
-                // Web 是 border-l-4：只有左边一条粗黑，不是四边
                 .drawLeftBar(PopStroke.Default)
                 .clickable(onClick = onToggle)
-                .padding(PopSpace.S3),
+                .padding(start = PopSpace.S4, end = PopSpace.S3, top = PopSpace.S2, bottom = PopSpace.S2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.graphicsLayer { rotationZ = if (expanded) 90f else 0f }) {
@@ -567,7 +533,7 @@ private fun Modifier.drawLeftBar(width: Dp): Modifier {
 
 @Composable
 private fun StatsCard(view: HistoryView, strings: PopStrings) {
-    PopCard(modifier = Modifier.fillMaxWidth(), title = strings.stats) {
+    PopGroup {
         Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S3)) {
             Row(horizontalArrangement = Arrangement.spacedBy(PopSpace.S3)) {
                 StatCell(

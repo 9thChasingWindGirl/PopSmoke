@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.popsmoke.tracker.design.LocalSkin
+import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopMotion
@@ -93,7 +94,7 @@ fun PopDialog(
                         .skinSurface(
                             current = current,
                             shape = RoundedCornerShape(current.radiusPanel),
-                            fill = current.palette.surfaceStrong,
+                            fill = current.palette.surfaceStrong.copy(alpha = PopGlass.OverlayAlpha),
                             lift = PopShadow.Pop,
                         )
                         .padding(PopSpace.S6),

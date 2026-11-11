@@ -1,6 +1,7 @@
 package com.popsmoke.tracker.ui.atoms
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,12 +51,14 @@ fun PopStatTile(
             .fillMaxWidth()
             .then(
                 if (current.glass) {
-                    Modifier.skinSurface(
-                        current = current,
-                        shape = current.chipShape(),
-                        fill = background,
-                        lift = 0.dp,
-                    )
+                    // 凹槽，不是玻璃。它已经在"静默分组"里面了，再来一层折射 +
+                    // 白边就成了"卡片里还嵌着一块玻璃"，层次反而更乱。
+                    Modifier
+                        .clip(current.chipShape())
+                        .background(background)
+                        // 再压 3% 墨色：纯白底在浅色分组里几乎看不出来，
+                        // 叠一点暗才读得出"这是一个凹进去的格子"
+                        .background(popInk.copy(alpha = 0.03f))
                 } else {
                     Modifier
                         .background(background)

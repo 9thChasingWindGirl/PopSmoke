@@ -82,20 +82,10 @@ fun PopSyncQueue(
     val panelShape = RoundedCornerShape(if (glass) current.radiusPanel else 0.dp)
     Column(
         modifier
-            // 玻璃下整块是一枚真正的玻璃面板：先在底层画投影/高光/描边，再裁圆角给内部三段
-            .then(
-                if (glass) {
-                    Modifier.skinSurface(
-                        current = current,
-                        shape = panelShape,
-                        fill = current.palette.surface,
-                        lift = 12.dp,
-                        tint = accent,
-                    )
-                } else {
-                    Modifier
-                },
-            )
+            // 这个组件现在住在「静默分组」里面，自己不再画玻璃。
+            // 原来它是一整块带投影的玻璃面板，叠在分组上就成了玻璃里镶玻璃 ——
+            // 两道圆角、两层白边，读起来像两片贴歪的膜。只保留圆角裁剪，
+            // 材质交给外层分组，表头用一条主题色淡染带区分层次。
             .clip(panelShape),
     ) {
         // ---- HEADER ----

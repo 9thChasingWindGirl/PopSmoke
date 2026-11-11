@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -74,31 +75,56 @@ fun PopButton(
     val current = LocalSkin.current
 
     if (current.glass) {
+        // 只有主按钮是玻璃 —— 它是一屏里的焦点，值得用材质突出。
+        //
+        // 次要按钮和危险按钮**不能**也是玻璃：一页设置里十几个按钮全部带折射、
+        // 白边和投影，就回到了"通体玻璃"，而且每个按钮都在和主按钮抢注意力。
+        // 这两个改成平面的：次要是压进组里的一层淡底，危险是实心红 ——
+        // 一页里只有一个是玻璃按钮，它才真的显眼。
+        val flat = variant != PopButtonVariant.Primary
         val fill = when (variant) {
-            // 彩色玻璃而不是实心色块：主按钮要能透出背后的光，否则一块不透明的色斑
-            // 会打断整个界面的通透感。
-            // 0.88 是初版的值 —— 那基本就是不透明，按钮读作"塑料橙"。
-            // 0.66 刚好还能认出是主色，同时背后的白卡与光带会透上来。
+            // 主按钮：彩色玻璃而不是实心色块，要能透出背后的光
             PopButtonVariant.Primary -> themeAccent.copy(alpha = 0.58f)
-            PopButtonVariant.Secondary -> current.palette.surface
-            PopButtonVariant.Danger -> PopColor.Status.Danger.copy(alpha = 0.62f)
+            // 次要：比分组底更深一点点，读作"按进去的槽"而不是"另一块板"
+            PopButtonVariant.Secondary -> current.palette.ink.copy(alpha = 0.05f)
+            // 危险：淡红底 + 红字，而不是一整块实心红。
+            // 实心红在浅色玻璃场景里是全屏最响的一块色，会盖过主题色的焦点；
+            // 而"红"这个信号由文字和底色的色相承担就够了，不需要饱和度来喊。
+            PopButtonVariant.Danger -> PopColor.Status.Danger.copy(alpha = 0.16f)
         }
         val foreground = when (variant) {
             PopButtonVariant.Primary -> themeOnAccent
             PopButtonVariant.Secondary -> current.palette.ink
-            PopButtonVariant.Danger -> Color.White
+            PopButtonVariant.Danger -> PopColor.Status.Danger
         }
         val shape = RoundedCornerShape(current.radiusButton)
         val interaction = remember { MutableInteractionSource() }
 
         val base = Modifier
             .jellyPress(interaction, enabled)
-            .skinSurface(
-                current = current,
-                shape = shape,
-                fill = fill,
-                lift = 12.dp,
-                tint = if (variant == PopButtonVariant.Primary) themeAccent else Color.Transparent,
+            .then(
+                if (flat) {
+                    Modifier
+                        .clip(shape)
+                        .background(fill, shape)
+                        .then(
+                            when (variant) {
+                                PopButtonVariant.Secondary ->
+                                    Modifier.border(1.dp, current.palette.ink.copy(alpha = 0.1f), shape)
+                                PopButtonVariant.Danger ->
+                                    Modifier.border(1.dp, PopColor.Status.Danger.copy(alpha = 0.28f), shape)
+                                else -> Modifier
+                            },
+                        )
+                } else {
+                    Modifier.skinSurface(
+                        current = current,
+                        shape = shape,
+                        fill = fill,
+                        lift = 12.dp,
+                        tint = themeAccent,
+                    )
+                },
             )
             .clickable(
                 interactionSource = interaction,

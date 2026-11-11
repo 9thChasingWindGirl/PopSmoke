@@ -88,9 +88,14 @@ private fun LogRow(
     val current = com.popsmoke.tracker.design.LocalSkin.current
     val rowShape = androidx.compose.foundation.shape.RoundedCornerShape(current.radiusField)
     val blockShape = androidx.compose.foundation.shape.RoundedCornerShape(current.radiusChip * 0.72f)
-    // 玻璃下每一行都是一小片玻璃：白色细边 + 柔和落影；波普仍是"纸片 + 硬描边"
+    // 行不再是"一小片玻璃"。
+    //
+    // 上一版每一行都是独立玻璃：白边 + 落影。它压在**玻璃卡片**上，于是出现
+    // 玻璃里镶玻璃 —— 边缘互相夹杂，读起来像一排浮在果冻上的芯片。
+    // 现在行退成一层淡底（比卡片深一点点），边界全靠留白和间距，
+    // 卡片本身仍是这一页唯一的玻璃。
     val blockBorder = if (current.glass) {
-        1.dp to Color.White.copy(alpha = 0.62f)
+        1.dp to Color.Transparent
     } else {
         PopStroke.Thin to popInk
     }
@@ -100,7 +105,9 @@ private fun LogRow(
             .fillMaxWidth()
             .then(
                 if (current.glass) {
-                    Modifier.skinSurface(current, rowShape, popSurface, lift = 8.dp)
+                    Modifier
+                        .clip(rowShape)
+                        .background(current.palette.ink.copy(alpha = 0.045f))
                 } else {
                     Modifier
                         .popShadow(PopShadow.ListItem, color = popInk.copy(alpha = 0.1f))

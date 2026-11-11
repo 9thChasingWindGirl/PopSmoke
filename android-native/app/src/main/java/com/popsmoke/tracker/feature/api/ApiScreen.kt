@@ -39,6 +39,9 @@ import com.popsmoke.tracker.i18n.PopStrings
 import com.popsmoke.tracker.ui.atoms.PopButton
 import com.popsmoke.tracker.ui.atoms.PopButtonVariant
 import com.popsmoke.tracker.ui.atoms.PopCard
+import com.popsmoke.tracker.ui.atoms.PopPageTitle
+import com.popsmoke.tracker.ui.atoms.PopSection
+import com.popsmoke.tracker.ui.chrome.LocalChromeInsets
 import com.popsmoke.tracker.ui.atoms.PopInput
 import com.popsmoke.tracker.ui.atoms.PopToast
 import com.popsmoke.tracker.ui.atoms.PopToastKind
@@ -81,16 +84,19 @@ fun ApiScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        // 顶栏/底栏是浮层，页面要自己让出这两条的高度（见 PopChrome.ChromeInsets）
         contentPadding = PaddingValues(
             start = PopSpace.S4,
             end = PopSpace.S4,
-            top = PopSpace.S4,
-            bottom = PopSpace.S8,
+            top = LocalChromeInsets.current.top + PopSpace.S4,
+            bottom = LocalChromeInsets.current.bottom + PopSpace.S6,
         ),
         verticalArrangement = Arrangement.spacedBy(PopSpace.S6),
     ) {
+        item { PopPageTitle(strings.api) }
+
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.apiManagement) {
+            PopSection(title = strings.apiManagement) {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S3)) {
                     PopBody(
                         text = strings.syncDescription,
@@ -117,7 +123,7 @@ fun ApiScreen(
         }
 
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.apiUrl) {
+            PopSection(title = strings.apiUrl) {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
                     FieldLabel(strings.feishuApi + " · " + strings.apiUrl)
                     PopInput(
@@ -192,7 +198,7 @@ fun ApiScreen(
         }
 
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.feishuDataSync) {
+            PopSection(title = strings.feishuDataSync) {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
                     PopBody(
                         text = strings.feishuSyncHint,
@@ -236,7 +242,7 @@ fun ApiScreen(
         }
 
         item {
-            PopCard(modifier = Modifier.fillMaxWidth(), title = strings.viewSavedApiSettings) {
+            PopSection(title = strings.viewSavedApiSettings) {
                 Column(verticalArrangement = Arrangement.spacedBy(PopSpace.S2)) {
                     KeyValue(strings.apiUrl, maskUrl(config.feishuUrl))
                     KeyValue(strings.apiUrl, maskUrl(config.supabaseUrl))

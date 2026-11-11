@@ -262,6 +262,11 @@ object PopGlass {
     const val WeaveInkAlpha = 0.085f
     const val SolidSheenAlpha = 0.2f
     const val InnerShadeAlpha = 0.11f
+    const val GroupAlpha = 0.3f
+    const val DividerAlpha = 0.09f
+    const val ChromeVeilAlpha = 0.1f
+    const val NavAlpha = 0.5f
+    const val OverlayAlpha = 0.66f
 }
 
 object PopMotion {
