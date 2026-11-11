@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
+import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.PopIconSize
 import com.popsmoke.tracker.design.PopLayout
 import com.popsmoke.tracker.design.PopMotion
@@ -75,18 +76,19 @@ fun PopButton(
     val current = LocalSkin.current
 
     if (current.glass) {
-        // 只有主按钮是玻璃 —— 它是一屏里的焦点，值得用材质突出。
+        // 按钮是"要按的东西"，在这套界面里都属于高频交互，所以都给材质。
         //
-        // 次要按钮和危险按钮**不能**也是玻璃：一页设置里十几个按钮全部带折射、
-        // 白边和投影，就回到了"通体玻璃"，而且每个按钮都在和主按钮抢注意力。
-        // 这两个改成平面的：次要是压进组里的一层淡底，危险是实心红 ——
-        // 一页里只有一个是玻璃按钮，它才真的显眼。
-        val flat = variant != PopButtonVariant.Primary
+        // 但强度必须分层：主按钮 0.58 的彩玻璃（一屏一个焦点），次要按钮 0.2 的白玻璃
+        // （抬起一点点，读作可点），危险按钮保持平面淡红 —— 红色本身已经是信号，
+        // 再叠折射和亮边，整页最响的会变成"删除"。
+        val flat = variant == PopButtonVariant.Danger
         val fill = when (variant) {
             // 主按钮：彩色玻璃而不是实心色块，要能透出背后的光
             PopButtonVariant.Primary -> themeAccent.copy(alpha = 0.58f)
-            // 次要：比分组底更深一点点，读作"按进去的槽"而不是"另一块板"
-            PopButtonVariant.Secondary -> current.palette.ink.copy(alpha = 0.05f)
+            // 次要：白玻璃。0.2 刚好能从静默分组（0.3 但无折射、无投影、无亮边）里
+            // 分出来，又不会变成第二块玻璃板
+            PopButtonVariant.Secondary ->
+                current.palette.surfaceStrong.copy(alpha = PopGlass.ControlAlpha)
             // 危险：淡红底 + 红字，而不是一整块实心红。
             // 实心红在浅色玻璃场景里是全屏最响的一块色，会盖过主题色的焦点；
             // 而"红"这个信号由文字和底色的色相承担就够了，不需要饱和度来喊。
@@ -217,7 +219,9 @@ fun PopIconButton(
                 .skinSurface(
                     current = current,
                     shape = CircleShape,
-                    fill = current.palette.surface,
+                    // 圆形图标键在这套界面里出现频率很高（编辑、删除一条记录都有它），
+                    // 0.055 的 surfaceAlpha 在浅背景上几乎看不见，按键的可点性丢了。
+                    fill = current.palette.surfaceStrong.copy(alpha = PopGlass.ControlAlpha),
                     lift = 8.dp,
                 )
                 .clickable(

@@ -1,8 +1,13 @@
 package com.popsmoke.tracker.ui.foundation
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -110,8 +115,57 @@ fun PopDisplay(
     lineHeight = lineHeight,
 )
 
-/** 正文字体（HarmonyOS Sans）：说明、时间、标签。 */
+/**
+ * 品牌字的字形：**无论哪套皮肤都用 Bangers**。
+ *
+ * [PopDisplay] 在玻璃主题下会换成 HarmonyOS Sans —— 那条规则是对的，漫画字做界面文案
+ * 会破功。但品牌标识不是文案，是 logo：它必须和 Web 版、图标、官网是同一副字形，
+ * 否则用户会觉得"这不是同一个 App"。
+ *
+ * 字号和字距对齐 `assets/logo.svg`：font-size 24、letter-spacing 1.2px（≈0.05em）。
+ */
 @Composable
+fun PopLogotype(
+    text: String,
+    modifier: Modifier = Modifier,
+    size: TextUnit = PopTypeScale.Xl,
+    color: Color = Color.Unspecified,
+) = PopTextBase(
+    text = text,
+    family = PopDisplayFont,
+    modifier = modifier,
+    size = size,
+    weight = FontWeight.Normal,
+    color = color,
+    tracking = size * 0.05f,
+    italic = false,
+    uppercase = false,
+    textAlign = TextAlign.Start,
+    maxLines = 1,
+    lineHeight = TextUnit.Unspecified,
+)
+
+/**
+ * 顶栏品牌：`POP` + `SMOKE`，后半段吃主题色。
+ *
+ * 两段必须是两个 Text —— 颜色不同。中间那个空隙对应原 logo 里的一个空格，
+ * 用 3dp 固定值而不是真的打一个空格：Bangers 的空格宽度会随字号变，
+ * 而品牌标识的字形比例在四个语言、两种皮肤下都应该一致。
+ */
+@Composable
+fun PopBrand(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    size: TextUnit = PopTypeScale.Xl,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        PopLogotype(text = "POP", size = size)
+        Spacer(Modifier.width(3.dp))
+        PopLogotype(text = "SMOKE", size = size, color = accent)
+    }
+}
+
+/** 正文字体（HarmonyOS Sans）：说明、时间、标签。 */@Composable
 fun PopBody(
     text: String,
     modifier: Modifier = Modifier,

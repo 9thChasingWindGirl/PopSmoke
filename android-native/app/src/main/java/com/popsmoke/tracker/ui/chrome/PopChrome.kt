@@ -60,6 +60,7 @@ import com.popsmoke.tracker.ui.atoms.PopColorPicker
 import com.popsmoke.tracker.ui.atoms.PopMenu
 import com.popsmoke.tracker.ui.atoms.PopMenuItem
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
+import com.popsmoke.tracker.ui.foundation.PopBrand
 import com.popsmoke.tracker.ui.foundation.PopDisplay
 import com.popsmoke.tracker.ui.foundation.PopIcon
 import com.popsmoke.tracker.ui.foundation.PopIconKind
@@ -142,24 +143,19 @@ fun PopTopBar(
             modifier = Modifier.pointerInput(Unit) { detectTapGestures { onTitleClick() } },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PopDisplay(
-                text = "POP",
-                size = PopTypeScale.Xl,
-                weight = FontWeight.Normal,
-                tracking = PopTracking.Wide,
-            )
-            PopDisplay(
-                text = "SMOKE",
-                size = PopTypeScale.Xl,
-                weight = FontWeight.Normal,
-                tracking = PopTracking.Wide,
-                color = accentColor,
-            )
+            // 品牌标识是 logo，不是界面文案：两套皮肤都用 Bangers（见 PopLogotype）。
+            PopBrand(accent = accentColor)
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(PopSpace.S2),
+            // 负间距是为了把**视觉**收紧，而不是把触摸目标缩小。
+            //
+            // 每个圆片外面套着 48dp 的无障碍触摸目标（PopA11y.TapTarget），圆片只有 28dp，
+            // 于是两个圆片之间天然隔着 20dp 的空白 —— 直接写 spacedBy(5dp)，
+            // 屏幕上看到的间隙是 25dp，怎么调数字都觉得"散"。
+            // -10dp 之后视觉间隙 10dp，触摸目标仍各剩 38dp（这两个键都是弹菜单，误触成本低）。
+            horizontalArrangement = Arrangement.spacedBy((-10).dp),
         ) {
             Box {
                 PopTapTarget(
@@ -175,10 +171,21 @@ fun PopTopBar(
                     Box(
                         Modifier
                             .size(PopLayout.Chip)
-                            .background(accentColor)
-                            .border(
-                                if (current.glass) 1.dp else PopStroke.Thin,
-                                if (current.glass) Color.White.copy(alpha = 0.75f) else PopColor.Core.Black,
+                            .then(
+                                if (current.glass) {
+                                    // 玻璃小圆片：圆才让折射有解（方形 radius=0，
+                                    // 壁宽会被 clamp 到 0.01dp，等于没有折射）
+                                    Modifier.skinSurface(
+                                        current = current,
+                                        shape = CircleShape,
+                                        fill = accentColor.copy(alpha = 0.52f),
+                                        lift = 0.dp,
+                                    )
+                                } else {
+                                    Modifier
+                                        .background(accentColor)
+                                        .border(PopStroke.Thin, PopColor.Core.Black)
+                                },
                             ),
                     )
                 }
@@ -212,15 +219,19 @@ fun PopTopBar(
                             .size(PopLayout.Chip)
                             .then(
                                 if (current.glass) {
-                                    Modifier.background(Color.White.copy(alpha = 0.55f), CircleShape)
+                                    Modifier.skinSurface(
+                                        current = current,
+                                        shape = CircleShape,
+                                        fill = current.palette.surfaceStrong.copy(alpha = 0.46f),
+                                        lift = 0.dp,
+                                    )
                                 } else {
-                                    Modifier
+                                    Modifier.border(
+                                        PopStroke.Thin,
+                                        PopColor.Core.Black,
+                                        androidx.compose.ui.graphics.RectangleShape,
+                                    )
                                 },
-                            )
-                            .border(
-                                if (current.glass) 1.dp else PopStroke.Thin,
-                                if (current.glass) Color.White.copy(alpha = 0.85f) else PopColor.Core.Black,
-                                if (current.glass) CircleShape else androidx.compose.ui.graphics.RectangleShape,
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -282,7 +293,10 @@ fun PopBottomBar(
 ) {
     val current = LocalSkin.current
     if (current.glass) {
-        val shape = RoundedCornerShape(current.radiusButton)
+        // 整圆的浮岛：58dp 高时 corner = 29dp，正好是胶囊。
+        // 用 CircleShape 而不是 radiusButton(26dp) —— 后者在矮条上还留着 3dp 的直边，
+        // 那段直边会让边缘折射在那儿"断一下"，浮岛看起来像被削平了两头。
+        val shape = CircleShape
         Box(
             modifier
                 .fillMaxWidth()
@@ -300,8 +314,12 @@ fun PopBottomBar(
                     .skinSurface(
                         current = current,
                         shape = shape,
+                        // 0.14：浮岛必须明显比内容区的分组更透，背后的色带和织纹要能继续
+                        // 在岛里存在。材质感交给边缘折射与那根菲涅尔线 —— 靠不透明度堆出来的
+                        // "白"，在浅底上只会读成一条塑料条，周围还被投影糊出一圈灰雾。
                         fill = current.palette.surfaceStrong.copy(alpha = PopGlass.NavAlpha),
-                        lift = 18.dp,
+                        // 投影收近：18dp 的落距在矮条上离岛太远，读作"底下垫了一块板"。
+                        lift = 10.dp,
                         tint = accentColor,
                     )
                     .padding(horizontal = PopSpace.S1),
@@ -316,7 +334,9 @@ fun PopBottomBar(
                         label = "nav-ink-$index",
                     )
                     val bed = animateColorAsState(
-                        targetValue = if (selected) accentColor.copy(alpha = 0.15f) else Color.Transparent,
+                        // 0.2：浮岛本身已经很透，选中胶囊如果只有 0.15，在浅底上几乎读不出边界 ——
+                        // 它在岛里是「当前在哪一页」的唯一指示，必须站得住
+                        targetValue = if (selected) accentColor.copy(alpha = 0.2f) else Color.Transparent,
                         label = "nav-bed-$index",
                     )
                     Column(

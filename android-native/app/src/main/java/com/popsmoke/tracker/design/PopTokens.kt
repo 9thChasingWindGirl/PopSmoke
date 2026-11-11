@@ -265,7 +265,8 @@ object PopGlass {
     const val GroupAlpha = 0.3f
     const val DividerAlpha = 0.09f
     const val ChromeVeilAlpha = 0.1f
-    const val NavAlpha = 0.5f
+    const val NavAlpha = 0.17f
+    const val ControlAlpha = 0.2f
     const val OverlayAlpha = 0.66f
 }
 
