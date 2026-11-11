@@ -76,15 +76,7 @@ jobs:
       - name: Verify i18n strings
         run: node tools/gen-strings.mjs --check
 
-      # 视觉回归：基准图是在 Windows 上录的，Linux 的 layoutlib 字体抗锯齿与之存在细微差异，
-      # 同一份代码可能在本机通过、在这里报像素差。所以这一步不阻断出包，失败结果单独留档，
-      # 需要时把 diff 下载下来看是"真改了样式"还是"渲染环境差异"。
-      - name: Verify screenshots
-        id: screenshots
-        continue-on-error: true
-        working-directory: android-native
-        run: gradle --no-daemon :app:verifyPaparazziDebug
-
+      # 先出包再跑视觉回归：截图挂了 run 会标红，但包已经在 artifact 里，不至于白等一轮。
       - name: Assemble debug
         working-directory: android-native
         run: gradle --no-daemon :app:assembleDebug
@@ -99,17 +91,24 @@ jobs:
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           "$BT/aapt2" dump badging output/*.apk | head -4
 
+      # 仓库的 artifact 保留上限是 7 天，写更大只会被降级并在日志里刷一条 warning
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: popsmoke-debug-${{ github.run_number }}
           path: output/*.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
-      # 截图失败时把报告一起带出来，否则只看得到一行 "verifyPaparazziDebug FAILED"
+      # 视觉回归是硬门槛：基准图虽在 Windows 上录，但 Linux 的 layoutlib 渲染结果与之逐像素一致
+      # （首次 CI 已验证）。失败说明确实改了样式而没重录基准。
+      - name: Verify screenshots
+        working-directory: android-native
+        run: gradle --no-daemon :app:verifyPaparazziDebug
+
+      # 失败时把报告一起带出来，否则只看得到一行 "verifyPaparazziDebug FAILED"
       - name: Upload screenshot diff
-        if: steps.screenshots.outcome == 'failure'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: popsmoke-screenshot-diff-${{ github.run_number }}
@@ -117,7 +116,7 @@ jobs:
             android-native/app/build/reports/paparazzi/**
             android-native/app/build/outputs/paparazzi/**
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
 
   # release 需要先配好四个 Secrets：KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD。
   # 缺任意一个就不出包，避免产出装不上的未签名 APK（上一版 CI 的坑）。
