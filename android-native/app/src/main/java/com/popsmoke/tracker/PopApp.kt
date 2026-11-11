@@ -5,10 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -88,8 +89,15 @@ fun PopApp(
 ) {
     val language = ui.settings.language
     val strings: PopStrings = remember(language) { popStrings(language) }
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // safeDrawing 而不是 statusBars：前者把刘海/挖孔也算进去，顶栏内容不会被摄像头挖掉一块。
+    val topInset = WindowInsets.safeDrawing
+        .only(WindowInsetsSides.Top)
+        .asPaddingValues()
+        .calculateTopPadding()
+    val bottomInset = WindowInsets.safeDrawing
+        .only(WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding()
     val haptic = LocalHapticFeedback.current
 
     var pendingDelete by remember { mutableStateOf<SmokeLog?>(null) }
@@ -134,7 +142,9 @@ fun PopApp(
                         onRecord = {
                             // 记录是这个 App 最核心的一次点击，值得一个触觉确认：
                             // 屏幕可能没正对着看，震动比动画更快让人知道"记上了"。
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            // 用 TextHandleMove（一次轻振）而不是 LongPress —— 后者在 Android 上
+                            // 是实打实的 500ms 长振，点一下麻半秒，反而像卡住了。
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             actions.onRecord()
                         },
                         onRequestEdit = { pendingEdit = it },
@@ -227,7 +237,7 @@ fun PopApp(
                 PopButton(
                     text = strings.delete,
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         pendingDelete?.let { actions.onDelete(it.id) }
                         pendingDelete = null
                     },

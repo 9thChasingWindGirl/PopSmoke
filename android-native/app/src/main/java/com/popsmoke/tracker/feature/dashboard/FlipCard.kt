@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.PopMotion
 import com.popsmoke.tracker.design.PopShadow
@@ -19,8 +20,16 @@ import com.popsmoke.tracker.design.PopShadow
  * 1. cameraDistance ≈ 1000dp 的像素值，对应 CSS `perspective: 1000px`。用默认值透视会夸张到变形。
  * 2. 背面先自己 rotateY(180°)，再叠加父层旋转，总角度 360° 才是正向。
  *
- * Compose 没有 backface-visibility，用「过半程切 alpha」实现同一效果：
- * 90° 时两张脸都是侧立的，切换不可见，所以不会闪。
+ * Compose 没有 backface-visibility，用角度过半来切换显示哪一面：
+ * 90° 时两张脸都是侧立的（宽度收敛为 0），在此处切换看不见，也不会闪。
+ *
+ * 性能上有两处刻意为之：
+ * - **背面只在后半个翻转里组合**。背面是 LazyColumn，700ms 里每帧都参与测量和绘制，
+ *   是翻转掉帧的主因；前半程它根本不可见，没有理由让它活着。
+ * - **cameraDistance 在组合期算成 px**。放在 graphicsLayer 的 lambda 里每帧都会
+ *   `Dp.toPx()` 一次，纯属浪费。
+ *
+ * 正面始终参与测量：卡片高度由它决定，抽掉它背面就没有高度可依，会塌成 0。
  */
 @Composable
 fun FlipCard(
@@ -35,31 +44,30 @@ fun FlipCard(
         label = "flip-rotation",
     )
 
-    // 高度由「正面」决定：正面是唯一参与布局的面，背面 matchParentSize 跟随。
-    // 这正是 Web 版的结构（背面是 absolute inset-0）—— 早先两面都 fillMaxSize，
-    // 卡片就被容器拉满，仪表区跟着变长，这一条是那处偏差的根源。
+    val cameraDistancePx = with(LocalDensity.current) { 1000.dp.toPx() }
+    val showFront = rotation < 90f
+
     Box(
         modifier
             .padding(end = PopShadow.PopLg, bottom = PopShadow.PopLg)
             .graphicsLayer {
                 rotationY = rotation
-                cameraDistance = 1000.dp.toPx()
+                cameraDistance = cameraDistancePx
             },
     ) {
         Box(
-            Modifier.graphicsLayer { alpha = if (rotation < 90f) 1f else 0f },
+            Modifier.graphicsLayer { alpha = if (showFront) 1f else 0f },
         ) {
             front()
         }
-        Box(
-            Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    rotationY = 180f
-                    alpha = if (rotation >= 90f) 1f else 0f
-                },
-        ) {
-            back()
+        if (!showFront) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { rotationY = 180f },
+            ) {
+                back()
+            }
         }
     }
 }

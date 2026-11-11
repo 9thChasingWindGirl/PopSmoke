@@ -2,7 +2,10 @@ package com.popsmoke.tracker.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +101,9 @@ fun SettingsScreen(
     var showClearDialog by remember { mutableStateOf(false) }
     var pendingImport by remember { mutableStateOf<StoreState?>(null) }
     var toast by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+    // 关于栏的外链：先弹确认再跳。Web 版也是这么做的（PopExternalLinkWarning），
+    // 一个"关于"页里的按钮直接把用户甩到浏览器，很容易被当成 App 自己的行为。
+    var pendingLink by remember { mutableStateOf<String?>(null) }
 
     val dataDir = remember { File(context.filesDir, "pop-data") }
     // 导入/清空之后文件大小会变，所以把数量也作为 key：不然"存储占用"会一直显示旧值。
@@ -335,8 +341,8 @@ fun SettingsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
                 ) {
-                    LinkRow(strings.blog)
-                    LinkRow(strings.github)
+                    LinkRow(strings.blog) { pendingLink = BLOG_URL }
+                    LinkRow(strings.github) { pendingLink = GITHUB_URL }
                     PopDisplay(
                         text = "ver.${BuildConfig.VERSION_NAME}",
                         size = PopTypeScale.Xs,
@@ -465,7 +471,43 @@ fun SettingsScreen(
             },
         )
     }
+
+    // 外链确认：先说清楚"要离开这个 App"，再交给系统浏览器。
+    // 用 ACTION_VIEW 而不是内置 WebView —— 登录态、cookie、证书都归浏览器管，App 不背这个包袱。
+    pendingLink?.let { url ->
+        PopDialog(
+            visible = true,
+            title = strings.externalLinkWarningTitle,
+            message = "${strings.externalLinkWarningMessage}\n$url",
+            onDismiss = { pendingLink = null },
+            actions = {
+                PopButton(
+                    text = strings.externalLinkCancel,
+                    onClick = { pendingLink = null },
+                    modifier = Modifier.weight(1f),
+                    variant = PopButtonVariant.Secondary,
+                )
+                PopButton(
+                    text = strings.externalLinkContinue,
+                    onClick = {
+                        pendingLink = null
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }.onFailure {
+                            // 设备上没有浏览器（少见的定制 ROM）不该静默失败
+                            toast = false to (it.message ?: strings.exportFailed)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            },
+        )
+    }
 }
+
+/** 与 Web 版 PopSettings 的"关于"栏保持同一组地址。 */
+private const val BLOG_URL = "https://blog.whysoserious.dpdns.org/"
+private const val GITHUB_URL = "https://github.com/9thChasingWindGirl"
 
 @Composable
 private fun SectionTitle(text: String) {
@@ -547,12 +589,13 @@ private fun InfoBlock(label: String, value: String) {
 }
 
 @Composable
-private fun LinkRow(text: String) {
+private fun LinkRow(text: String, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
             .background(PopColor.Core.White)
             .popBorder(PopStroke.Thin, PopColor.Core.Black)
+            .clickable(onClick = onClick)
             .padding(PopSpace.S3),
         contentAlignment = Alignment.Center,
     ) {

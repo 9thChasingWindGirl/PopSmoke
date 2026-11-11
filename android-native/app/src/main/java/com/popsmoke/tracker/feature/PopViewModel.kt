@@ -60,20 +60,26 @@ class PopViewModel(
 
     init {
         viewModelScope.launch {
-            repository.init()
+            // 读盘失败也要往下走：登录态恢复不该被一份坏数据文件拖死。
+            runCatching { repository.init() }
             refreshCloudReadiness()
-            val restored = cloud.restore()
+            val restored = runCatching { cloud.restore() }.getOrNull()
             _cloud.update { it.copy(user = restored) }
         }
+        // 这一行是整个界面能不能"动"的关键。
+        // 派生 UI 状态时抛一次异常，collect 就再也收不到后续数据，
+        // 表现是"点记录没反应、重开也一样"——外面必须接住，单帧失败退回上一帧。
         viewModelScope.launch {
-            repository.state.collect { store -> _ui.value = buildUi(store) }
+            repository.state.collect { store ->
+                _ui.value = runCatching { buildUi(store) }.getOrDefault(_ui.value)
+            }
         }
         viewModelScope.launch {
             _cloud.collect { state -> _ui.update { it.copy(cloud = state) } }
         }
         // 队列变化要立刻反映到账户卡的"N 条待同步"和分析页的队列卡上。
         viewModelScope.launch {
-            queue.ops.collect { refreshQueue() }
+            queue.ops.collect { runCatching { refreshQueue() } }
         }
     }
 

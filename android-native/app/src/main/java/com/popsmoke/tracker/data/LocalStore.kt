@@ -16,18 +16,40 @@ import java.io.File
 class LocalStore(private val baseDir: File) {
 
     private val file = File(baseDir, FILE_NAME)
-    private val tempFile = File(baseDir, "$FILE_NAME.tmp")
 
     fun load(): StoreState = runCatching {
         if (!file.exists()) return StoreState()
         StoreCodec.decode(file.readText(Charsets.UTF_8)) ?: StoreState()
     }.getOrElse { StoreState() }
 
+    /**
+     * 保存。三处刻意为之：
+     *
+     * 1. **临时文件名唯一**。早先固定用 `popsmoke.json.tmp`，两个保存交错时会互相踩：
+     *    A 写 tmp、B 写 tmp、A 改名成功、B 改名时 tmp 已不存在 —— 结果主文件还在，
+     *    但内容是谁的说不准。唯一名字让每次保存各自独立。
+     * 2. **不先删主文件**。`renameTo` 在 Android（Linux）上同分区是原子替换，会覆盖目标。
+     *    原来"先 delete 再 rename"留了一个窗口：这中间进程被杀，数据就真没了。
+     * 3. **rename 失败退回复制**。极少数机型/SD 挂载点上 rename 会返回 false，
+     *    这时宁可多一次 IO，也不能让这次修改凭空消失。
+     *
+     * @Synchronized 保证同一进程内的保存串行，配合唯一临时名挡住跨协程并发。
+     */
+    @Synchronized
     fun save(state: StoreState) {
         baseDir.mkdirs()
-        tempFile.writeText(StoreCodec.encode(state), Charsets.UTF_8)
-        if (file.exists()) file.delete()
-        tempFile.renameTo(file)
+        val text = StoreCodec.encode(state)
+        val temp = File.createTempFile("$FILE_NAME.", ".tmp", baseDir)
+        try {
+            temp.writeText(text, Charsets.UTF_8)
+            if (!temp.renameTo(file)) {
+                temp.copyTo(file, overwrite = true)
+                temp.delete()
+            }
+        } catch (t: Throwable) {
+            runCatching { temp.delete() }
+            throw t
+        }
     }
 
     private companion object {

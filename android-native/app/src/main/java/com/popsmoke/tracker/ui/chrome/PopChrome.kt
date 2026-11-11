@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -48,9 +49,13 @@ import com.popsmoke.tracker.ui.foundation.PopTapTarget
 
 /**
  * 顶栏。三个容易被忽略但必须做对的点：
- * 1. 高度 = 60dp + 状态栏 inset，白色底一直铺到屏幕顶端（Web 版用 paddingTop 模拟，原生用真实 inset）
+ * 1. 高度 = 内容 60dp + 状态栏 inset，白色底一直铺到屏幕顶端（Web 版用 paddingTop 模拟，原生用真实 inset）
  * 2. 四周 4dp 黑边：这是波普"贴纸感"的一部分，不要为了沉浸式去掉顶部那条线
  * 3. 语言和主题色块视觉很小，触摸目标补到 48dp
+ *
+ * 高度用 `padding(top) + heightIn(min)` 而不是 `height(60 + inset)`：
+ * 后者把高度钉死了，系统字体放大（fontScale 1.3/1.5）时文字会被裁掉；
+ * 前者让内容自己撑开，inset 只算一次，也顺带解决了刘海屏裁切区。
  *
  * 两个小键是**弹菜单**，不是点一下循环切换：Web 版就是弹层，循环切换在四种语言下
  * 要连点三次才能回到上一种，没法撤销。菜单还顺带把"当前是哪一种"显示出来。
@@ -76,10 +81,12 @@ fun PopTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(PopLayout.HeaderHeight + topInset)
             .background(PopColor.Core.White)
+            // border 必须在 windowInsets padding 之前：它要包住「含状态栏」的整块矩形，
+            // 放到里面就会变成"状态栏下方一条线"，顶上多出一段白边，看着像预留过高。
             .border(PopStroke.Default, PopColor.Core.Black)
             .padding(top = topInset)
+            .heightIn(min = PopLayout.HeaderHeight)
             .padding(horizontal = PopSpace.S3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -199,6 +206,11 @@ fun PopTopBar(
 /**
  * 底栏：5 个等宽文字页签，顶部 4dp 黑线，高度 = 60dp + 手势条 inset。
  * 选中态黑字、未选中灰字 60% 透明度；整块高度都是点击区（不做 24dp 的小按钮）。
+ *
+ * 高度必须是**固定值**，不能像顶栏那样用 `heightIn(min)`：
+ * 页签的子布局是 `fillMaxHeight()`，一旦最大高度不受限，它就会撑满整个剩余空间，
+ * 把上面的内容区压成 0（实测表现：内容一片空白、页签文字跑到屏幕中间）。
+ * 底栏只有一行文字，本来也不需要随字体放大而变高。
  */
 @Composable
 fun PopBottomBar(

@@ -206,6 +206,8 @@ object PopLayout {
     val TimeWheelHeight = 128.dp
     val TimeWheelRow = 40.dp
     val TimeWheelColumn = 80.dp
+    val SvPanelHeight = 120.dp
+    val HueBarHeight = 28.dp
 }
 
 object PopMotion {
