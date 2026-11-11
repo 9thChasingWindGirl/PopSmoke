@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      只用平台自带的 Material Light 主题做窗口底，不引入 AppCompat/Material 组件库。
+      Compose 侧不依赖 XML 主题，这里只负责启动瞬间的背景色和透明系统栏，
+      避免冷启动时闪一下白屏再变成纸面灰。
+    -->
+    <style name="Theme.PopSmoke" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/pop_canvas</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
