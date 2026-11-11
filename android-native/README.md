@@ -15,6 +15,25 @@ gradle :app:assembleDebug
 
 `local.properties` 里写 `sdk.dir=...`（已在 .gitignore）。
 
+## CI
+
+`.github/workflows/android-native.yml` 在 PR 与 main 推送（触及 `android-native/**`、`design/`、`tools/`、`i18n/`）时运行：
+
+1. `gen-tokens --check` / `gen-strings --check`：生成物与源不一致直接失败
+2. `assembleDebug` 出包并上传 artifact
+3. `verifyPaparazziDebug` 比对基准图，**这是硬门槛**
+
+顺序是"先出包再比对"：截图挂了 run 会标红，但包已经在 artifact 里，不用白等一轮。基准图在 Windows 录制、CI 在 Linux 渲染，实测逐像素一致，所以这里不需要放宽。
+
+取 CI 产物：
+
+```bash
+gh run list --limit 3                                   # 找 run id
+gh run download <run-id> -n popsmoke-debug-<run_number> -D out
+```
+
+artifact 保留 7 天（仓库上限）。`release` job 只在手动触发时跑，需要 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 四个 Secret，缺一个就报错退出，不会产出装不上的未签名包。
+
 ## 令牌
 
 所有色值、描边、阴影、间距、字阶、动效都来自仓库根的 `design/tokens.json`，由脚本生成 `design/PopTokens.kt`：
