@@ -147,6 +147,25 @@ fun DrawScope.drawAuroraBody(
     drawFieldArcs(arcInk, w, h)
     drawBokeh(w, h)
     drawWeave(w, h, arcInk, PopGlass.WeaveSpacing.toPx(), PopGlass.WeaveStroke.toPx())
+
+    // 光的方向：左上亮、右下暗。
+    //
+    // 这一层不是为了"好看"，是为了让玻璃**有东西可反射**。整屏在 200~240 的明度区间里
+    // 徘徊时，玻璃边缘的亮线、暗边、色散都落在几乎同一个灰度上 —— 材质做了但看不见。
+    // 压出一条从左上到右下的明暗坡（只有 6%~7%），玻璃压上去时，边缘的明暗就有了参照：
+    // 同一条菲涅尔线，在左上角读作"迎光"，在右下角读作"背光"。
+    //
+    // 方向和边缘高光的 sweep 一致（左上最亮），两套光才是同一个光源。
+    drawRect(
+        Brush.linearGradient(
+            0f to Color.White.copy(alpha = 0.06f),
+            0.48f to Color.Transparent,
+            1f to arcInk.copy(alpha = 0.075f),
+            start = Offset(0f, 0f),
+            end = Offset(w, h),
+        ),
+    )
+
     drawRect(grain)
 }
 
@@ -209,23 +228,27 @@ private data class BandSpec(
  */
 private fun DrawScope.drawBokeh(w: Float, h: Float) {
     // (cx, cy, 半径相对宽度, 颜色, 核心透明度)
+    //
+    // 这一版把半径和透明度都收了：0.20~0.26 的半径在 1080p 上是 200 多像素，
+    // 一块那么大的色斑压在半透面板底下，读作"擦不掉的污渍"，而不是光斑。
+    // 光斑的作用是给折射一个**有轮廓**的参照物，不是给整屏染色 —— 半径小一点、
+    // 淡一点，被弯折时才看得见那个圆被拉长了，而不是整块背景泛紫。
     val spots = listOf(
-        BokehSpec(0.14f, 0.13f, 0.20f, Color(0xFFFFE3D2), 0.22f),
-        BokehSpec(0.92f, 0.22f, 0.24f, Color(0xFFD8E4FF), 0.20f),
-        BokehSpec(0.06f, 0.52f, 0.18f, Color(0xFFCDEFE4), 0.18f),
-        BokehSpec(0.86f, 0.63f, 0.22f, Color(0xFFFFD9E6), 0.16f),
-        BokehSpec(0.30f, 0.90f, 0.26f, Color(0xFFE6DCFF), 0.18f),
-        BokehSpec(0.66f, 0.78f, 0.14f, Color(0xFFFFF0CC), 0.20f),
+        BokehSpec(0.14f, 0.13f, 0.15f, Color(0xFFFFE3D2), 0.14f),
+        BokehSpec(0.92f, 0.22f, 0.17f, Color(0xFFD8E4FF), 0.12f),
+        BokehSpec(0.06f, 0.52f, 0.13f, Color(0xFFCDEFE4), 0.11f),
+        BokehSpec(0.86f, 0.63f, 0.16f, Color(0xFFFFD9E6), 0.10f),
+        BokehSpec(0.30f, 0.90f, 0.18f, Color(0xFFE6DCFF), 0.11f),
     )
     spots.forEach { spot ->
         val center = Offset(spot.cx * w, spot.cy * h)
         val radius = spot.radius * w
-        // 核心一直实到 0.62 才开始衰减：边界越"硬"，被折射推开时越看得见。
-        // 一路柔到底的渐变是雾，不是光斑。
+        // 核心实到 0.5 才开始衰减：边界越"硬"，被折射推开时越看得见。
+        // 但衰减要比上一版更长（1f 处才归零），否则边缘会在浅底上留下一圈硬边。
         drawCircle(
             brush = Brush.radialGradient(
                 0f to spot.color.copy(alpha = spot.alpha),
-                0.62f to spot.color.copy(alpha = spot.alpha * 0.88f),
+                0.5f to spot.color.copy(alpha = spot.alpha * 0.7f),
                 1f to spot.color.copy(alpha = 0f),
                 center = center,
                 radius = radius,

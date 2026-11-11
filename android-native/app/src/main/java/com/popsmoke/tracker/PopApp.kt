@@ -280,6 +280,7 @@ fun PopApp(
                     topInset = topInset,
                     themeDescription = strings.cdThemeColor,
                     languageDescription = strings.cdLanguage,
+                    customColorLabel = strings.customColor,
                     currentTheme = ui.settings.themeColor,
                     currentLanguage = language,
                     themePresets = themePresets,

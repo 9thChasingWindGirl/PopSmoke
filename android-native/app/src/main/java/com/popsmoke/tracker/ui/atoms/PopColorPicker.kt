@@ -49,7 +49,15 @@ import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopGlass
 
 /**
- * 取色器：色相条 + 饱和度/明度面板 + 色号输入 + 预设色块。
+ * 取色器：预设色块 + 色号输入，**色盘收在一个入口后面**。
+ *
+ * ## 为什么色盘不再默认出现
+ *
+ * 一打开主题菜单就甩出一整块渐变面板 + 彩虹条，看起来像"开发者工具"，而且盖住了
+ * 半屏内容。原 Web 版的做法是：默认只有「当前色块 + 色号输入 + 预设色」，点色块
+ * 才展开色盘 —— 大多数人的需求是"换一个预设色"，不是"调一个 HSV"。
+ *
+ * 现在照这个结构走：色块和下面的「自定义颜色」都可以展开/收起色盘。
  *
  * 三条与性能/手感相关的决定：
  *
@@ -57,7 +65,7 @@ import com.popsmoke.tracker.design.PopGlass
  *    每帧一次全量落盘足以让手指跟不上，甚至把主线程拖到 ANR。松开手指再提交一次，
  *    颜色变化本身是连续的，用户看不出差别。
  * 2. **面板做成横向矩形（120dp）而不是正方形**。它要装在顶栏那个 280dp 的浮层里，
- *    正方形面板会把高度顶出屏幕，底部预设色块就被窗口裁掉了——用户"看不到色盘"就是这么来的。
+ *    正方形面板会把高度顶出屏幕。
  * 3. 保留色号输入与预设色块。知道色号的人不该被逼着拖滑块，常用色也不该每次都拖一遍。
  */
 @Composable
@@ -66,8 +74,11 @@ fun PopColorPicker(
     onChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     presets: List<String> = emptyList(),
+    customLabel: String = "Custom",
 ) {
     var draft by remember(value) { mutableStateOf(value) }
+    // 色盘默认收起 —— 这一条是照着原 Web 版改的，别改回去
+    var wheelOpen by remember { mutableStateOf(false) }
     val current = parseHexColor(draft) ?: parseHexColor(value) ?: PopColor.Core.DefaultAccent
     val hsv = remember(current) { current.toHsv() }
 
@@ -87,9 +98,11 @@ fun PopColorPicker(
             Box(
                 Modifier
                     .size(PopSpace.S10)
-                    .background(current)
                     .clip(pickerShape())
-            .popBorder(PopStroke.Thin, popInk),
+                    .background(current)
+                    .popBorder(PopStroke.Thin, popInk)
+                    // 点当前色 → 展开/收起色盘（原 Web 版的入口）
+                    .clickable { wheelOpen = !wheelOpen },
             )
             Box(Modifier.size(PopSpace.S2))
             PopInput(
@@ -105,24 +118,26 @@ fun PopColorPicker(
             )
         }
 
-        Box(Modifier.size(PopSpace.S2))
+        if (wheelOpen) {
+            Box(Modifier.size(PopSpace.S2))
 
-        // 饱和度（横）× 明度（纵）
-        SvPanel(
-            hue = hsv[0],
-            saturation = hsv[1],
-            brightness = hsv[2],
-            onPick = { s, v -> updateColor(Color.hsv(hsv[0], s, v)) },
-            onCommit = ::commit,
-        )
+            // 饱和度（横）× 明度（纵）
+            SvPanel(
+                hue = hsv[0],
+                saturation = hsv[1],
+                brightness = hsv[2],
+                onPick = { s, v -> updateColor(Color.hsv(hsv[0], s, v)) },
+                onCommit = ::commit,
+            )
 
-        Box(Modifier.size(PopSpace.S2))
+            Box(Modifier.size(PopSpace.S2))
 
-        HueBar(
-            hue = hsv[0],
-            onPick = { h -> updateColor(Color.hsv(h, hsv[1].coerceAtLeast(0.05f), hsv[2].coerceAtLeast(0.05f))) },
-            onCommit = ::commit,
-        )
+            HueBar(
+                hue = hsv[0],
+                onPick = { h -> updateColor(Color.hsv(h, hsv[1].coerceAtLeast(0.05f), hsv[2].coerceAtLeast(0.05f))) },
+                onCommit = ::commit,
+            )
+        }
 
         if (presets.isNotEmpty()) {
             Box(Modifier.size(PopSpace.S3))
@@ -164,8 +179,15 @@ fun PopColorPicker(
                 }
             }
             Box(Modifier.size(PopSpace.S1))
+
+            // 色盘的入口。放在预设色下面一行 —— 先给"最省事的选择"，
+            // 想调精确值的人再往下点一层。
             PopDisplay(
-                text = "TAP A SWATCH OR TYPE A HEX",
+                text = if (wheelOpen) "$customLabel −" else "$customLabel +",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { wheelOpen = !wheelOpen }
+                    .padding(vertical = PopSpace.S1),
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Bold,
                 color = popInkMuted,

@@ -47,6 +47,7 @@ import com.popsmoke.tracker.feature.dashboard.DashboardScreen
 import com.popsmoke.tracker.feature.dashboard.DashboardUiState
 import com.popsmoke.tracker.feature.dashboard.LimitAlert
 import com.popsmoke.tracker.feature.history.HistoryScreen
+import com.popsmoke.tracker.feature.settings.AboutSection
 import com.popsmoke.tracker.feature.settings.SettingsScreen
 import com.popsmoke.tracker.i18n.popStrings
 import com.popsmoke.tracker.ui.atoms.PopCard
@@ -205,6 +206,7 @@ class DashboardScreenshotTest {
                         topInset = 24.dp,
                         themeDescription = "",
                         languageDescription = "",
+                        customColorLabel = "Custom",
                         currentTheme = state.settings.themeColor,
                         currentLanguage = state.settings.language,
                         themePresets = emptyList(),
@@ -338,6 +340,7 @@ class DashboardScreenshotTest {
                             topInset = 24.dp,
                             themeDescription = "",
                             languageDescription = "",
+                            customColorLabel = "Custom",
                             currentTheme = settings.themeColor,
                             currentLanguage = settings.language,
                             themePresets = emptyList(),
@@ -515,10 +518,25 @@ class DashboardScreenshotTest {
         }
     }
 
+    /**
+     * 玻璃主题的接口页。
+     *
+     * 这一页有两个"重量级"控件：状态行（EMPTY / READY）和输入框。它们都曾经是实心色块 ——
+     * 在一片浅玻璃里，两块高饱和红是整屏最响的东西。这条快照专门守着它们别再变回去。
+     */
+    @Test
+    fun glass_api_zh() {
+        val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Page(settings, "中", listOf("记录", "分析", "历史", "接口", "设置"), 3, style = PopThemeStyle.Liquid) {
+                ApiScreen(strings = popStrings("zh"), modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // 第三批：时间编辑 / 操作日志 / 顶栏浮层
     // ------------------------------------------------------------------
-
     /**
      * 队列样例：两条正常待推送 + 一条失败。
      * 故意混着三种类型和两种状态，一张图就能看出图标、状态徽标、两行布局是否都对。
@@ -831,6 +849,32 @@ class DashboardScreenshotTest {
                     onGoToApi = {},
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
+        }
+    }
+
+    /**
+     * 关于区块：它永远在设置页最底部，一屏截图看不到，所以单独出一张。
+     *
+     * 单独截图的另一个理由：这一块曾经和上面几块不是同一种语法（贴边大行 + 居中版本号），
+     * 而"看不见"正是它能长期不一致的原因。
+     */
+    @Test
+    fun glass_about_zh() {
+        val settings = AppSettings(language = "zh", themeColor = "#4ECDC4")
+        paparazzi.snapshot {
+            Page(settings, "中", listOf("记录", "分析", "历史", "接口", "设置"), 4, style = PopThemeStyle.Liquid) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = PopSpace.S4, vertical = PopSpace.S3),
+                ) {
+                    AboutSection(
+                        strings = popStrings("zh"),
+                        version = "0.1.0-debug",
+                        onOpenLink = {},
+                    )
+                }
             }
         }
     }

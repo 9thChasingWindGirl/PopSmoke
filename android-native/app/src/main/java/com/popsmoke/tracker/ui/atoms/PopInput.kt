@@ -1,6 +1,7 @@
 package com.popsmoke.tracker.ui.atoms
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -78,14 +79,19 @@ fun PopInput(
                     .then(
                         if (current.glass && !error) {
                             // 输入框是内容区里唯一"要动手"的控件，给它一层薄玻璃：
-                            // 比分组略实、带边缘折射、没有投影（它是嵌在分组里的槽，不该浮起来）。
+                            // 比分组略透、带边缘折射、没有投影（它是嵌在分组里的槽，不该浮起来）。
                             // 错误态不走玻璃 —— 红边是警示信号，折射会把那条线的边界糊掉。
-                            Modifier.skinSurface(
-                                current = current,
-                                shape = shape,
-                                fill = current.palette.surfaceStrong.copy(alpha = PopGlass.ControlAlpha * 0.75f),
-                                lift = 0.dp,
-                            )
+                            //
+                            // 再加一根 6% 的内边线：浅色背景上，"槽"和"分组"都是一层白，
+                            // 只靠 alpha 差（0.08 vs 0.18）读不出"这里可以输入"。
+                            Modifier
+                                .skinSurface(
+                                    current = current,
+                                    shape = shape,
+                                    fill = current.palette.surfaceStrong.copy(alpha = PopGlass.ControlAlpha * 0.5f),
+                                    lift = 0.dp,
+                                )
+                                .border(1.dp, current.palette.ink.copy(alpha = 0.06f), shape)
                         } else {
                             Modifier
                                 // 玻璃下输入框是"凹槽"：比卡片更透、更暗一点，才读得出可以输入

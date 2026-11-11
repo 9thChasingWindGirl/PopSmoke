@@ -73,6 +73,7 @@ import com.popsmoke.tracker.ui.atoms.PopGroupLabel
 import com.popsmoke.tracker.ui.atoms.PopPageTitle
 import com.popsmoke.tracker.ui.atoms.PopSelect
 import com.popsmoke.tracker.ui.atoms.PopSelectOption
+import com.popsmoke.tracker.ui.atoms.PopSection
 import com.popsmoke.tracker.ui.atoms.PopSlider
 import com.popsmoke.tracker.ui.atoms.PopToast
 import com.popsmoke.tracker.ui.atoms.PopToastKind
@@ -403,35 +404,11 @@ fun SettingsScreen(
 
         // 关于
         item {
-            Column {
-                PopGroupLabel(strings.about)
-                PopGroup(padding = PaddingValues(0.dp)) {
-                    LinkRow(strings.blog) { pendingLink = BLOG_URL }
-                    PopDivider()
-                    LinkRow(strings.github) { pendingLink = GITHUB_URL }
-                    PopDivider()
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(PopSpace.S4),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(PopSpace.S2),
-                    ) {
-                        PopDisplay(
-                            text = "ver.${BuildConfig.VERSION_NAME}",
-                            size = PopTypeScale.Xs,
-                            weight = FontWeight.Black,
-                            color = popInkMuted,
-                            maxLines = 1,
-                        )
-                        PopBody(
-                            text = strings.fontAttribution,
-                            size = PopTypeScale.Xs,
-                            weight = FontWeight.Bold,
-                            color = popInkMuted,
-                            maxLines = 2,
-                        )
-                    }
-                }
-            }
+            AboutSection(
+                strings = strings,
+                version = BuildConfig.VERSION_NAME,
+                onOpenLink = { pendingLink = it },
+            )
         }
     }
 
@@ -672,14 +649,14 @@ private fun InfoBlock(label: String, value: String) {
 }
 
 @Composable
-private fun LinkRow(text: String, onClick: () -> Unit) {
-    // 组内行：不再自己带底色和描边（那会让"组里还有一块板"），
-    // 只留一行字 + 一个右向箭头 —— 箭头是"点了会去别处"的语法，比底色更省
+private fun LinkRow(text: String, onClick: () -> Unit) {    // 组内行：不再自己带底色和描边（那会让"组里还有一块板"），
+    // 只留一行字 + 一个右向箭头 —— 箭头是"点了会去别处"的语法，比底色更省。
+    // 水平内边距由 group 统一给（14dp），这里只留竖直的呼吸，否则会缩进两次。
     Row(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = PopSpace.S4, vertical = PopSpace.S3),
+            .padding(vertical = PopSpace.S3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PopDisplay(
@@ -696,6 +673,51 @@ private fun LinkRow(text: String, onClick: () -> Unit) {
             color = popInkMuted,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * 关于：两个外链 + 版本与字体声明。
+ *
+ * 结构回到 `PopSection` 的通用语法 —— 组标签、14dp 内边距、行之间一条发丝线、
+ * 注脚左对齐。它原来是 `PopGroup(padding = 0)` + 两条贴边的大行 + 居中的版本号，
+ * 和上面「阈值设置」「主题风格」不是同一种写法，放在同一页里像拼错了模板。
+ *
+ * 单独抽出来还有一个好处：它永远在页面最底部，一屏截图看不到。抽成独立组件之后
+ * 可以单独出快照，样式回退不会再"看不见"。
+ */
+@Composable
+internal fun AboutSection(
+    strings: PopStrings,
+    version: String,
+    onOpenLink: (String) -> Unit,
+) {
+    PopSection(strings.about) {
+        LinkRow(strings.blog) { onOpenLink(BLOG_URL) }
+        PopDivider()
+        LinkRow(strings.github) { onOpenLink(GITHUB_URL) }
+        PopDivider()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = PopSpace.S3),
+            verticalArrangement = Arrangement.spacedBy(PopSpace.S1),
+        ) {
+            PopDisplay(
+                text = "ver.$version",
+                size = PopTypeScale.Xs,
+                weight = FontWeight.Black,
+                color = popInkMuted,
+                maxLines = 1,
+            )
+            PopBody(
+                text = strings.fontAttribution,
+                size = PopTypeScale.Xs,
+                weight = FontWeight.Bold,
+                color = popInkMuted,
+                maxLines = 2,
+            )
+        }
     }
 }
 

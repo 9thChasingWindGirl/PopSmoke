@@ -273,21 +273,27 @@ fun rememberBackdrop(accent: Color, widthPx: Int, heightPx: Int): PopBackdrop? {
 /**
  * 用「缩到 1/N 再放大回来」做模糊。
  *
- * 不是高斯，但玻璃后面那种大范围虚化本来就不需要精确的核 —— 需要的是**把高频抹平**。
+ * 不是高斯，但玻璃后面那种中频虚化本来就不需要精确的核 —— 需要的是**把高频抹平**。
  * 降采样时每个目标像素吃掉 N×N 个源像素，已经完成了最重要的那一步平均；
- * 双线性放大负责把边界接圆滑。两次插值之后，颗粒、织纹、光斑边缘全部化成色块，
- * 只留下低频的明暗与色相 —— 正是透过一块厚玻璃该看到的东西。
+ * 双线性放大负责把边界接圆滑。两次插值之后，颗粒、织纹、光斑边缘全部化成色块。
  *
- * 为什么不在着色器里做多采样卷积：那样每帧每个像素都要几十次纹理读取，
- * 一屏好几块玻璃就是几十万次；而这笔开销只需要付一次（背景是静态的）。
+ * ## 这一版把模糊量砍掉了三分之二
  *
- * [factor] 取 12：在 1080p 上是 90×160 的缩略图，放大后模糊半径约 24px ≈ 一块
- * 20dp 厚的玻璃。再大就把背景压成纯色块了，玻璃里会没有东西可看。
+ * 上一版 factor 取到 26（1080p 上缩成 41×92），玻璃里什么都看不见 —— 只剩一层均匀的雾，
+ * 于是材质只能靠"加白"来表达，越加越像磨砂塑料。真机的观感是"脏"：一片灰，没有结构。
+ *
+ * 参考实现（archisvaze/liquid-glass）的 Blur 默认只有 1.8 —— 玻璃内部是**近乎清晰**的
+ * 背景，只是边缘被压弯。人眼判断"隔了一层玻璃"靠的是**边界处的错位**，不是整体的糊。
+ * 糊得越狠，越没有东西可以被弯折，玻璃就越不像玻璃。
+ *
+ * 现在 factor 取到 70（1080p → 15），只抹掉噪点和织纹的毛边，色带的走向、光斑的轮廓
+ * 都还在。折射把那些轮廓推开时，边缘会立刻出现一条"被挤压的带子"。
+ *
+ * [factor] 按短边算，不按像素比例 —— 换一块分辨率更高的屏，玻璃的厚度不该跟着变。
  */
 private fun blurDownsample(image: ImageBitmap, width: Int, height: Int): ImageBitmap {
-    // 模糊半径按短边算，不按像素比例 —— 换一块分辨率更高的屏，玻璃的厚度不该跟着变。
-    val heavy = (minOf(width, height) / 26).coerceIn(6, 40)
-    val light = (heavy / 4).coerceAtLeast(2)
+    val heavy = (minOf(width, height) / 70).coerceIn(4, 24)
+    val light = (heavy / 3).coerceAtLeast(2)
     return try {
         val src = image.asAndroidBitmap()
         val out = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
@@ -295,16 +301,16 @@ private fun blurDownsample(image: ImageBitmap, width: Int, height: Int): ImageBi
         val rect = android.graphics.Rect(0, 0, width, height)
         val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
 
-        // 两层叠着画，而不是只画一层重模糊。
+        // 两层叠着画，而不是只画一层模糊。
         //
-        // 单层重模糊会把**低频也一起压平** —— 色带的走向、明暗的大块结构全糊成一团，
+        // 单层会把**低频也一起压平** —— 色带的走向、明暗的大块结构全糊成一团，
         // 卡片里读作"脏"，而不是"隔着一层玻璃"。真玻璃丢掉的是高频，不是全部。
-        // 所以：重模糊铺底，再用 40% 的轻模糊盖上去，把中低频的结构捞回来。
+        // 所以：一层中模糊铺底，再用 55% 的轻模糊盖上去，把中低频的结构捞回来。
         val small = android.graphics.Bitmap.createScaledBitmap(src, width / heavy, height / heavy, true)
         canvas.drawBitmap(small, null, rect, paint)
 
         val fine = android.graphics.Bitmap.createScaledBitmap(src, width / light, height / light, true)
-        paint.alpha = (255 * 0.38f).toInt()
+        paint.alpha = (255 * 0.55f).toInt()
         canvas.drawBitmap(fine, null, rect, paint)
 
         out.asImageBitmap()

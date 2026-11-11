@@ -276,18 +276,18 @@ private fun DrawScope.drawGlassPanel(
     // 对角渐变，左上亮右下暗。为什么不是"中心最透"的径向：
     // 径向会在边缘形成一圈比中心更实的边 —— 那又是一道环，只是分辨率低一点。
     //
-    // 渐变的幅度要跟着填充的透明度走：半透明面板（0.10）靠这点明暗差建立体积；
-    // 实心元件（1.0）如果也做同样的渐变，就变成"一块橙色的上浅下深"，
-    // 读作塑料而不是玻璃。实心上必须完全均匀，否则它就不再是同一套材质了。
+    // 幅度要小。真机的观感里，"脏"几乎全部来自这层：背景被模糊之后再压一层白、
+    // 白本身还有明暗坡度，读起来就是一块擦不干净的玻璃。体积交给折射去表达 ——
+    // 边缘被压弯的地方自然会有明暗，不需要在整个面上再刷一道渐变。
     if (fill.alpha > 0f) {
         val a = fill.alpha
         val softness = (1f - a).coerceIn(0f, 1f)
         drawOutlineShape(
             outline,
             Brush.linearGradient(
-                0f to fill.copy(alpha = (a * (1f + 0.18f * softness)).coerceAtMost(1f)),
+                0f to fill.copy(alpha = (a * (1f + 0.10f * softness)).coerceAtMost(1f)),
                 0.45f to fill,
-                1f to fill.copy(alpha = a * (1f - 0.22f * softness)),
+                1f to fill.copy(alpha = a * (1f - 0.14f * softness)),
                 start = Offset(bounds.left, bounds.top),
                 end = Offset(bounds.right, bounds.bottom),
             ),
@@ -328,8 +328,11 @@ private fun DrawScope.drawGlassPanel(
     // 强度还要跟填充的透明度挂钩。玻璃的亮边是"表面反射"，越透明越显眼；
     // 一块实心橙色的按钮如果也镶一圈 92% 的白边，那读作"贴纸描边"，
     // 是波普语言误闯进玻璃主题 —— 必须按透明度衰减掉。
+    //
+    // 系数从 0.85 降到 0.5：浮岛现在要压住背后的滚动内容（alpha 0.62），
+    // 按 0.85 折算只剩 0.27 的边缘光，整块玻璃就没有"边"了。
     val solidity = fill.alpha.coerceIn(0f, 1f)
-    val edgeScale = 1f - solidity * 0.85f
+    val edgeScale = 1f - solidity * 0.5f
     val peak = PopGlass.EdgePeakAlpha * edgeScale
     val minA = PopGlass.EdgeMinAlpha * edgeScale
     fun at(v: Float) = minA + (peak - minA) * v

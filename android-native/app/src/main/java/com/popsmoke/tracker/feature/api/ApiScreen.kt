@@ -26,6 +26,7 @@ import com.popsmoke.tracker.data.ApiConfig
 import com.popsmoke.tracker.data.ApiConfigStore
 import com.popsmoke.tracker.data.maskSecret
 import com.popsmoke.tracker.data.maskUrl
+import com.popsmoke.tracker.design.LocalSkin
 import com.popsmoke.tracker.design.PopColor
 import com.popsmoke.tracker.design.PopSpace
 import com.popsmoke.tracker.design.PopStroke
@@ -264,6 +265,8 @@ fun ApiScreen(
 
 @Composable
 private fun StatusRow(label: String, configured: Boolean) {
+    val glass = LocalSkin.current.glass
+    val status = if (configured) PopColor.Status.Success else PopColor.Status.Danger
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -281,7 +284,10 @@ private fun StatusRow(label: String, configured: Boolean) {
         )
         Box(
             Modifier
-                .background(if (configured) PopColor.Status.Success else PopColor.Status.Danger)
+                // 玻璃下不铺实心色：EMPTY / READY 是"状态"不是"警告"，
+                // 一整块高饱和红在一片浅玻璃里是全屏最响的东西，比主按钮还抢眼。
+                // 淡底 + 同色字，读得出来，但不参与抢注意力。
+                .background(status.copy(alpha = if (glass) 0.16f else 1f))
                 .popBorder(PopStroke.Thin, popInk)
                 .padding(horizontal = PopSpace.S2, vertical = 2.dp),
         ) {
@@ -289,8 +295,8 @@ private fun StatusRow(label: String, configured: Boolean) {
                 text = if (configured) "READY" else "EMPTY",
                 size = PopTypeScale.Xs,
                 weight = FontWeight.Black,
-                // 彩色标签上的字是纯白，不该跟着皮肤走（popSurface 是半透明的）
-                color = Color.White,
+                // 波普：实心色块上的字是纯白（popSurface 是半透明的，不能跟皮肤）
+                color = if (glass) status else Color.White,
                 maxLines = 1,
             )
         }

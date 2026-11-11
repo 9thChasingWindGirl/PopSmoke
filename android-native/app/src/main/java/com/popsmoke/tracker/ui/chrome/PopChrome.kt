@@ -117,6 +117,7 @@ fun PopTopBar(
     topInset: Dp,
     themeDescription: String,
     languageDescription: String,
+    customColorLabel: String,
     currentTheme: String,
     currentLanguage: String,
     themePresets: List<String>,
@@ -199,6 +200,7 @@ fun PopTopBar(
                         value = currentTheme,
                         onChange = onSelectTheme,
                         presets = themePresets,
+                        customLabel = customColorLabel,
                     )
                 }
             }
