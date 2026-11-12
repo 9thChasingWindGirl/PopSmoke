@@ -1,0 +1,193 @@
+name: Android Native
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-native/**'
+      - 'design/tokens.json'
+      - 'tools/gen-tokens.mjs'
+      - 'tools/gen-strings.mjs'
+      - 'i18n/**'
+      - '.github/workflows/android-native.yml'
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - 'design/tokens.json'
+      - 'tools/gen-tokens.mjs'
+      - 'tools/gen-strings.mjs'
+      - 'i18n/**'
+      - '.github/workflows/android-native.yml'
+  workflow_dispatch:
+
+# upload-artifact 只需要读权限；没有这个块时默认权限随仓库设置漂移，
+# 私有仓库改过默认值后 checkout 可能拿不到内容。
+permissions:
+  contents: read
+
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 与 gradle.properties 的 jvmargs 同量级；runner 是 16G 内存，多给 Kotlin 编译留余量
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Djava.awt.headless=true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 令牌与文案是生成产物，node 版本固定下来，避免 runner 默认版本漂移导致 --check 输出格式差异
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 不提交 gradle wrapper 二进制：由这个 action 提供固定版本的 gradle，本地用 Android Studio 自带发行版
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # runner 镜像自带的 SDK 不一定含 android-35；显式装一次，已装时 sdkmanager 会立即返回。
+      # AGP 8.7.3 会在构建时校验 build-tools 版本，缺了只会给出难读的报错。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+          accept-android-sdk-licenses: true
+
+      # 红线：有人手改了 PopTokens.kt 而没改 tokens.json，这里直接失败
+      - name: Verify design tokens
+        run: node tools/gen-tokens.mjs --check
+
+      # 红线：文案是生成的，手改 PopStrings.kt 或改了 i18n 忘了重生成，这里直接失败
+      - name: Verify i18n strings
+        run: node tools/gen-strings.mjs --check
+
+      # 先出包再跑视觉回归：截图挂了 run 会标红，但包已经在 artifact 里，不至于白等一轮。
+      - name: Assemble debug
+        working-directory: android-native
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Rename debug APK
+        run: |
+          mkdir -p output
+          SRC=$(ls android-native/app/build/outputs/apk/debug/*.apk | head -1)
+          echo "源包: $SRC ($(du -h "$SRC" | cut -f1))"
+          cp "$SRC" "output/popsmoke-debug-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::8}.apk"
+          # debug 包带 .debug 后缀（与 Web 套壳包共存），装的时候认这个 applicationId
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/aapt2" dump badging output/*.apk | head -4
+
+      # 仓库的 artifact 保留上限是 7 天，写更大只会被降级并在日志里刷一条 warning
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: popsmoke-debug-${{ github.run_number }}
+          path: output/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      # 视觉回归是硬门槛：基准图虽在 Windows 上录，但 Linux 的 layoutlib 渲染结果与之逐像素一致
+      # （首次 CI 已验证）。失败说明确实改了样式而没重录基准。
+      - name: Verify screenshots
+        working-directory: android-native
+        run: gradle --no-daemon :app:verifyPaparazziDebug
+
+      # 失败时把报告一起带出来，否则只看得到一行 "verifyPaparazziDebug FAILED"
+      - name: Upload screenshot diff
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: popsmoke-screenshot-diff-${{ github.run_number }}
+          path: |
+            android-native/app/build/reports/paparazzi/**
+            android-native/app/build/outputs/paparazzi/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # release 需要先配好四个 Secrets：KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD。
+  # 缺任意一个就不出包，避免产出装不上的未签名 APK（上一版 CI 的坑）。
+  release:
+    name: Build signed AAB + APK
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+          accept-android-sdk-licenses: true
+
+      - name: Check signing secrets
+        run: |
+          for key in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::error::缺少 Secret: $key"
+              exit 1
+            fi
+          done
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Decode keystore
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Assemble release
+        working-directory: android-native
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 0.1.${{ github.run_number }}
+        run: |
+          gradle --no-daemon :app:assembleRelease :app:bundleRelease
+          echo "--- 产物校验 ---"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          "$BT/aapt2" dump badging "$APK" | head -5
+          "$BT/apksigner" verify --print-certs "$APK" | head -3
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: popsmoke-release
+          path: |
+            android-native/app/build/outputs/apk/release/*.apk
+            android-native/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error

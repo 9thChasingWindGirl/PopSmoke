@@ -48,6 +48,11 @@ export const i18n_KO = {
   customHex: '사용자 지정 색상',
   customColor: '사용자 지정 색상',
   theme: '테마',
+  themeStyle: '테마 스타일',
+  styleLiquid: '리퀴드 글라스',
+  stylePop: '팝 코믹',
+  styleLiquidDesc: '반투명 유리 질감과 빛의 흐름, 젤리 모션',
+  stylePopDesc: '굵은 잉크선과 하드 섀도의 만화풍',
   
   // ============ Dashboard - Messages ============
   warningMsg: '경고: 일일 한도에 근접!',

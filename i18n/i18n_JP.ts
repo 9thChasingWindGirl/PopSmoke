@@ -48,6 +48,11 @@ export const i18n_JP = {
   customHex: 'カスタム色',
   customColor: 'カスタム色',
   theme: 'テーマ',
+  themeStyle: 'テーマスタイル',
+  styleLiquid: 'リキッドグラス',
+  stylePop: 'ポップコミック',
+  styleLiquidDesc: 'すりガラスの透明感と光の流れ、ジェリーの動き',
+  stylePopDesc: '太い黒線とハードシャドウの漫画調',
   
   // ============ Dashboard - Messages ============
   warningMsg: '警告：制限に近づいています！',
