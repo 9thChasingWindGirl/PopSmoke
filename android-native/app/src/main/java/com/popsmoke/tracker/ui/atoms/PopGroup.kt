@@ -46,8 +46,8 @@ import com.popsmoke.tracker.ui.foundation.GlassTone
 import com.popsmoke.tracker.ui.foundation.LocalPopBackdrop
 import com.popsmoke.tracker.ui.foundation.PopBody
 import com.popsmoke.tracker.ui.foundation.PopDisplay
-import com.popsmoke.tracker.ui.foundation.drawBackdropSlice
 import com.popsmoke.tracker.ui.foundation.drawInnerGlow
+import com.popsmoke.tracker.ui.foundation.drawRefractedMesh
 import com.popsmoke.tracker.ui.foundation.popBorder
 import com.popsmoke.tracker.ui.foundation.popShadow
 
@@ -131,15 +131,15 @@ private fun Modifier.groupSurface(current: PopSkin, shape: Shape): Modifier =
                     ) ?: GlassTone.Light
                     val outline = shape.createOutline(size, layoutDirection, this@drawBehind)
                     val path = Path().apply { addOutline(outline) }
+                    // 1. 软件折射：内部≈背景本身（4px 极轻模糊），边缘一圈弯折带
+                    if (backdrop != null) {
+                        drawRefractedMesh(backdrop, origin.value, outline, strong = false)
+                    }
+                    // 2. 恒定中性填充（内部"几乎不加工"，只垫一层极淡的白）
                     clipPath(path) {
-                        // 1. 适度模糊的背景切片（辉光要压在它上面，顺序不能反）
-                        if (backdrop != null) {
-                            drawBackdropSlice(backdrop, origin.value)
-                        }
-                        // 2. 恒定中性填充
                         drawRect(Color.White.copy(alpha = PopGlass.GroupAlpha))
                     }
-                    // 3. 内辉光（贴轮廓，独立画，避免和填充叠成两层白）
+                    // 3. 内辉光（贴轮廓，压在填充上）
                     drawInnerGlow(outline, tone)
                 }
         }

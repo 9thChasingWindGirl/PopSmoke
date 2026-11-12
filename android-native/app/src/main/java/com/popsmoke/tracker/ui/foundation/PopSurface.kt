@@ -284,15 +284,7 @@ private fun DrawScope.drawGlassPanel(
 
     // ---- 1. 折射 ----
     if (backdrop != null) {
-        drawRefracted(
-            backdrop = backdrop,
-            origin = origin,
-            shape = shape,
-            bezel = RefractionDefaults.bezel(this),
-            depth = RefractionDefaults.depth(this),
-            dispersion = RefractionDefaults.dispersion(this),
-            strong = strongBlur,
-        )
+        drawRefractedMesh(backdrop, origin, outline, strongBlur)
     }
 
     // ---- 2. body ----

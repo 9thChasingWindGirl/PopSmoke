@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.popsmoke.tracker.design.PopGlass
 import com.popsmoke.tracker.design.skin
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * 背景快照：一张清晰版 + 三档模糊版 + 一张明度地图。
@@ -68,7 +70,7 @@ import kotlin.math.min
 class PopBackdrop internal constructor(
     /** 屏幕尺寸的清晰背景。壁纸原图，或程序化极光。 */
     val image: ImageBitmap,
-    /** div 级模糊（弱）：内容卡片、输入框、按钮。 */
+    /** div 级模糊（极轻，≈4px）：内容卡片、输入框、按钮 —— 内部"几乎不加工"。 */
     val soft: ImageBitmap,
     /** chrome 级模糊（强）：顶栏、底栏、菜单、弹窗。 */
     val heavy: ImageBitmap,
@@ -78,8 +80,6 @@ class PopBackdrop internal constructor(
     val heightPx: Float,
     /** 明度网格，行优先。 */
     private val luma: FloatArray,
-    /** null 表示这台设备/这个渲染环境不支持 AGSL，调用方应跳过折射层。 */
-    val shader: RuntimeShader?,
 ) {
 
     internal val softShader: BitmapShader? = soft.bitmapShader(widthPx)
@@ -94,6 +94,14 @@ class PopBackdrop internal constructor(
     val heavyBitmap: android.graphics.Bitmap get() = heavy.asAndroidBitmap()
     val softBitmap: android.graphics.Bitmap get() = soft.asAndroidBitmap()
     val tinyBitmap: android.graphics.Bitmap get() = tiny.asAndroidBitmap()
+
+    // ---- 折射网格（见 [drawRefractedMesh]）----
+    // 全屏均匀网格，格子目标 16px。快照视口（~460px）和真机（1080px）都落在上下界内。
+    internal val meshCols: Int = (widthPx / 16f).toInt().coerceIn(20, 96)
+    internal val meshRows: Int = (heightPx / 16f).toInt().coerceIn(20, 170)
+
+    /** 顶点缓冲，进程内复用（绘制顺序串行，一个面板画完才轮到下一个）。 */
+    internal val meshVerts = FloatArray((meshCols + 1) * (meshRows + 1) * 2)
 
     /**
      * 矩形区域的平均明度（0 = 纯黑，1 = 纯白）。
@@ -206,89 +214,141 @@ private const val LumaCols = 16
 private const val LumaRows = 32
 
 /**
- * 把"被折射过的背景"画到当前 DrawScope 上，裁到 [shape]。
+ * 软件折射：把面板背后的背景按玻璃剖面弯折一遍。
  *
- * [origin] 是当前绘制的左上角在根坐标系中的位置 —— 卡片内的 fragCoord 是局部坐标，
- * 要采样全屏位图就得把它平移回去。这个值必须来自 `onGloballyPositioned`，猜不出来。
+ * ## 为什么从 AGSL 换成 drawBitmapMesh
  *
- * 圆角半径从 `Outline` 里读，而不是外面传一个"大概的值"：形状和着色器一旦不一致，
- * 折射带就会和真实轮廓错开一两个像素，边缘看起来是毛的。
+ * AGSL 版有两个致命伤：
+ *
+ * 1. API 33 以下没有 `RuntimeShader`；
+ * 2. **layoutlib（Paparazzi）构造着色器成功但渲染输出为空** —— 位移调到 90dp 也
+ *    看不到任何扭曲。也就是说此前所有轮次里，折射只存在于真机上，
+ *    快照迭代闭环里**从来没人看见过它**。玻璃的灵魂层一直处于盲区，
+ *    被反复调参的全是模糊/填充这些参考实现里最不重要的层。
+ *
+ * `drawBitmapMesh` 是普通 Canvas API：Paparazzi、硬件画布、所有 API 级别都渲染。
+ * 折射从此进快照，调参闭环才算闭合。
+ *
+ * ## 实现
+ *
+ * 全屏均匀网格（格子 ~16px，见 [PopBackdrop.meshCols]），每个顶点按玻璃剖面
+ * 位移：`amt = depth · smoothstep(0,0.03,t) · (1-t)²`，t 是到轮廓的归一化距离
+ * （0 = 轮廓上，1 = 壁内沿）。峰值贴边、向内单调归零 —— 与参考实现
+ * （archisvaze/liquid-glass 的表面斜率模型）同一套数学，只是执行层从着色器
+ * 换成了网格。位移方向沿 SDF 梯度（直边垂直、圆角径向）。
+ *
+ * 关键点：
+ *
+ * - **dest 顶点 = 网格点 + 沿法线外推 amt**（前向位移），等价于"边缘看到更靠里
+ *   的背景"，背景被压向轮廓 —— 参考仓库的读法；
+ * - 源网格是 drawBitmapMesh 隐式的均匀位图网格，正好覆盖整屏半分辨率位图，
+ *   坐标天然对齐（根坐标 × 0.5 = 位图坐标）；
+ * - 画布先 clip 到面板轮廓：网格虽是全屏的，栅格化只发生在面板内，
+ *   不会重绘别的面板已经画好的东西；
+ * - 内部位移归零 → 网格退化为恒等映射，**内部就是背景本身**（≈4px 极轻模糊），
+ *   "内部几乎不加工"由此成立。
+ *
+ * [strong] 换更糊的源图：底栏背后是滚动文字，弯折的对象必须是重模糊层。
  */
-internal fun DrawScope.drawRefracted(
+internal fun DrawScope.drawRefractedMesh(
     backdrop: PopBackdrop,
     origin: Offset,
-    shape: Shape,
-    bezel: Float,
-    depth: Float,
-    dispersion: Float,
+    outline: Outline,
     strong: Boolean,
-) {    val s = backdrop.shader ?: return
-    val bs = (if (strong) backdrop.heavyShader else backdrop.softShader) ?: return
+) {
+    val w = size.width
+    val h = size.height
+    if (w <= 0f || h <= 0f) return
 
-    val outline = shape.createOutline(size, layoutDirection, this)
     val radius = when (outline) {
         is Outline.Rounded -> outline.roundRect.topLeftCornerRadius.x
-        is Outline.Rectangle -> 0f
-        is Outline.Generic -> 0f
+        else -> 0f
+    }
+    val hsX = w / 2f
+    val hsY = h / 2f
+    val r = min(radius, min(hsX, hsY))
+    if (r <= 0f) return // 方形没有可解的壁，跳过折射层
+
+    val shortSide = min(w, h)
+    // 壁宽：圆角半径封顶 —— SDF 在角部的最大深度就是半径，壁比半径宽的话
+    // t 在角内永远到不了 1，角上会留下一块不回零的位移残留。
+    // 上限放到短边 28%（参考仓库 bezel ≈ 短边 30%），下限 4%。
+    val bezel = min(r, shortSide * 0.28f).coerceAtLeast(shortSide * 0.04f)
+    // 位移：壁宽的 85% 封顶，短边 12% 封顶 —— 小元件自动拿小位移。
+    val depth = with(density) { PopGlass.RefractDepth.toPx() }
+        .coerceAtMost(min(bezel * 0.85f, shortSide * 0.12f))
+    if (depth <= 0.5f) return
+
+    val cols = backdrop.meshCols
+    val rows = backdrop.meshRows
+    val verts = backdrop.meshVerts
+    val src = if (strong) backdrop.heavyBitmap else backdrop.softBitmap
+
+    var idx = 0
+    var j = 0
+    while (j <= rows) {
+        // 根坐标系里的网格点。源网格是隐式的：顶点 (i,j) 恒对应位图上
+        // (i·bw/cols, j·bh/rows) —— 位图是半分辨率，根坐标 ×0.5 恰好对齐。
+        val sy = j * backdrop.heightPx / rows
+        val ly = sy - origin.y
+        val py = ly - hsY
+        var i = 0
+        while (i <= cols) {
+            val sx = i * backdrop.widthPx / cols
+            val lx = sx - origin.x
+            val px = lx - hsX
+            val d = sdRoundRect(px, py, hsX, hsY, r)
+            var vx = lx
+            var vy = ly
+            // 只处理壁内顶点（d ∈ (-bezel, 0)）。轮廓外被 clip 裁掉，
+            // 剖面在 t=0 处归零，所以跨界三角形天然连续，不会留缝。
+            if (d > -bezel && d < 0f) {
+                val t = -d / bezel
+                val amt = depth * smoothstep(0f, 0.03f, t) * (1f - t) * (1f - t)
+                if (amt > 0.05f) {
+                    // SDF 数值梯度 = 外法线。只有壁内顶点需要算（4 次额外求值）。
+                    val e = 1.5f
+                    var nx = sdRoundRect(px + e, py, hsX, hsY, r) - sdRoundRect(px - e, py, hsX, hsY, r)
+                    var ny = sdRoundRect(px, py + e, hsX, hsY, r) - sdRoundRect(px, py - e, hsX, hsY, r)
+                    val len = sqrt(nx * nx + ny * ny)
+                    if (len > 1e-4f) {
+                        nx /= len
+                        ny /= len
+                        vx += nx * amt
+                        vy += ny * amt
+                    }
+                }
+            }
+            verts[idx] = vx
+            verts[idx + 1] = vy
+            idx += 2
+            i++
+        }
+        j++
     }
 
-    // 壁不能比形状本身还宽：胶囊按钮的整个高度都是壁，再宽就没有平板区了，
-    // 剖面会被截断成"整块都在位移"，反而糊。
-    //
-    // 另一条约束是圆角半径：SDF 距离在圆角区域的最大值就是半径，壁宽一旦超过它，
-    // 圆角中心就落在带内且 t 永远到不了 1，位移在角上留下一个不回零的残留 ——
-    // 表现为四个角各多出一块楔形色斑，与旁边的直边接不上。
-    //
-    // 还有一条下界：壁宽要跟着元件长大。固定的 26dp 放在卡片（380dp）上是 7%，
-    // 放在满屏面板（780dp）上只剩 3%，边缘那条折射带细得像描边，
-    // 一屏大玻璃就退化成"磨砂贴膜"。
-    val shortSide = min(size.width, size.height)
-    val maxBezel = min(shortSide * 0.075f, radius * 0.9f).coerceAtLeast(0.01f)
-    val floor = shortSide * 0.05f
-    val b = maxOf(bezel, floor).coerceIn(0.01f, maxBezel)
-
-    // 位移量必须跟着元件的短边走，不能是固定 dp。
-    // 26dp 的位移放在 380dp 高的卡片上是 7%，是一道好看的折边；
-    // 放在 56dp 高的按钮上就是 46%，整个按钮会糊成一团 —— 小元件要用小位移。
-    s.setInputShader("iBackdrop", bs)
-    s.setFloatUniform("iSize", size.width, size.height)
-    s.setFloatUniform("iOrigin", origin.x, origin.y)
-    s.setFloatUniform("iRadius", radius)
-    s.setFloatUniform("iBezel", b)
-    s.setFloatUniform("iDepth", depth.coerceAtMost(min(b * 1.9f, shortSide * 0.15f)))
-    s.setFloatUniform("iDisperse", dispersion)
-
     val path = Path().apply { addOutline(outline) }
-    backdrop.paint.shader = s
     clipPath(path) {
         drawIntoCanvas { canvas ->
-            canvas.nativeCanvas.drawRect(0f, 0f, size.width, size.height, backdrop.paint)
+            canvas.nativeCanvas.drawBitmapMesh(
+                src, cols, rows, verts, 0, null, 0, backdrop.slicePaint,
+            )
         }
     }
 }
 
-/**
- * 适度模糊的背景切片：给"安静的底"（分组卡片）用的轻量玻璃输入。
- *
- * 分组不走折射着色器（那是浮动层的表演），但也不该把锐利的壁纸直接压在白块底下 ——
- * 那正是"材质不理想"的另一半：卡片后面 34% 的白盖不住叶脉和文字，
- * 背景的高频全部透进来。切片用 soft 档（约 8px 模糊），高频没了，
- * 山脊和色带还在，玻璃"隔了一层"的感觉由此而来。
- *
- * 坐标：切片要采样自己在根坐标系里的那一块背景。画布平移 -[origin] 后，
- * 画布内坐标恰好等于根坐标，BitmapShader 的 localMatrix 负责把半分辨率
- * 位图对回屏幕 —— 和折射着色器里的 iOrigin 是同一套思路。
- */
-internal fun DrawScope.drawBackdropSlice(backdrop: PopBackdrop, origin: Offset) {
-    val shader = backdrop.softShader ?: return
-    drawIntoCanvas { canvas ->
-        val nc = canvas.nativeCanvas
-        val save = nc.save()
-        nc.translate(-origin.x, -origin.y)
-        backdrop.slicePaint.shader = shader
-        nc.drawRect(0f, 0f, size.width, size.height, backdrop.slicePaint)
-        nc.restoreToCount(save)
-    }
+/** 圆角矩形 SDF（与旧着色器同一套公式）。 */
+private fun sdRoundRect(px: Float, py: Float, hx: Float, hy: Float, r: Float): Float {
+    val qx = kotlin.math.abs(px) - hx + r
+    val qy = kotlin.math.abs(py) - hy + r
+    val ax = max(qx, 0f)
+    val ay = max(qy, 0f)
+    return min(max(qx, qy), 0f) + sqrt(ax * ax + ay * ay) - r
+}
+
+private fun smoothstep(e0: Float, e1: Float, x: Float): Float {
+    val t = ((x - e0) / (e1 - e0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
 }
 
 /**
@@ -315,13 +375,17 @@ internal fun DrawScope.drawInnerGlow(outline: Outline, tone: GlassTone) {
     if (strength <= 0.01f) return
     val path = Path().apply { addOutline(outline) }
     val shortSide = min(size.width, size.height)
-    // 12dp 在卡片上是身份特征，在 28dp 的圆片上就是半块饼 —— 带宽跟元件走
-    val band = with(density) { PopGlass.GlowBand.toPx() }.coerceAtMost(shortSide * 0.22f)
+    // 12dp 在卡片上太小 —— 参考实现的"白内辉"是 40px 量级。带宽取
+    // [PopGlass.GlowBand]（40dp）与短边 20% 的较小者：卡片吃满 40dp，
+    // 58dp 的导航胶囊自动收到 ~12dp。
+    val band = with(density) { PopGlass.GlowBand.toPx() }.coerceAtMost(shortSide * 0.20f)
     val blur = band * 0.55f
     val glow = glowPaint.apply {
         style = android.graphics.Paint.Style.STROKE
-        // 描边居中：外半圈会被裁掉，内侧留 band；blur 再吃掉一点边缘，补上余量
-        strokeWidth = band * 2f + blur
+        // 描边居中 + BlurMaskFilter 向两侧各扩约 blur/2：内侧总延伸 ≈ W/2 + blur/2。
+        // 要把辉光**锁在 band 以内**（否则 40dp 带在矮卡上糊满整卡、暗壁纸整块发灰），
+        // 反推 W = 2·(band − blur)，负值时退化为贴边细线。
+        strokeWidth = max(2f, (band - blur) * 2f)
         color = tone.glowColor
             .copy(alpha = (PopGlass.GlowMaxAlpha * strength).coerceIn(0f, 1f))
             .toArgb()
@@ -451,14 +515,14 @@ fun rememberBackdrop(
             }
             PopBackdrop(
                 image = image,
-                // 两档模糊：weak 给内容区（背后轮廓还认得出），strong 给浮层（背后是滚动文字）
-                soft = blurLayer(image, widthPx, heightPx, short = 55),
+                // 两档模糊：soft 给内容区（≈4px，内部"几乎不加工"，山脊和草地都认得出），
+                // strong/heavy 给浮层（背后有滚动文字，必须糊开）
+                soft = blurLayer(image, widthPx, heightPx, short = 110),
                 heavy = blurLayer(image, widthPx, heightPx, short = 22),
                 tiny = blurLayer(image, widthPx, heightPx, short = 12),
                 widthPx = widthPx.toFloat(),
                 heightPx = heightPx.toFloat(),
                 luma = lumaGrid(image),
-                shader = compileRefractionShader(),
             )
         }
     }
@@ -596,101 +660,6 @@ private fun lumaGrid(image: ImageBitmap): FloatArray {
     }
 }
 
-/**
- * AGSL 折射。API 33 以下没有 `RuntimeShader`，返回 null，调用方降级。
- *
- * ## 剖面：这一版把峰值挪到了贴边
- *
- * 上一版是两端归零的驼峰，峰值落在壁宽的 43% 处。在 30dp 的壁上，
- * 最强的那圈扰动在**离边框 13dp 的地方**，边框本身几乎不动 ——
- * 视觉上就是"一圈一圈"，和最早那版甜甜圈是同一个东西，只是换了实现层。
- *
- * 参考实现（archisvaze/liquid-glass）用的是 `h(t) = (1-(1-t)^4)^0.25` 的表面高度，
- * 位移取它的斜率：**轮廓处最陡、向内单调衰减到零**。也就是最强扰动贴着边框，
- * 玻璃的"折"发生在最外面那一两毫米里。
- *
- * 这里照抄那个形状：`fall = pow(1-t, 2)` 单调递减，再用 `anchor` 让 t≈0 处
- * 归零（否则边界内外是两张图硬拼，会露一条 1px 的缝）。3% 的壁宽约等于 1px，
- * 肉眼看就是"贴着边折"。
- */
-private fun compileRefractionShader(): RuntimeShader? = try {
-    RuntimeShader(
-        """
-        uniform shader iBackdrop;
-        uniform float2 iSize;
-        uniform float2 iOrigin;
-        uniform float iRadius;
-        uniform float iBezel;
-        uniform float iDepth;
-        uniform float iDisperse;
-
-        float sdRoundRect(float2 p, float2 hs, float r) {
-            float2 q = abs(p) - hs + r;
-            return min(max(q.x, q.y), 0.0) + length(max(q, float2(0.0))) - r;
-        }
-
-        half4 main(float2 fragCoord) {
-            float2 hs = iSize * 0.5;
-            float2 p = fragCoord - hs;
-            float r = min(iRadius, min(hs.x, hs.y));
-
-            float d = sdRoundRect(p, hs, r);
-
-            // SDF 的中央差分梯度 = 真法线。直边垂直、圆角径向，一套公式通吃。
-            float e = 1.0;
-            float2 nrm = float2(
-                sdRoundRect(p + float2(e, 0.0), hs, r) - sdRoundRect(p - float2(e, 0.0), hs, r),
-                sdRoundRect(p + float2(0.0, e), hs, r) - sdRoundRect(p - float2(0.0, e), hs, r)
-            );
-            nrm = normalize(nrm + float2(1e-5, 1e-5));
-
-            // t: 0 = 轮廓上，1 = 壁的内沿
-            float t = clamp(-d / max(iBezel, 0.001), 0.0, 1.0);
-
-            // 边界归零（1px 内到位），然后单调衰减 —— 单峰，没有第二个环。
-            float anchor = smoothstep(0.0, 0.03, t);
-            float fall = pow(1.0 - t, 2.0);
-            float amt = iDepth * anchor * fall;
-
-            // 向内取：边缘看到的是更靠里的背景，整块背景被压向轮廓，
-            // 读作"这块料把后面的东西挤扁了"。
-            float2 uv = fragCoord + iOrigin - nrm * amt;
-
-            half4 base = iBackdrop.eval(uv);
-
-            // 玻璃的材料色不是"盖一层白"，是"让颜色更浓一点"。
-            // 全靠 body 的白色半透明来建立存在感，结果是整块面板被漂白，
-            // 背景的暖色穿不过来 —— 看起来像磨砂塑料。真玻璃的作用是提纯：
-            // 稍稍提高饱和、稍稍提亮，颜色反而比外面更"实"。
-            half luma = dot(base.rgb, half3(0.2126, 0.7152, 0.0722));
-            base.rgb = mix(half3(luma), base.rgb, 1.16) * 0.995;
-            base.rgb = min(base.rgb, half3(1.0));
-
-            // 明暗回应不在这里做：着色器只负责光学（折射 + 提纯 + 色散），
-            // 玻璃对背后明暗的全部回应统一走 Compose 层的内辉光（见 drawInnerGlow）。
-            // 以前这里有一项"贴轮廓压暗内沿"，和辉光叠画会出现两套边界。
-
-            if (iDisperse <= 0.0) {
-                return base;
-            }
-            // 色散：蓝光偏折更多、红光更少。三通道各取一次，只在边缘强对比处露彩。
-            float2 dv = nrm * amt * iDisperse * 0.5;
-            return half4(
-                iBackdrop.eval(uv - dv).r,
-                base.g,
-                iBackdrop.eval(uv + dv).b,
-                base.a
-            );
-        }
-        """.trimIndent(),
-    )
-} catch (t: Throwable) {
-    // API < 33 抛 NoClassDefFoundError；AGSL 语法错误会抛 IllegalArgumentException。
-    // 两种情况都只是"这台设备做不了折射"，不该让界面挂掉 —— 降级成半透明面板，
-    // 少一层光学，但绝不能白屏。
-    null
-}
-
 private var shadowShaderCache: RuntimeShader? = null
 private var shadowShaderResolved = false
 
@@ -730,13 +699,6 @@ private fun compileShadowShader(): RuntimeShader? {
         null
     }
     return shadowShaderCache
-}
-
-/** 折射参数的默认值，集中在这里，方便整体调软/调硬。 */
-object RefractionDefaults {
-    fun bezel(density: Density): Float = with(density) { PopGlass.RefractBezel.toPx() }
-    fun depth(density: Density): Float = with(density) { PopGlass.RefractDepth.toPx() }
-    fun dispersion(density: Density): Float = PopGlass.DispersionAmount
 }
 
 /** 阴影参数的默认值。 */
